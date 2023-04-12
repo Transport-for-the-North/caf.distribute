@@ -19,7 +19,8 @@ from caf.toolkit import pandas_utils as pd_utils
 
 # Local Imports
 # pylint: disable=import-error,wrong-import-position
-
+from caf.toolkit import timing
+from caf.distribute import cost_functions
 # pylint: enable=import-error,wrong-import-position
 
 # # # CONSTANTS # # #
@@ -42,7 +43,7 @@ class GravityModelBase(abc.ABC):
 
     def __init__(
         self,
-        cost_function: cost.CostFunction,
+        cost_function: cost_functions.CostFunction,
         cost_matrix: np.ndarray,
         target_cost_distribution: pd.DataFrame,
         running_log_path: os.PathLike,
