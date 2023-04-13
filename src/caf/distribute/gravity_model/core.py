@@ -20,6 +20,8 @@ from caf.toolkit import pandas_utils as pd_utils
 # Local Imports
 # pylint: disable=import-error,wrong-import-position
 from caf.toolkit import timing
+from caf.toolkit import math_utils
+from caf.toolkit import cost_utils
 from caf.distribute import cost_functions
 # pylint: enable=import-error,wrong-import-position
 
