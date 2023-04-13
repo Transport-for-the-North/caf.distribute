@@ -12,6 +12,8 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from caf.toolkit import toolbox
+
 # Local Imports
 # pylint: disable=import-error,wrong-import-position
 from caf.distribute import furness
@@ -109,11 +111,11 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
 
         row_targets:
             The target values for the sum of each row.
-            i.e np.sum(seed_matrix, axis=1)
+            i.e. np.sum(seed_matrix, axis=1)
 
         col_targets:
             The target values for the sum of each column
-            i.e np.sum(seed_matrix, axis=0)
+            i.e. np.sum(seed_matrix, axis=0)
 
         ignore_result:
             Whether to ignore the return result or not. Useful when a Jacobian
@@ -174,7 +176,7 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
 
         estimate_init_params:
             Whether to ignore the given init_params and estimate new ones
-            using least squares, or just use the given init_params to start
+            using least-squares, or just use the given init_params to start
             with.
 
         calibrate_params:
@@ -211,7 +213,7 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
             considered a failure. Any convergence values less than or equal
             to this value will be considered a failure. If this is met,
             the gravity model will be re-ran with
-            `self.cost_function.default_params` to try get better performance
+            `self.cost_function.default_params` to try to get better performance
 
         verbose:
             Copied from scipy.optimize.least_squares documentation, where it
@@ -382,7 +384,7 @@ def gravity_model(row_targets: np.ndarray,
         cost parameters have been given.
     """
     # Validate additional arguments passed in
-    equal, extra, missing = du.compare_sets(
+    equal, extra, missing = toolbox.compare_sets(
         set(cost_params.keys()),
         set(cost_function.param_names),
     )
