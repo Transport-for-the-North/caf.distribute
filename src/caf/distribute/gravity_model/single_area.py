@@ -30,18 +30,19 @@ LOG = logging.getLogger(__name__)
 class SingleAreaGravityModelCalibrator(core.GravityModelBase):
     # TODO(BT): Write GravityModelCalibrator docs
 
-    def __init__(self,
-                 row_targets: np.ndarray,
-                 col_targets: np.ndarray,
-                 cost_function: cost_functions.CostFunction,
-                 cost_matrix: np.ndarray,
-                 target_cost_distribution: pd.DataFrame,
-                 target_convergence: float,
-                 furness_max_iters: int,
-                 furness_tol: float,
-                 running_log_path: os.PathLike,
-                 use_perceived_factors: bool = True,
-                 ):
+    def __init__(
+        self,
+        row_targets: np.ndarray,
+        col_targets: np.ndarray,
+        cost_function: cost_functions.CostFunction,
+        cost_matrix: np.ndarray,
+        target_cost_distribution: pd.DataFrame,
+        target_convergence: float,
+        furness_max_iters: int,
+        furness_tol: float,
+        running_log_path: os.PathLike,
+        use_perceived_factors: bool = True,
+    ):
         # TODO(BT): Write GravityModelCalibrator __init__ docs
         super().__init__(
             cost_function=cost_function,
@@ -59,9 +60,10 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
 
         self.target_convergence = target_convergence
 
-    def gravity_furness(self,
-                        seed_matrix: np.ndarray,
-                        ) -> tuple[np.ndarray, int, float]:
+    def gravity_furness(
+        self,
+        seed_matrix: np.ndarray,
+    ) -> tuple[np.ndarray, int, float]:
         """Runs a doubly constrained furness on the seed matrix
 
         Wrapper around furness.doubly_constrained_furness, using class
@@ -91,12 +93,13 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
             max_iters=self.furness_max_iters,
         )
 
-    def jacobian_furness(self,
-                         seed_matrices: dict[str, np.ndarray],
-                         row_targets: np.ndarray,
-                         col_targets: np.ndarray,
-                         ignore_result: bool = False,
-                         ) -> dict[str, np.ndarray]:
+    def jacobian_furness(
+        self,
+        seed_matrices: dict[str, np.ndarray],
+        row_targets: np.ndarray,
+        col_targets: np.ndarray,
+        ignore_result: bool = False,
+    ) -> dict[str, np.ndarray]:
         """Runs a doubly constrained furness on the seed matrix
 
         Wrapper around furness.doubly_constrained_furness, to be used when
@@ -145,17 +148,18 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
 
         return return_dict
 
-    def calibrate(self,
-                  init_params: dict[str, Any],
-                  estimate_init_params: bool = False,
-                  calibrate_params: bool = True,
-                  diff_step: float = 1e-8,
-                  ftol: float = 1e-4,
-                  xtol: float = 1e-4,
-                  grav_max_iters: int = 100,
-                  failure_tol: float = 0,
-                  verbose: int = 0,
-                  ) -> dict[str, Any]:
+    def calibrate(
+        self,
+        init_params: dict[str, Any],
+        estimate_init_params: bool = False,
+        calibrate_params: bool = True,
+        diff_step: float = 1e-8,
+        ftol: float = 1e-4,
+        xtol: float = 1e-4,
+        grav_max_iters: int = 100,
+        failure_tol: float = 0,
+        verbose: int = 0,
+    ) -> dict[str, Any]:
         """Finds the optimal parameters for self.cost_function
 
         Optimal parameters are found using `scipy.optimize.least_squares`
@@ -278,12 +282,11 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
         # Warn if the lower limit hasn't been reached
         if self.achieved_convergence < lower_limit:
             warnings.warn(
-                "Calibration was not able to reach the lower threshold "
-                "required to use perceived factors.\n"
-                "Target convergence: %s\n"
-                "Upper Limit: %s\n"
-                "Achieved convergence: %s"
-                % (self.target_convergence, upper_limit, self.achieved_convergence)
+                f"Calibration was not able to reach the lower threshold "
+                f"required to use perceived factors.\n"
+                f"Target convergence: {self.target_convergence}\n"
+                f"Upper Limit: {upper_limit}\n"
+                f"Achieved convergence: {self.achieved_convergence}"
             )
             return self.optimal_cost_params
 
@@ -303,25 +306,25 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
 
         if self.achieved_convergence < self.target_convergence:
             warnings.warn(
-                "Calibration with perceived factors was not able to reach the "
-                "target_convergence.\n"
-                "Target convergence: %s\n"
-                "Achieved convergence: %s"
-                % (self.target_convergence, self.achieved_convergence)
+                f"Calibration with perceived factors was not able to reach "
+                f"the target_convergence.\n"
+                f"Target convergence: {self.target_convergence}\n"
+                f"Achieved convergence: {self.achieved_convergence}"
             )
 
         return self.optimal_cost_params
 
 
 # # # FUNCTIONS # # #
-def gravity_model(row_targets: np.ndarray,
-                  col_targets: np.ndarray,
-                  cost_function: cost_functions.CostFunction,
-                  costs: np.ndarray,
-                  furness_max_iters: int,
-                  furness_tol: float,
-                  **cost_params
-                  ):
+def gravity_model(
+    row_targets: np.ndarray,
+    col_targets: np.ndarray,
+    cost_function: cost_functions.CostFunction,
+    costs: np.ndarray,
+    furness_max_iters: int,
+    furness_tol: float,
+    **cost_params,
+):
     """
     Runs a gravity model and returns the distributed row/col targets
 
@@ -391,10 +394,9 @@ def gravity_model(row_targets: np.ndarray,
 
     if not equal:
         raise TypeError(
-            "gravity_model() got one or more unexpected keyword arguments.\n"
-            "Received the following extra arguments: %s\n"
-            "While missing arguments: %s"
-            % (extra, missing)
+            f"gravity_model() got one or more unexpected keyword arguments.\n"
+            f"Received the following extra arguments: {extra}\n"
+            f"While missing arguments: {missing}"
         )
 
     # Calculate initial matrix through cost function

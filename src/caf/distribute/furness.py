@@ -23,6 +23,7 @@ LOG = logging.getLogger(__name__)
 # # # FUNCTIONS # # #
 # TODO(BT): Add a pandas wrapper to doubly_constrained_furness()
 
+
 def doubly_constrained_furness(
     seed_vals: np.ndarray,
     row_targets: np.ndarray,
@@ -76,9 +77,9 @@ def doubly_constrained_furness(
     # Error check
     if seed_vals.shape != (len(row_targets), len(col_targets)):
         raise ValueError(
-            "The shape of the seed values given does not match the row "
-            "and col targets. Seed_vals are shape %s. Expected shape (%d, %d)."
-            % (str(seed_vals.shape), len(row_targets), len(col_targets))
+            f"The shape of the seed values given does not match the row and "
+            f"col targets. Seed_vals are shape {str(seed_vals.shape)}. "
+            f"Expected shape ({len(row_targets):d}, {len(col_targets):d})."
         )
 
     # Init
