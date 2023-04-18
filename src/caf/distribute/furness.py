@@ -82,8 +82,13 @@ def doubly_constrained_furness(
             f"Expected shape ({len(row_targets):d}, {len(col_targets):d})."
         )
 
-    # Init
+    # Need to ensure furnessed mat is floating to avoid numpy casting
+    # errors in loop
     furnessed_mat = seed_vals.copy()
+    if np.issubdtype(furnessed_mat.dtype, np.integer):
+        furnessed_mat = furnessed_mat.astype(float)
+
+    # Init loop
     early_exit = False
     cur_rmse = np.inf
     iter_num = 0
