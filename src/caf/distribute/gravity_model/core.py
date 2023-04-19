@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
-"""
-"""
+"""Core abstract functionality for gravity model classes to build on."""
 # Built-Ins
 import os
 import abc
@@ -39,6 +38,7 @@ class GravityModelBase(abc.ABC):
     Contains any shared functionality needed across gravity model
     implementations.
     """
+    # pylint: disable=too-many-instance-attributes
 
     # Class constants
     _avg_cost_col = "ave_km"  # Should be more generic
@@ -63,14 +63,15 @@ class GravityModelBase(abc.ABC):
             dir_name, _ = os.path.split(running_log_path)
             if not os.path.exists(dir_name):
                 raise FileNotFoundError(
-                    "Cannot find the defined directory to write out a"
-                    "log. Given the following path: %s" % dir_name
+                    f"Cannot find the defined directory to write out a log. "
+                    f"Given the following path: {dir_name}"
                 )
 
             if os.path.isfile(running_log_path):
                 warnings.warn(
-                    "Given a log path to a file that already exists. Logs "
-                    "will be appended to the end of the file at: %s" % running_log_path
+                    f"Given a log path to a file that already exists. "
+                    f"Logs will be appended to the end of the file at: "
+                    f"{running_log_path}"
                 )
 
         # Set attributes
@@ -136,9 +137,9 @@ class GravityModelBase(abc.ABC):
         """Converts a list or args into kwargs that self.cost_function expects"""
         if len(args) != len(self.cost_function.kw_order):
             raise ValueError(
-                "Received the wrong number of args to convert to cost function "
-                "kwargs. Expected %s args, but got %s."
-                % (len(self.cost_function.kw_order), len(args))
+                f"Received the wrong number of args to convert to cost "
+                f"function kwargs. Expected {len(self.cost_function.kw_order)} "
+                f"args, but got {len(args)}."
             )
 
         return dict(zip(self.cost_function.kw_order, args))
@@ -511,9 +512,10 @@ class GravityModelBase(abc.ABC):
             if result is not None and failed:
                 LOG.info(
                     "Performance wasn't great with the given `init_params`. "
-                    f"Achieved '{self.achieved_convergence}', and the `failure_tol` "
-                    f"is set to {failure_tol}. Trying again with the "
-                    f"`default_params`"
+                    "Achieved '%s', and the `failure_tol` "
+                    "is set to %s. Trying again with the "
+                    "`default_params`"
+                    % (self.achieved_convergence, failure_tol)
                 )
 
             if result is None:

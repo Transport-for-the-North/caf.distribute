@@ -74,6 +74,7 @@ def doubly_constrained_furness(
     achieved_rmse:
         The Root Mean Squared Error difference achieved before exiting
     """
+    # pylint: disable=too-many-locals
     # Error check
     if seed_vals.shape != (len(row_targets), len(col_targets)):
         raise ValueError(

@@ -44,6 +44,7 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
         use_perceived_factors: bool = True,
     ):
         # TODO(BT): Write GravityModelCalibrator __init__ docs
+        # pylint: disable=too-many-arguments
         super().__init__(
             cost_function=cost_function,
             cost_matrix=cost_matrix,

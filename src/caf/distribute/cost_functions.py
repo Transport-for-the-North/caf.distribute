@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
-"""
-"""
+"""Collection of cost functions to be used with distribution models."""
+from __future__ import annotations
+
 # Built-Ins
 import enum
 import inspect
@@ -14,7 +15,7 @@ import numpy as np
 
 # Local Imports
 # pylint: disable=import-error,wrong-import-position
-
+from caf.toolkit import math_utils
 # pylint: enable=import-error,wrong-import-position
 
 # # # CONSTANTS # # #
@@ -24,10 +25,12 @@ LOG = logging.getLogger(__name__)
 # # # CLASSES # # #
 @enum.unique
 class BuiltInCostFunction(enum.Enum):
+    """Enum of the built-in cost functions for easy access"""
     TANNER = "tanner"
     LOG_NORMAL = "log_normal"
 
-    def get_cost_function(self):
+    def get_cost_function(self) -> CostFunction:
+        """Get the Class defining this cost function"""
         if self == BuiltInCostFunction.TANNER:
             params = {"alpha": [-5, 5], "beta": [-5, 5]}
             default = {"alpha": 1, "beta": 1}
@@ -39,7 +42,7 @@ class BuiltInCostFunction(enum.Enum):
             function = log_normal
 
         else:
-            raise ValueError("No definition exists for %s built in cost function" % self)
+            raise ValueError(f"No definition exists for {self} built in cost function")
 
         return CostFunction(
             name=self.name,
@@ -84,13 +87,14 @@ class CostFunction:
         # Validate the params and cost function
         try:
             self.function(np.array(1e-2), **self.param_max)
-        except TypeError:
+        except TypeError as exc:
             raise ValueError(
-                "Received a TypeError while testing the given params "
-                "definition and cost function will work together. Have the "
-                "params been defined correctly for the given function?\n"
-                "Tried passing in '%s' to function %s." % (self.param_names, self.function)
-            )
+                f"Received a TypeError while testing the given params "
+                f"definition and cost function will work together. Have the "
+                f"params been defined correctly for the given function?\n"
+                f"Tried passing in '{self.param_names}' to function "
+                f"{self.function}."
+            ) from exc
 
     @property
     def parameter_names(self):
@@ -124,8 +128,8 @@ class CostFunction:
             # Check name is valid
             if name not in self.param_names:
                 raise ValueError(
-                    "Parameter '%s' is not a valid parameter for "
-                    "CostFunction %s" % (name, self.name)
+                    f"Parameter '{name}' is not a valid parameter for "
+                    f"CostFunction {self.name}"
                 )
 
             # Check values are valid
@@ -134,9 +138,9 @@ class CostFunction:
 
             if value < min_val or value > max_val:
                 raise ValueError(
-                    "Parameter '%s' falls outside the acceptable range of "
-                    "values. Value must be between %s and %s. Got %s."
-                    % (name, min_val, max_val, value)
+                    f"Parameter '{name}' falls outside the acceptable range "
+                    f"of values. Value must be between {min_val} and "
+                    f"{max_val}. Got {value}."
                 )
 
             if value > self.param_max[name]:
