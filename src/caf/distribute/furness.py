@@ -82,6 +82,9 @@ def doubly_constrained_furness(
             f"Expected shape ({len(row_targets):d}, {len(col_targets):d})."
         )
 
+    if np.any(np.isnan(row_targets)) or np.any(np.isnan(col_targets)):
+        raise ValueError("np.nan found in the targets. Cannot run.")
+
     # Need to ensure furnessed mat is floating to avoid numpy casting
     # errors in loop
     furnessed_mat = seed_vals.copy()
@@ -97,7 +100,7 @@ def doubly_constrained_furness(
     # Can return early if all 0 - probably shouldn't happen!
     if row_targets.sum() == 0 or col_targets.sum() == 0:
         warnings.warn("Furness given targets of 0. Returning all 0's")
-        return np.zeros(seed_vals.shape), iter_num, cur_rmse
+        return np.zeros_like(seed_vals), iter_num, np.inf
 
     # Set up numpy overflow errors
     with np.errstate(over="raise"):
@@ -138,12 +141,16 @@ def doubly_constrained_furness(
 
             # We got a NaN! Make sure to point out we didn't converge
             if np.isnan(cur_rmse):
+                warnings.warn(
+                    "np.nan value found in the rmse calculation. It must have "
+                    "been introduced during the furness process."
+                )
                 return np.zeros(furnessed_mat.shape), iter_num, np.inf
 
     # Warn the user if we exhausted our number of loops
     if not early_exit and warning:
-        print(
-            f"WARNING! The doubly constrained furness exhausted its max "
+        warnings.warn(
+            f"The doubly constrained furness exhausted its max "
             f"number of loops ({max_iters:d}), while achieving an RMSE "
             f"difference of {cur_rmse:f}. The values returned may not be "
             f"accurate."
