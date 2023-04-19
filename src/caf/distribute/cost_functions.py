@@ -16,6 +16,7 @@ import numpy as np
 # Local Imports
 # pylint: disable=import-error,wrong-import-position
 from caf.toolkit import math_utils
+
 # pylint: enable=import-error,wrong-import-position
 
 # # # CONSTANTS # # #
@@ -26,6 +27,7 @@ LOG = logging.getLogger(__name__)
 @enum.unique
 class BuiltInCostFunction(enum.Enum):
     """Enum of the built-in cost functions for easy access"""
+
     TANNER = "tanner"
     LOG_NORMAL = "log_normal"
 
