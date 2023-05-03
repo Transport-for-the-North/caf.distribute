@@ -51,7 +51,11 @@ class DoubleFurnessResults:
         }
 
     def check_results(
-        self, furness_mat: np.ndarray, iter_num: int, rmse: float, ignore_rmse: bool = False
+        self,
+        furness_mat: np.ndarray,
+        iter_num: int,
+        rmse: float,
+        ignore_rmse: bool = False,
     ):
         """Assert the returned results"""
         np.testing.assert_almost_equal(furness_mat, self.furness_mat)

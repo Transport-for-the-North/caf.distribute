@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
-"""
-"""
+"""Implementation of a self-calibrating single area gravity model."""
 # Built-Ins
 import os
 import logging
 import warnings
 
 from typing import Any
+from typing import Optional
 
 # Third Party
 import numpy as np
@@ -28,7 +28,7 @@ LOG = logging.getLogger(__name__)
 
 # # # CLASSES # # #
 class SingleAreaGravityModelCalibrator(core.GravityModelBase):
-    # TODO(BT): Write GravityModelCalibrator docs
+    """A self-calibrating single area gravity model."""
 
     def __init__(
         self,
@@ -37,13 +37,27 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
         cost_function: cost_functions.CostFunction,
         cost_matrix: np.ndarray,
         target_cost_distribution: pd.DataFrame,
-        target_convergence: float,
+        target_convergence: float,      # TLD convergence?
         furness_max_iters: int,
         furness_tol: float,
         running_log_path: os.PathLike,
         use_perceived_factors: bool = True,
     ):
-        # TODO(BT): Write GravityModelCalibrator __init__ docs
+        """
+        Parameters
+        ----------
+        row_targets:
+
+        col_targets
+        cost_function
+        cost_matrix
+        target_cost_distribution
+        target_convergence
+        furness_max_iters
+        furness_tol
+        running_log_path
+        use_perceived_factors
+        """
         # pylint: disable=too-many-arguments
         super().__init__(
             cost_function=cost_function,
@@ -151,7 +165,7 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
 
     def calibrate(
         self,
-        init_params: dict[str, Any],
+        init_params: Optional[dict[str, Any]] = None,
         estimate_init_params: bool = False,
         calibrate_params: bool = True,
         diff_step: float = 1e-8,
@@ -247,6 +261,8 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
         scipy.optimize.least_squares
         """
         # Validate init_params
+        if init_params is None:
+            init_params = self.cost_function.default_params
         self.cost_function.validate_params(init_params)
 
         # Estimate what the initial params should be

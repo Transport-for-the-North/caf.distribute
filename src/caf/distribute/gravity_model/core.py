@@ -32,8 +32,7 @@ LOG = logging.getLogger(__name__)
 
 # # # CLASSES # # #
 class GravityModelBase(abc.ABC):
-    """
-    Base Class for gravity models.
+    """Base Class for gravity models.
 
     Contains any shared functionality needed across gravity model
     implementations.
@@ -301,6 +300,7 @@ class GravityModelBase(abc.ABC):
             self.achieved_distribution
             self.optimal_cost_params
         """
+        # pylint: disable=too-many-locals
         # Convert the cost function args back into kwargs
         cost_kwargs = self._cost_params_to_kwargs(cost_args)
 
@@ -401,6 +401,7 @@ class GravityModelBase(abc.ABC):
 
         Used by the `optimize.least_squares` function.
         """
+        # pylint: disable=too-many-locals
         # Initialise the output
         n_bands = len(self.target_cost_distribution["band_share"].values)
         n_cost_params = len(cost_args)
@@ -457,6 +458,7 @@ class GravityModelBase(abc.ABC):
 
         return jacobian
 
+    # calibrate_cost_params
     def _calibrate(
         self,
         init_params: dict[str, Any],
@@ -468,7 +470,7 @@ class GravityModelBase(abc.ABC):
         failure_tol: float = 0,
         verbose: int = 0,
     ) -> None:
-        """Internal function of calibrate.
+        """Calibrate the cost parameters to the optimum values.
 
         Runs the gravity model, and calibrates the optimal cost parameters
         if calibrate params is set to True. Will do a final run of the
@@ -515,7 +517,8 @@ class GravityModelBase(abc.ABC):
                     "Performance wasn't great with the given `init_params`. "
                     "Achieved '%s', and the `failure_tol` "
                     "is set to %s. Trying again with the "
-                    "`default_params`" % (self.achieved_convergence, failure_tol)
+                    "`default_params`"
+                    % (self.achieved_convergence, failure_tol)
                 )
 
             if result is None:
