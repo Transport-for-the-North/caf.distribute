@@ -84,7 +84,9 @@ class CostFunction:
         self.default_params = {k: default_params.get(k, def_val) for k in self.param_names}
 
         self.kw_order = list(inspect.signature(self.function).parameters.keys())[1:]
-        self.kw_order.remove("min_return_val")
+        for val in ["max_return_val", "min_return_val"]:
+            if val in self.kw_order:
+                self.kw_order.remove(val)
 
         # Validate the params and cost function
         try:
@@ -186,6 +188,7 @@ def tanner(
     alpha: float,
     beta: float,
     min_return_val: float = 1e-150,
+    max_return_val: float = 1e100,
 ) -> np.ndarray:
     r"""Implementation of the tanner cost function.
 
@@ -200,6 +203,10 @@ def tanner(
     min_return_val: float
         The minimum value allowed in the return. Avoid return arrays with values
         such as 1e-300 which lead to overflow errors when divisions are made.
+
+    max_return_val: float
+        The maximum value allowed in the return. Avoid return arrays with values
+        such as np.inf which lead to errors.
 
     Returns
     -------
@@ -230,7 +237,8 @@ def tanner(
     exp = np.exp(beta * base_cost)
 
     # Clip the min values to the min_val
-    return math_utils.clip_small_non_zero(power * exp, min_return_val)
+    arr = math_utils.clip_small_non_zero(power * exp, min_return_val)
+    return np.minimum(arr, max_return_val)
 
 
 def log_normal(
