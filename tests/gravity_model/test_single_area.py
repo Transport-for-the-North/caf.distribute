@@ -214,6 +214,18 @@ def simple_gm_calib_results(tmp_path, cost_function) -> GMCalibrateResults:
     )
 
 
+def real_gm_calib_results(tmp_path, cost_function) -> GMCalibrateResults:
+    """Load in the real world test"""
+    running_log_path = tmp_path / "run_log.log"
+    running_log_path.touch()
+    data_path = TEST_DATA_PATH / "realistic"
+    return GMCalibrateResults.from_file(
+        path=data_path,
+        running_log_path=running_log_path,
+        cost_function=cost_function,
+    )
+
+
 def simple_gm_run_results(tmp_path, cost_function) -> GMRunResults:
     """Load in the small_and_simple test"""
     running_log_path = tmp_path / "run_log.log"
@@ -229,8 +241,10 @@ def simple_gm_run_results(tmp_path, cost_function) -> GMRunResults:
 @pytest.fixture(name="simple_log_normal_calib")
 def fixture_simple_log_normal_calib(tmp_path) -> GMCalibrateResults:
     """Load in the small_and_simple log normal test"""
+    path = tmp_path / "simple_log_normal_calib"
+    path.mkdir()
     return simple_gm_calib_results(
-        tmp_path=tmp_path,
+        tmp_path=path,
         cost_function=cost_functions.BuiltInCostFunction.LOG_NORMAL.get_cost_function(),
     )
 
@@ -238,8 +252,10 @@ def fixture_simple_log_normal_calib(tmp_path) -> GMCalibrateResults:
 @pytest.fixture(name="simple_tanner_calib")
 def fixture_simple_tanner_calib(tmp_path) -> GMCalibrateResults:
     """Load in the small_and_simple log normal test"""
+    path = tmp_path / "simple_tanner_calib"
+    path.mkdir()
     return simple_gm_calib_results(
-        tmp_path=tmp_path,
+        tmp_path=path,
         cost_function=cost_functions.BuiltInCostFunction.TANNER.get_cost_function(),
     )
 
@@ -247,8 +263,10 @@ def fixture_simple_tanner_calib(tmp_path) -> GMCalibrateResults:
 @pytest.fixture(name="simple_log_normal_run")
 def fixture_simple_log_normal_run(tmp_path) -> GMRunResults:
     """Load in the small_and_simple log normal test"""
+    path = tmp_path / "simple_log_normal_run"
+    path.mkdir()
     return simple_gm_run_results(
-        tmp_path=tmp_path,
+        tmp_path=path,
         cost_function=cost_functions.BuiltInCostFunction.LOG_NORMAL.get_cost_function(),
     )
 
@@ -256,16 +274,29 @@ def fixture_simple_log_normal_run(tmp_path) -> GMRunResults:
 @pytest.fixture(name="simple_tanner_run")
 def fixture_simple_tanner_run(tmp_path) -> GMRunResults:
     """Load in the small_and_simple log normal test"""
+    path = tmp_path / "simple_tanner_run"
+    path.mkdir()
     return simple_gm_run_results(
-        tmp_path=tmp_path,
+        tmp_path=path,
         cost_function=cost_functions.BuiltInCostFunction.TANNER.get_cost_function(),
+    )
+
+
+@pytest.fixture(name="real_log_normal_calib")
+def fixture_real_log_normal_calib(tmp_path) -> GMCalibrateResults:
+    """Load in the realistic log normal test"""
+    path = tmp_path / "real_log_normal_calib"
+    path.mkdir()
+    return real_gm_calib_results(
+        tmp_path=path,
+        cost_function=cost_functions.BuiltInCostFunction.LOG_NORMAL.get_cost_function(),
     )
 
 
 # # # TESTS # # #
 @pytest.mark.usefixtures("simple_log_normal_calib", "simple_log_normal_run")
-class TestSingleAreaGravityModelCalibratorLogNormal:
-    """Tests the single area gravity model class"""
+class TestSimpleLogNormal:
+    """Tests the log normal calibrator with a simple example"""
 
     def test_correct_calibrate(self, simple_log_normal_calib: GMCalibrateResults):
         """Test that the gravity model correctly calibrates."""
@@ -297,8 +328,8 @@ class TestSingleAreaGravityModelCalibratorLogNormal:
 
 
 @pytest.mark.usefixtures("simple_tanner_calib", "simple_tanner_run")
-class TestSingleAreaGravityModelCalibratorTanner:
-    """Tests the single area gravity model class"""
+class TestSimpleTanner:
+    """Tests the tanner calibrator with a simple example"""
 
     def test_correct_calibrate(self, simple_tanner_calib: GMCalibrateResults):
         """Test that the gravity model correctly calibrates."""
@@ -315,6 +346,20 @@ class TestSingleAreaGravityModelCalibratorTanner:
         best_params = simple_tanner_run.get_optimal_params()
         best_params = gm.calibrate(init_params=best_params, calibrate_params=False)
         simple_tanner_run.assert_results(
+            best_params=best_params,
+            calibrated_gm=gm,
+        )
+
+
+@pytest.mark.usefixtures("real_log_normal_calib")
+class TestRealLogNormal:
+    """Test the log normal calibrator with real world data."""
+
+    def test_correct_calibrate(self, real_log_normal_calib: GMCalibrateResults):
+        """Test that the gravity model correctly calibrates."""
+        gm = real_log_normal_calib.create_gravity_model()
+        best_params = gm.calibrate()
+        real_log_normal_calib.assert_results(
             best_params=best_params,
             calibrated_gm=gm,
         )
