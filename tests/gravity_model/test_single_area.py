@@ -181,12 +181,8 @@ class GMRunResults(GMCalibrateResults):
         cost_function: cost_functions.CostFunction,
     ) -> GMCreator:
         """Load data from files to create this test"""
-        calib_path = path / cost_function.name / "run"
-        print("@"*50)
-        print(calib_path)
         import os
-        print(os.getcwd())
-        print("@"*50)
+        calib_path = pathlib.Path(os.getcwd()) / cost_function.name / "run"
         return GMRunResults(
             row_targets=GMCalibrateResults._read_row_targets(path),
             col_targets=GMCalibrateResults._read_col_targets(path),
