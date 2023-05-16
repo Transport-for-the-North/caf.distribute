@@ -130,7 +130,7 @@ class GMCalibrateResults(GMCreator):
         cost_function: cost_functions.CostFunction,
     ) -> GMCreator:
         """Load data from files to create this test"""
-        calib_path = path / cost_function.name / "calibrate"
+        calib_path = path / cost_function.name.lower() / "calibrate"
         return GMCalibrateResults(
             row_targets=GMCalibrateResults._read_row_targets(path),
             col_targets=GMCalibrateResults._read_col_targets(path),
@@ -181,7 +181,7 @@ class GMRunResults(GMCalibrateResults):
         cost_function: cost_functions.CostFunction,
     ) -> GMCreator:
         """Load data from files to create this test"""
-        calib_path = path / cost_function.name / "run"
+        calib_path = path / cost_function.name.lower() / "run"
         return GMRunResults(
             row_targets=GMCalibrateResults._read_row_targets(path),
             col_targets=GMCalibrateResults._read_col_targets(path),
