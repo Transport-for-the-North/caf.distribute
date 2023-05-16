@@ -166,9 +166,39 @@ class GMCalibrateResults(GMCreator):
         np.testing.assert_allclose(calibrated_gm.achieved_distribution, self.distribution, rtol=1e-4)
 
 
+@dataclasses.dataclass
+class GMRunResults(GMCalibrateResults):
+    """Stores the expected results alongside the inputs for run"""
+
+    @staticmethod
+    def from_file(
+        path: pathlib.Path,
+        running_log_path: os.PathLike,
+        cost_function: cost_functions.CostFunction,
+    ) -> GMCreator:
+        """Load data from files to create this test"""
+        calib_path = path / cost_function.name / "run"
+        return GMRunResults(
+            row_targets=GMCalibrateResults._read_row_targets(path),
+            col_targets=GMCalibrateResults._read_col_targets(path),
+            cost_matrix=GMCalibrateResults._read_cost_matrix(path),
+            target_cost_distribution=GMCalibrateResults._read_cost_distribution(path),
+            cost_function=cost_function,
+            running_log_path=running_log_path,
+            convergence=GMCalibrateResults._read_convergence(calib_path),
+            band_share=GMCalibrateResults._read_band_share(calib_path),
+            distribution=GMCalibrateResults._read_distribution(calib_path),
+            residuals=GMCalibrateResults._read_residuals(calib_path),
+            best_params=GMCalibrateResults._read_best_params(calib_path),
+        )
+
+    def get_optimal_params(self) -> dict[str, Any]:
+        """Get the optimal parameters from disk"""
+        return self.best_params
+
+
 # # # FIXTURES # # #
-@pytest.fixture(name="simple_gm_results")
-def fixture_simple_gm_results(tmp_path, request) -> GMCalibrateResults:
+def simple_gm_calib_results(tmp_path, cost_function) -> GMCalibrateResults:
     """Load in the small_and_simple test"""
     running_log_path = tmp_path / "run_log.log"
     running_log_path.touch()
@@ -176,40 +206,81 @@ def fixture_simple_gm_results(tmp_path, request) -> GMCalibrateResults:
     return GMCalibrateResults.from_file(
         path=data_path,
         running_log_path=running_log_path,
-        cost_function=request.param,
+        cost_function=cost_function,
+    )
+
+
+def simple_gm_run_results(tmp_path, cost_function) -> GMRunResults:
+    """Load in the small_and_simple test"""
+    running_log_path = tmp_path / "run_log.log"
+    running_log_path.touch()
+    data_path = TEST_DATA_PATH / "small_and_simple"
+    return GMRunResults.from_file(
+        path=data_path,
+        running_log_path=running_log_path,
+        cost_function=cost_function,
+    )
+
+
+@pytest.fixture(name="simple_log_normal_calib")
+def fixture_simple_log_normal_calib(tmp_path) -> GMCalibrateResults:
+    """Load in the small_and_simple log normal test"""
+    return simple_gm_calib_results(
+        tmp_path=tmp_path,
+        cost_function=cost_functions.BuiltInCostFunction.LOG_NORMAL.get_cost_function(),
+    )
+
+
+@pytest.fixture(name="simple_tanner_calib")
+def fixture_simple_tanner_calib(tmp_path) -> GMCalibrateResults:
+    """Load in the small_and_simple log normal test"""
+    return simple_gm_calib_results(
+        tmp_path=tmp_path,
+        cost_function=cost_functions.BuiltInCostFunction.TANNER.get_cost_function(),
+    )
+
+
+@pytest.fixture(name="simple_log_normal_run")
+def fixture_simple_log_normal_run(tmp_path) -> GMRunResults:
+    """Load in the small_and_simple log normal test"""
+    return simple_gm_run_results(
+        tmp_path=tmp_path,
+        cost_function=cost_functions.BuiltInCostFunction.LOG_NORMAL.get_cost_function(),
+    )
+
+
+@pytest.fixture(name="simple_tanner_run")
+def fixture_simple_tanner_run(tmp_path) -> GMRunResults:
+    """Load in the small_and_simple log normal test"""
+    return simple_gm_run_results(
+        tmp_path=tmp_path,
+        cost_function=cost_functions.BuiltInCostFunction.TANNER.get_cost_function(),
     )
 
 
 # # # TESTS # # #
-@pytest.mark.usefixtures("simple_gm_results")
-class TestSingleAreaGravityModelCalibrator:
+@pytest.mark.usefixtures("simple_log_normal_calib", "simple_log_normal_run")
+class TestSingleAreaGravityModelCalibratorLogNormal:
     """Tests the single area gravity model class"""
 
-    @pytest.mark.parametrize(
-        "simple_gm_results",
-        [
-            cost_functions.BuiltInCostFunction.LOG_NORMAL.get_cost_function(),
-            cost_functions.BuiltInCostFunction.TANNER.get_cost_function(),
-        ],
-        indirect=True,
-    )
-    def test_correct_calibrate(self, simple_gm_results: GMCalibrateResults):
+    def test_correct_calibrate(self, simple_log_normal_calib: GMCalibrateResults):
         """Test that the gravity model correctly calibrates."""
-        gm = simple_gm_results.create_gravity_model()
+        gm = simple_log_normal_calib.create_gravity_model()
         best_params = gm.calibrate()
-        simple_gm_results.assert_results(
+        simple_log_normal_calib.assert_results(
             best_params=best_params,
             calibrated_gm=gm,
         )
 
-    def test_correct_run(self):
+    def test_correct_run(self, simple_log_normal_run: GMRunResults):
         """Test that the gravity model correctly runs."""
-        # Use cost function as a param
-
-        # Make GM
-        # Run
-        # Assert
-        pass
+        gm = simple_log_normal_run.create_gravity_model()
+        best_params = simple_log_normal_run.get_optimal_params()
+        best_params = gm.calibrate(init_params=best_params, calibrate_params=False)
+        simple_log_normal_run.assert_results(
+            best_params=best_params,
+            calibrated_gm=gm,
+        )
 
     def test_correct_perceived(self):
         """Test that the gravity model correctly calibrates with perceived factors."""
@@ -219,3 +290,27 @@ class TestSingleAreaGravityModelCalibrator:
         # Run
         # Assert
         pass
+
+
+@pytest.mark.usefixtures("simple_tanner_calib", "simple_tanner_run")
+class TestSingleAreaGravityModelCalibratorLogNormal:
+    """Tests the single area gravity model class"""
+
+    def test_correct_calibrate(self, simple_tanner_calib: GMCalibrateResults):
+        """Test that the gravity model correctly calibrates."""
+        gm = simple_tanner_calib.create_gravity_model()
+        best_params = gm.calibrate()
+        simple_tanner_calib.assert_results(
+            best_params=best_params,
+            calibrated_gm=gm,
+        )
+
+    def test_correct_run(self, simple_tanner_run: GMRunResults):
+        """Test that the gravity model correctly runs."""
+        gm = simple_tanner_run.create_gravity_model()
+        best_params = simple_tanner_run.get_optimal_params()
+        best_params = gm.calibrate(init_params=best_params, calibrate_params=False)
+        simple_tanner_run.assert_results(
+            best_params=best_params,
+            calibrated_gm=gm,
+        )
