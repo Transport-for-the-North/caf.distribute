@@ -24,7 +24,7 @@ from caf.distribute.gravity_model import SingleAreaGravityModelCalibrator
 # pylint: enable=import-error,wrong-import-position
 
 # # # CONSTANTS # # #
-TEST_DATA_PATH = pathlib.Path("data")
+TEST_DATA_PATH = pathlib.Path(__file__).parent.resolve() / "data"
 
 
 # # # Classes # # #
