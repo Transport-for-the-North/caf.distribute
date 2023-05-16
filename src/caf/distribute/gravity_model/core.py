@@ -517,8 +517,7 @@ class GravityModelBase(abc.ABC):
                     "Performance wasn't great with the given `init_params`. "
                     "Achieved '%s', and the `failure_tol` "
                     "is set to %s. Trying again with the "
-                    "`default_params`"
-                    % (self.achieved_convergence, failure_tol)
+                    "`default_params`" % (self.achieved_convergence, failure_tol)
                 )
 
             if result is None:

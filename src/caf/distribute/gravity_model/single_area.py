@@ -37,7 +37,7 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
         cost_function: cost_functions.CostFunction,
         cost_matrix: np.ndarray,
         target_cost_distribution: pd.DataFrame,
-        target_convergence: float,      # TLD convergence?
+        target_convergence: float,  # TLD convergence?
         furness_max_iters: int,
         furness_tol: float,
         running_log_path: os.PathLike,

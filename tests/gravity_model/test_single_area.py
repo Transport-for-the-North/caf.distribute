@@ -161,9 +161,13 @@ class GMCalibrateResults(GMCreator):
         )
 
         # Check the matrices
-        np.testing.assert_allclose(calibrated_gm.achieved_band_share, self.band_share, rtol=1e-4)
+        np.testing.assert_allclose(
+            calibrated_gm.achieved_band_share, self.band_share, rtol=1e-4
+        )
         np.testing.assert_allclose(calibrated_gm.achieved_residuals, self.residuals, rtol=1e-4)
-        np.testing.assert_allclose(calibrated_gm.achieved_distribution, self.distribution, rtol=1e-4)
+        np.testing.assert_allclose(
+            calibrated_gm.achieved_distribution, self.distribution, rtol=1e-4
+        )
 
 
 @dataclasses.dataclass
