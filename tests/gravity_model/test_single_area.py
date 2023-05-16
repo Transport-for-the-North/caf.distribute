@@ -297,7 +297,7 @@ class TestSingleAreaGravityModelCalibratorLogNormal:
 
 
 @pytest.mark.usefixtures("simple_tanner_calib", "simple_tanner_run")
-class TestSingleAreaGravityModelCalibratorLogNormal:
+class TestSingleAreaGravityModelCalibratorTanner:
     """Tests the single area gravity model class"""
 
     def test_correct_calibrate(self, simple_tanner_calib: GMCalibrateResults):
