@@ -236,9 +236,13 @@ class TestDoublyConstrainedFurness:
         if warn:
             msg = "furness exhausted its max number of loops"
             with pytest.warns(UserWarning, match=msg):
-                results = furness.doubly_constrained_furness(**furness_results.input_kwargs())
+                results = furness.doubly_constrained_furness(
+                    **furness_results.input_kwargs() | {"warning": warn}
+                )
         else:
-            results = furness.doubly_constrained_furness(**furness_results.input_kwargs())
+            results = furness.doubly_constrained_furness(
+                **furness_results.input_kwargs() | {"warning": warn}
+            )
         furness_results.check_results(*results, ignore_rmse=True)
 
     def test_zero_target_warning(self, zero_target_furness: DoubleFurnessResults):
