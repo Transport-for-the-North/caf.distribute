@@ -171,6 +171,33 @@ class GMCalibrateResults(GMCreator):
 
 
 @dataclasses.dataclass
+class GMCalibratePerceivedResults(GMCalibrateResults):
+    """Stores the expected results alongside the inputs for calibration"""
+
+    @staticmethod
+    def from_file(
+        path: pathlib.Path,
+        running_log_path: os.PathLike,
+        cost_function: cost_functions.CostFunction,
+    ) -> GMCreator:
+        """Load data from files to create this test"""
+        calib_path = path / cost_function.name.lower() / "calibrate_perceived"
+        return GMCalibrateResults(
+            row_targets=GMCalibrateResults._read_row_targets(path),
+            col_targets=GMCalibrateResults._read_col_targets(path),
+            cost_matrix=GMCalibrateResults._read_cost_matrix(path),
+            target_cost_distribution=GMCalibrateResults._read_cost_distribution(path),
+            cost_function=cost_function,
+            running_log_path=running_log_path,
+            convergence=GMCalibrateResults._read_convergence(calib_path),
+            band_share=GMCalibrateResults._read_band_share(calib_path),
+            distribution=GMCalibrateResults._read_distribution(calib_path),
+            residuals=GMCalibrateResults._read_residuals(calib_path),
+            best_params=GMCalibrateResults._read_best_params(calib_path),
+        )
+
+
+@dataclasses.dataclass
 class GMRunResults(GMCalibrateResults):
     """Stores the expected results alongside the inputs for run"""
 
@@ -204,7 +231,7 @@ class GMRunResults(GMCalibrateResults):
 # # # FIXTURES # # #
 def simple_gm_calib_results(tmp_path, cost_function) -> GMCalibrateResults:
     """Load in the small_and_simple test"""
-    running_log_path = tmp_path / "run_log.log"
+    running_log_path = tmp_path / "run_log.csv"
     running_log_path.touch()
     data_path = TEST_DATA_PATH / "small_and_simple"
     return GMCalibrateResults.from_file(
@@ -216,7 +243,7 @@ def simple_gm_calib_results(tmp_path, cost_function) -> GMCalibrateResults:
 
 def real_gm_calib_results(tmp_path, cost_function) -> GMCalibrateResults:
     """Load in the real world test"""
-    running_log_path = tmp_path / "run_log.log"
+    running_log_path = tmp_path / "run_log.csv"
     running_log_path.touch()
     data_path = TEST_DATA_PATH / "realistic"
     return GMCalibrateResults.from_file(
@@ -226,11 +253,35 @@ def real_gm_calib_results(tmp_path, cost_function) -> GMCalibrateResults:
     )
 
 
+def real_gm_calib_perceived_results(tmp_path, cost_function) -> GMCalibrateResults:
+    """Load in the real world test"""
+    running_log_path = tmp_path / "run_log.csv"
+    running_log_path.touch()
+    data_path = TEST_DATA_PATH / "realistic"
+    return GMCalibratePerceivedResults.from_file(
+        path=data_path,
+        running_log_path=running_log_path,
+        cost_function=cost_function,
+    )
+
+
 def simple_gm_run_results(tmp_path, cost_function) -> GMRunResults:
     """Load in the small_and_simple test"""
-    running_log_path = tmp_path / "run_log.log"
+    running_log_path = tmp_path / "run_log.csv"
     running_log_path.touch()
     data_path = TEST_DATA_PATH / "small_and_simple"
+    return GMRunResults.from_file(
+        path=data_path,
+        running_log_path=running_log_path,
+        cost_function=cost_function,
+    )
+
+
+def real_gm_run_results(tmp_path, cost_function) -> GMRunResults:
+    """Load in the real world test"""
+    running_log_path = tmp_path / "run_log.csv"
+    running_log_path.touch()
+    data_path = TEST_DATA_PATH / "realistic"
     return GMRunResults.from_file(
         path=data_path,
         running_log_path=running_log_path,
@@ -288,6 +339,28 @@ def fixture_real_log_normal_calib(tmp_path) -> GMCalibrateResults:
     path = tmp_path / "real_log_normal_calib"
     path.mkdir()
     return real_gm_calib_results(
+        tmp_path=path,
+        cost_function=cost_functions.BuiltInCostFunction.LOG_NORMAL.get_cost_function(),
+    )
+
+
+@pytest.fixture(name="real_log_normal_calib_perceived")
+def fixture_real_log_normal_calib_perceived(tmp_path) -> GMCalibrateResults:
+    """Load in the realistic log normal test"""
+    path = tmp_path / "real_log_normal_calib_perceived"
+    path.mkdir()
+    return real_gm_calib_perceived_results(
+        tmp_path=path,
+        cost_function=cost_functions.BuiltInCostFunction.LOG_NORMAL.get_cost_function(),
+    )
+
+
+@pytest.fixture(name="real_log_normal_run")
+def fixture_real_log_normal_run(tmp_path) -> GMCalibrateResults:
+    """Load in the realistic log normal test"""
+    path = tmp_path / "real_log_normal_run"
+    path.mkdir()
+    return real_gm_run_results(
         tmp_path=path,
         cost_function=cost_functions.BuiltInCostFunction.LOG_NORMAL.get_cost_function(),
     )
@@ -351,7 +424,7 @@ class TestSimpleTanner:
         )
 
 
-@pytest.mark.usefixtures("real_log_normal_calib")
+@pytest.mark.usefixtures("real_log_normal_calib", "real_log_normal_calib_perceived", "real_log_normal_run")
 class TestRealLogNormal:
     """Test the log normal calibrator with real world data."""
 
@@ -360,6 +433,25 @@ class TestRealLogNormal:
         gm = real_log_normal_calib.create_gravity_model()
         best_params = gm.calibrate()
         real_log_normal_calib.assert_results(
+            best_params=best_params,
+            calibrated_gm=gm,
+        )
+
+    def test_correct_calibrate_perceived(self, real_log_normal_calib_perceived: GMCalibratePerceivedResults):
+        """Test that the gravity model correctly calibrates."""
+        gm = real_log_normal_calib_perceived.create_gravity_model(use_perceived_factors=True)
+        best_params = gm.calibrate()
+        real_log_normal_calib_perceived.assert_results(
+            best_params=best_params,
+            calibrated_gm=gm,
+        )
+
+    def test_correct_run(self, real_log_normal_run: GMRunResults):
+        """Test that the gravity model correctly runs."""
+        gm = real_log_normal_run.create_gravity_model()
+        best_params = real_log_normal_run.get_optimal_params()
+        best_params = gm.calibrate(init_params=best_params, calibrate_params=False)
+        real_log_normal_run.assert_results(
             best_params=best_params,
             calibrated_gm=gm,
         )
