@@ -159,7 +159,6 @@ class GMCalibrateResults(GMCreator):
         np.testing.assert_almost_equal(
             calibrated_gm.achieved_convergence, self.convergence, decimal=5
         )
-
         # Check the matrices
         np.testing.assert_allclose(
             calibrated_gm.achieved_band_share, self.band_share, rtol=1e-4
@@ -420,7 +419,7 @@ class TestSimpleTanner:
 
 
 @pytest.mark.usefixtures(
-    "real_log_normal_calib", "real_log_normal_calib_perceived", "real_log_normal_run"
+    "real_log_normal_calib", "real_log_normal_calib_perceived", "real_log_normal_run",
 )
 class TestRealLogNormal:
     """Test the log normal calibrator with real world data."""
