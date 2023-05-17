@@ -424,7 +424,9 @@ class TestSimpleTanner:
         )
 
 
-@pytest.mark.usefixtures("real_log_normal_calib", "real_log_normal_calib_perceived", "real_log_normal_run")
+@pytest.mark.usefixtures(
+    "real_log_normal_calib", "real_log_normal_calib_perceived", "real_log_normal_run"
+)
 class TestRealLogNormal:
     """Test the log normal calibrator with real world data."""
 
@@ -437,7 +439,9 @@ class TestRealLogNormal:
             calibrated_gm=gm,
         )
 
-    def test_correct_calibrate_perceived(self, real_log_normal_calib_perceived: GMCalibratePerceivedResults):
+    def test_correct_calibrate_perceived(
+        self, real_log_normal_calib_perceived: GMCalibratePerceivedResults
+    ):
         """Test that the gravity model correctly calibrates."""
         gm = real_log_normal_calib_perceived.create_gravity_model(use_perceived_factors=True)
         best_params = gm.calibrate()
