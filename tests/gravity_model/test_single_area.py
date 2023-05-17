@@ -232,7 +232,6 @@ class GMRunResults(GMCalibrateResults):
 def simple_gm_calib_results(tmp_path, cost_function) -> GMCalibrateResults:
     """Load in the small_and_simple test"""
     running_log_path = tmp_path / "run_log.csv"
-    running_log_path.touch()
     data_path = TEST_DATA_PATH / "small_and_simple"
     return GMCalibrateResults.from_file(
         path=data_path,
@@ -244,7 +243,6 @@ def simple_gm_calib_results(tmp_path, cost_function) -> GMCalibrateResults:
 def real_gm_calib_results(tmp_path, cost_function) -> GMCalibrateResults:
     """Load in the real world test"""
     running_log_path = tmp_path / "run_log.csv"
-    running_log_path.touch()
     data_path = TEST_DATA_PATH / "realistic"
     return GMCalibrateResults.from_file(
         path=data_path,
@@ -256,7 +254,6 @@ def real_gm_calib_results(tmp_path, cost_function) -> GMCalibrateResults:
 def real_gm_calib_perceived_results(tmp_path, cost_function) -> GMCalibrateResults:
     """Load in the real world test"""
     running_log_path = tmp_path / "run_log.csv"
-    running_log_path.touch()
     data_path = TEST_DATA_PATH / "realistic"
     return GMCalibratePerceivedResults.from_file(
         path=data_path,
@@ -268,7 +265,6 @@ def real_gm_calib_perceived_results(tmp_path, cost_function) -> GMCalibrateResul
 def simple_gm_run_results(tmp_path, cost_function) -> GMRunResults:
     """Load in the small_and_simple test"""
     running_log_path = tmp_path / "run_log.csv"
-    running_log_path.touch()
     data_path = TEST_DATA_PATH / "small_and_simple"
     return GMRunResults.from_file(
         path=data_path,
@@ -280,7 +276,6 @@ def simple_gm_run_results(tmp_path, cost_function) -> GMRunResults:
 def real_gm_run_results(tmp_path, cost_function) -> GMRunResults:
     """Load in the real world test"""
     running_log_path = tmp_path / "run_log.csv"
-    running_log_path.touch()
     data_path = TEST_DATA_PATH / "realistic"
     return GMRunResults.from_file(
         path=data_path,
@@ -440,15 +435,17 @@ class TestRealLogNormal:
         )
 
     def test_correct_calibrate_perceived(
-        self, real_log_normal_calib_perceived: GMCalibratePerceivedResults
+        self, real_log_normal_calib_perceived: GMCalibratePerceivedResults,
     ):
         """Test that the gravity model correctly calibrates."""
-        gm = real_log_normal_calib_perceived.create_gravity_model(use_perceived_factors=True)
-        best_params = gm.calibrate()
-        real_log_normal_calib_perceived.assert_results(
-            best_params=best_params,
-            calibrated_gm=gm,
-        )
+        msg = "Calibration with perceived factors was not able to reach the target_convergence"
+        with pytest.warns(UserWarning, match=msg):
+            gm = real_log_normal_calib_perceived.create_gravity_model(use_perceived_factors=True)
+            best_params = gm.calibrate()
+            real_log_normal_calib_perceived.assert_results(
+                best_params=best_params,
+                calibrated_gm=gm,
+            )
 
     def test_correct_run(self, real_log_normal_run: GMRunResults):
         """Test that the gravity model correctly runs."""
