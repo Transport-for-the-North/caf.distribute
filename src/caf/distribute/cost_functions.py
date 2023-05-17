@@ -8,6 +8,7 @@ import inspect
 import logging
 
 from typing import Any
+from typing import Mapping
 from typing import Callable
 
 # Third Party
@@ -26,32 +27,30 @@ LOG = logging.getLogger(__name__)
 # # # CLASSES # # #
 @enum.unique
 class BuiltInCostFunction(enum.Enum):
-    """Enum of the built-in cost functions for easy access"""
+    """Enum of the built-in cost functions for easy access."""
 
     TANNER = "tanner"
     LOG_NORMAL = "log_normal"
 
     def get_cost_function(self) -> CostFunction:
-        """Get the Class defining this cost function"""
+        """Get the Class defining this cost function."""
         if self == BuiltInCostFunction.TANNER:
-            params = {"alpha": [-5, 5], "beta": [-5, 5]}
-            default = {"alpha": 1, "beta": 1}
-            function = tanner
+            return CostFunction(
+                name=self.name,
+                params={"alpha": (-5, 5), "beta": (-5, 5)},
+                default_params={"alpha": 1, "beta": 1},
+                function=tanner,
+            )
 
-        elif self == BuiltInCostFunction.LOG_NORMAL:
-            params = {"sigma": [0, 5], "mu": [0, 10]}
-            default = {"sigma": 1, "mu": 2}
-            function = log_normal
+        if self == BuiltInCostFunction.LOG_NORMAL:
+            return CostFunction(
+                name=self.name,
+                params={"sigma": (0, 5), "mu": (0, 10)},
+                default_params={"sigma": 1, "mu": 2},
+                function=log_normal,
+            )
 
-        else:
-            raise ValueError(f"No definition exists for {self} built in cost function")
-
-        return CostFunction(
-            name=self.name,
-            params=params,
-            function=function,
-            default_params=default,
-        )
+        raise ValueError(f"No definition exists for {self} built in cost function")
 
 
 class CostFunction:
@@ -66,9 +65,9 @@ class CostFunction:
     def __init__(
         self,
         name: str,
-        params: dict[str, tuple[float, float]],
+        params: Mapping[str, tuple[float, float]],
         function: Callable,
-        default_params: dict[str, float] = None,
+        default_params: Mapping[str, float | int] = None,
     ):
         self.name = name
         self.function = function
@@ -102,11 +101,11 @@ class CostFunction:
 
     @property
     def parameter_names(self):
-        """Return the key-word names of the cost function params"""
+        """Return the key-word names of the cost function params."""
         return self.kw_order
 
     def validate_params(self, param_dict: dict[str, Any]) -> None:
-        """Validates that the given values are valid and within min/max ranges
+        """Check the given values are valid and within min/max ranges.
 
         Validates that the param dictionary given contains only and all
         expected parameter names as keys, and that the values for each key
@@ -151,8 +150,7 @@ class CostFunction:
                 raise ValueError()
 
     def calculate(self, base_cost: np.ndarray, **kwargs) -> np.ndarray:
-        """
-        Calculates the actual cost using self.function
+        """Calculate the actual cost using self.function.
 
         Before calling the cost function the given cost function params will
         be checked that they are within the min and max values passed in when
@@ -190,7 +188,7 @@ def tanner(
     min_return_val: float = 1e-150,
     max_return_val: float = 1e100,
 ) -> np.ndarray:
-    r"""Implementation of the tanner cost function.
+    r"""Apply the tanner cost function.
 
     Parameters
     ----------
@@ -247,7 +245,7 @@ def log_normal(
     mu: float,
     min_return_val: float = 1e-150,
 ) -> np.ndarray:
-    r"""Implementation of the log normal cost function.
+    r"""Apply of the log normal cost function.
 
     Parameters
     ----------

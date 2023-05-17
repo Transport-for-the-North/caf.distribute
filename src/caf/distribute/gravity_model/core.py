@@ -7,7 +7,6 @@ import logging
 import warnings
 
 from typing import Any
-from typing import Optional
 
 # Third Party
 import numpy as np
@@ -100,12 +99,17 @@ class GravityModelBase(abc.ABC):
 
     @property
     def target_band_share(self) -> np.ndarray:
-        """Returns the target band share from target cost distribution"""
+        """The target band share from target cost distribution."""
         return self.target_cost_distribution["band_share"].values
 
     @staticmethod
     def _update_tcd(tcd: pd.DataFrame) -> pd.DataFrame:
-        """Extrapolates data where needed"""
+        """Tidy up the cost distribution data where needed.
+
+        Infills the ave_km column where values don't exist based in the middle
+        of a bin.
+        Converts the trips into band share, so a sum of all the values becomes 1 .
+        """
         # Add in ave_km where needed
         tcd["ave_km"] = np.where(
             (tcd["ave_km"] == 0) | np.isnan(tcd["ave_km"]),
@@ -126,7 +130,7 @@ class GravityModelBase(abc.ABC):
         return [min_bounds[0]] + max_bounds
 
     def _initialise_calibrate_params(self) -> None:
-        """Sets running params to their default values for a run"""
+        """Set running params to their default values for a run."""
         self._loop_num = 1
         self._loop_start_time = timing.current_milli_time()
         self.initial_cost_params = dict()
@@ -134,7 +138,7 @@ class GravityModelBase(abc.ABC):
         self._perceived_factors = np.ones_like(self.cost_matrix)
 
     def _cost_params_to_kwargs(self, args: list[Any]) -> dict[str, Any]:
-        """Converts a list or args into kwargs that self.cost_function expects"""
+        """Convert a list of args into kwargs that self.cost_function expects."""
         if len(args) != len(self.cost_function.kw_order):
             raise ValueError(
                 f"Received the wrong number of args to convert to cost "
@@ -145,7 +149,7 @@ class GravityModelBase(abc.ABC):
         return dict(zip(self.cost_function.kw_order, args))
 
     def _order_cost_params(self, params: dict[str, Any]) -> list[Any]:
-        """Order params into a list that self.cost_function expects"""
+        """Order params into a list that self.cost_function expects."""
         ordered_params = [0] * len(self.cost_function.kw_order)
         for name, value in params.items():
             index = self.cost_function.kw_order.index(name)
@@ -154,11 +158,11 @@ class GravityModelBase(abc.ABC):
         return ordered_params
 
     def _order_init_params(self, init_params: dict[str, Any]) -> list[Any]:
-        """Order init_params into a list that self.cost_function expects"""
+        """Order init_params into a list that self.cost_function expects."""
         return self._order_cost_params(init_params)
 
     def _order_bounds(self) -> tuple[list[Any], list[Any]]:
-        """Order min and max into a tuple of lists that self.cost_function expects"""
+        """Order min and max into a tuple of lists that self.cost_function expects."""
         min_vals = self._order_cost_params(self.cost_function.param_min)
         max_vals = self._order_cost_params(self.cost_function.param_max)
 
@@ -172,7 +176,7 @@ class GravityModelBase(abc.ABC):
         matrix: np.ndarray,
         tcd_bin_edges: list[float],
     ) -> np.ndarray:
-        """Returns the distribution of matrix across self.tcd_bin_edges"""
+        """Calculate the distribution of matrix across tcd_bin_edges."""
         _, normalised = cost_utils.normalised_cost_distribution(
             matrix=matrix,
             cost_matrix=self.cost_matrix,
@@ -185,9 +189,9 @@ class GravityModelBase(abc.ABC):
         cost_args: list[float],
         target_cost_distribution: pd.DataFrame,
     ):
-        """Internal function of _estimate_init_params()
+        """Guess the initial cost arguments.
 
-        Guesses what the initial params should be.
+        Internal function of _estimate_init_params().
         Used by the `optimize.least_squares` function.
         """
         # Convert the cost function args back into kwargs
@@ -207,7 +211,7 @@ class GravityModelBase(abc.ABC):
         self,
         init_params: dict[str, Any],
         target_cost_distribution: pd.DataFrame,
-    ):
+    ) -> dict[str, Any]:
         """Guesses what the initial params should be.
 
         Uses the average cost in each band to estimate what changes in
@@ -232,7 +236,7 @@ class GravityModelBase(abc.ABC):
         return init_params
 
     def _calculate_perceived_factors(self) -> None:
-        """Updates the perceived cost class variables
+        """Update the perceived cost class variables.
 
         Compares the latest run of the gravity model (as defined by the
         variables: self.achieved_band_share)
@@ -285,7 +289,7 @@ class GravityModelBase(abc.ABC):
         cost_args: list[float],
         diff_step: float,
     ):
-        """Returns residuals to target cost distribution
+        """Calculate residuals to the target cost distribution.
 
         Runs gravity model with given parameters and converts into achieved
         cost distribution. The residuals are then calculated between the
@@ -392,7 +396,7 @@ class GravityModelBase(abc.ABC):
         diff_step: float,
         ignore_result: bool = False,
     ):
-        """Returns the Jacobian for _gravity_function
+        """Calculate the Jacobian for _gravity_function.
 
         Uses the matrices stored in self._jacobian_mats (which were stored in
         the previous call to self._gravity function) to estimate what a change
@@ -420,7 +424,10 @@ class GravityModelBase(abc.ABC):
 
         # Estimate how the final matrix would be different with
         # different input cost parameters
-        estimated_mats = dict.fromkeys(self.cost_function.kw_order)
+        estimated_mats = dict.fromkeys(
+            self.cost_function.kw_order,
+            np.zeros_like(self._jacobian_mats["base"]),
+        )
         for cost_param in self.cost_function.kw_order:
             # Estimate what the furness would have done
             furness_mat = self._jacobian_mats[cost_param] * furness_factor
@@ -495,7 +502,7 @@ class GravityModelBase(abc.ABC):
             }
 
             # Can sometimes fail with infeasible arguments, workaround
-            result: Optional = None
+            result = None
 
             try:
                 ordered_init_params = self._order_init_params(init_params)
@@ -513,6 +520,9 @@ class GravityModelBase(abc.ABC):
             # If performance was terrible, try again with default params
             failed = self.achieved_convergence <= failure_tol
             if result is not None and failed:
+                # Not sure what's going on with pylint below, but it raises
+                # both these errors for the log call
+                # pylint: disable=logging-not-lazy, consider-using-f-string
                 LOG.info(
                     "Performance wasn't great with the given `init_params`. "
                     "Achieved '%s', and the `failure_tol` "
@@ -549,7 +559,7 @@ class GravityModelBase(abc.ABC):
         self,
         seed_matrix: np.ndarray,
     ) -> tuple[np.ndarray, int, float]:
-        """Runs a doubly constrained furness on the seed matrix
+        """Run a doubly constrained furness on the seed matrix.
 
         Wrapper around furness.doubly_constrained_furness, to be used when
         running the furness withing the gravity model.
@@ -580,7 +590,7 @@ class GravityModelBase(abc.ABC):
         col_targets: np.ndarray,
         ignore_result: bool = False,
     ) -> dict[str, np.ndarray]:
-        """Runs a doubly constrained furness on the seed matrix
+        """Run a doubly constrained furness on the seed matrix.
 
         Wrapper around furness.doubly_constrained_furness, to be used when
         running the furness withing the jacobian calculation.

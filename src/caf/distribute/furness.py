@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Furness functions for distributing vectors to matrices"""
+"""Furness functions for distributing vectors to matrices."""
 # Built-Ins
 import logging
 import warnings
@@ -32,7 +32,7 @@ def doubly_constrained_furness(
     warning: bool = True,
 ) -> tuple[np.ndarray, int, float]:
     """
-    Performs a doubly constrained furness for max_iters or until tol is met
+    Perform a doubly constrained furness for max_iters or until tol is met.
 
     Controls numpy warnings to warn of any overflow errors encountered
 

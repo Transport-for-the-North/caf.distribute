@@ -79,7 +79,7 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
         self,
         seed_matrix: np.ndarray,
     ) -> tuple[np.ndarray, int, float]:
-        """Runs a doubly constrained furness on the seed matrix
+        """Run a doubly constrained furness on the seed matrix.
 
         Wrapper around furness.doubly_constrained_furness, using class
         attributes to set up the function call.
@@ -115,7 +115,7 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
         col_targets: np.ndarray,
         ignore_result: bool = False,
     ) -> dict[str, np.ndarray]:
-        """Runs a doubly constrained furness on the seed matrix
+        """Run a doubly constrained furness on the seed matrix.
 
         Wrapper around furness.doubly_constrained_furness, to be used when
         running the furness withing the jacobian calculation.
@@ -150,7 +150,7 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
         achieved_rmse:
             The Root Mean Squared Error difference achieved before exiting
         """
-        return_dict = dict.fromkeys(seed_matrices.keys())
+        return_dict = dict.fromkeys(seed_matrices.keys(), np.zeros_like(seed_matrices))
         for cost_param, seed_matrix in seed_matrices.items():
             return_dict[cost_param], *_ = furness.doubly_constrained_furness(
                 seed_vals=seed_matrix,
@@ -175,7 +175,7 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
         failure_tol: float = 0,
         verbose: int = 0,
     ) -> dict[str, Any]:
-        """Finds the optimal parameters for self.cost_function
+        """Find the optimal parameters for self.cost_function.
 
         Optimal parameters are found using `scipy.optimize.least_squares`
         to fit the distributed row/col targets to self.target_tld. Once
@@ -263,6 +263,7 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
         # Validate init_params
         if init_params is None:
             init_params = self.cost_function.default_params
+        assert init_params is not None
         self.cost_function.validate_params(init_params)
 
         # Estimate what the initial params should be
@@ -343,7 +344,7 @@ def gravity_model(
     **cost_params,
 ):
     """
-    Runs a gravity model and returns the distributed row/col targets
+    Run a gravity model and returns the distributed row/col targets.
 
     Uses the given cost function to generate an initial matrix which is
     used in a double constrained furness to distribute the row and column
