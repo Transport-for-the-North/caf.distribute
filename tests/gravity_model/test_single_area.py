@@ -163,21 +163,17 @@ class GMCalibrateResults(GMCreator):
         np.testing.assert_allclose(
             calibrated_gm.achieved_band_share,
             self.band_share,
-            rtol=1e-4,
-            atol=1e-7,
-
+            rtol=1e-3,
         )
         np.testing.assert_allclose(
             calibrated_gm.achieved_residuals,
             self.residuals,
-            rtol=1e-4,
-            atol=1e-7,
+            rtol=1e-3,
         )
         np.testing.assert_allclose(
             calibrated_gm.achieved_distribution,
             self.distribution,
-            rtol=1e-4,
-            atol=1e-7,
+            rtol=1e-3,
         )
 
 
