@@ -28,7 +28,62 @@ LOG = logging.getLogger(__name__)
 
 # # # CLASSES # # #
 class SingleAreaGravityModelCalibrator(core.GravityModelBase):
-    """A self-calibrating single area gravity model."""
+    """A self-calibrating single area gravity model.
+
+    Parameters
+    ----------
+    row_targets:
+        The targets for each row that the gravity model should be aiming to
+        match. This can alternatively be thought of as the rows that wish to
+        be distributed.
+
+    col_targets:
+        The targets for each column that the gravity model should be
+        aiming to match. This can alternatively be thought of as the
+        columns that wish to be distributed.
+
+    cost_function:
+        The cost function to use when calibrating the gravity model. This
+        function is applied to `cost_matrix` before Furnessing during
+        calibration.
+
+    cost_matrix:
+        A matrix detailing the cost between each and every zone. This
+        matrix must be the same size as
+        `(len(row_targets), len(col_targets))`.
+
+    target_cost_distribution:
+        The cost distribution to target during calibration. The cost should
+        be in the same units as the `cost_matrix`. It should contain four
+        columns: ["min", "max", "ave", "trips"]. Where "min" and "max"
+        contain the minimum and maximum bounds for each row, "ave" contains
+        the average cost for each row, and "trips" is the number of trips
+        in each boundary.
+
+    target_convergence:
+        A value between 0 and 1, the convergence to aim for during
+        calibration. Values closer to 1 mean a better convergence.
+
+    furness_max_iters:
+        The maximum number of furness iterations to complete before exiting.
+
+    furness_tol:
+        The maximum difference between the achieved and the target values
+        to tolerate before exiting the furness early. R^2 is used to
+        calculate the difference.
+
+    running_log_path:
+        Path to output the running log to. This log will detail the
+        performance of each iteration of the calibration and is written in
+        .csv format.
+
+    use_perceived_factors:
+        Whether to utilise perceived factors while calibrating the
+        gravity model. These factors are good to improve convergence when
+        the performance is near the target already.
+
+    # TODO(BT) : Fully Document this class
+    """
 
     def __init__(
         self,
@@ -37,27 +92,12 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
         cost_function: cost_functions.CostFunction,
         cost_matrix: np.ndarray,
         target_cost_distribution: pd.DataFrame,
-        target_convergence: float,  # TLD convergence?
+        target_convergence: float,
         furness_max_iters: int,
         furness_tol: float,
         running_log_path: os.PathLike,
         use_perceived_factors: bool = True,
     ):
-        """
-        Parameters
-        ----------
-        row_targets:
-
-        col_targets
-        cost_function
-        cost_matrix
-        target_cost_distribution
-        target_convergence
-        furness_max_iters
-        furness_tol
-        running_log_path
-        use_perceived_factors
-        """
         # pylint: disable=too-many-arguments
         super().__init__(
             cost_function=cost_function,
