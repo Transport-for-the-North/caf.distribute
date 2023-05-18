@@ -67,7 +67,7 @@ class CostFunction:
         name: str,
         params: Mapping[str, tuple[float, float]],
         function: Callable,
-        default_params: Mapping[str, float | int] = None,
+        default_params: Optional[Mapping[str, float | int]] = None,
     ):
         self.name = name
         self.function = function
