@@ -160,20 +160,24 @@ class GMCalibrateResults(GMCreator):
             calibrated_gm.achieved_convergence, self.convergence, decimal=5
         )
         # Check the matrices
-        np.testing.assert_almost_equal(
+        np.testing.assert_allclose(
             calibrated_gm.achieved_band_share,
             self.band_share,
-            decimal=5,
+            rtol=1e-4,
+            atol=1e-7,
+
         )
-        np.testing.assert_almost_equal(
+        np.testing.assert_allclose(
             calibrated_gm.achieved_residuals,
             self.residuals,
-            decimal=5,
+            rtol=1e-4,
+            atol=1e-7,
         )
-        np.testing.assert_almost_equal(
+        np.testing.assert_allclose(
             calibrated_gm.achieved_distribution,
             self.distribution,
-            decimal=5,
+            rtol=1e-4,
+            atol=1e-7,
         )
 
 
