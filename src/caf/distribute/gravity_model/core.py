@@ -6,14 +6,15 @@ import abc
 import logging
 import warnings
 
+
 from typing import Any
+from typing import Optional
 
 # Third Party
 import numpy as np
 import pandas as pd
 
 from scipy import optimize
-from caf.toolkit import pandas_utils as pd_utils
 
 # Local Imports
 # pylint: disable=import-error,wrong-import-position
@@ -40,23 +41,23 @@ class GravityModelBase(abc.ABC):
     # pylint: disable=too-many-instance-attributes
 
     # Class constants
-    _avg_cost_col = "ave_km"  # Should be more generic
-    _target_cost_distribution_cols = ["min", "max", "trips"] + [_avg_cost_col]
     _least_squares_method = "trf"
 
     def __init__(
         self,
         cost_function: cost_functions.CostFunction,
         cost_matrix: np.ndarray,
-        target_cost_distribution: pd.DataFrame,
+        target_cost_distribution: cost_utils.CostDistribution,
         running_log_path: os.PathLike,
         cost_min_max_buf: float = 0.1,
     ):
         # Validate attributes
-        target_cost_distribution = pd_utils.reindex_cols(
-            target_cost_distribution,
-            self._target_cost_distribution_cols,
-        )
+        if not isinstance(target_cost_distribution, cost_utils.CostDistribution):
+            raise ValueError(
+                "Expected a CostDistribution class for "
+                f"target_cost_distribution, got "
+                f"{type(target_cost_distribution)} instead"
+            )
 
         if running_log_path is not None:
             dir_name, _ = os.path.split(running_log_path)
@@ -77,8 +78,7 @@ class GravityModelBase(abc.ABC):
         self.cost_function = cost_function
         self.cost_min_max_buf = cost_min_max_buf
         self.cost_matrix = cost_matrix
-        self.target_cost_distribution = self._update_tcd(target_cost_distribution)
-        self.tcd_bin_edges = self._get_tcd_bin_edges(target_cost_distribution)
+        self.target_cost_distribution = target_cost_distribution
         self.running_log_path = running_log_path
 
         # Running attributes
@@ -100,34 +100,12 @@ class GravityModelBase(abc.ABC):
     @property
     def target_band_share(self) -> np.ndarray:
         """The target band share from target cost distribution."""
-        return self.target_cost_distribution["band_share"].values
+        return self.target_cost_distribution.band_share_vals
 
-    @staticmethod
-    def _update_tcd(tcd: pd.DataFrame) -> pd.DataFrame:
-        """Tidy up the cost distribution data where needed.
-
-        Infills the ave_km column where values don't exist based in the middle
-        of a bin.
-        Converts the trips into band share, so a sum of all the values becomes 1 .
-        """
-        # Add in ave_km where needed
-        tcd["ave_km"] = np.where(
-            (tcd["ave_km"] == 0) | np.isnan(tcd["ave_km"]),
-            tcd["min"],
-            tcd["ave_km"],
-        )
-
-        # Generate the band shares using the given data
-        tcd["band_share"] = tcd["trips"].copy()
-        tcd["band_share"] /= tcd["band_share"].values.sum()
-
-        return tcd
-
-    @staticmethod
-    def _get_tcd_bin_edges(target_cost_distribution: pd.DataFrame) -> list[float]:
-        min_bounds = target_cost_distribution["min"].tolist()
-        max_bounds = target_cost_distribution["max"].tolist()
-        return [min_bounds[0]] + max_bounds
+    @property
+    def tcd_bin_edges(self) -> np.ndarray:
+        """The bin edges from the target cost distribution."""
+        return self.target_cost_distribution.bin_edges
 
     def _initialise_calibrate_params(self) -> None:
         """Set running params to their default values for a run."""
@@ -198,7 +176,9 @@ class GravityModelBase(abc.ABC):
         cost_kwargs = self._cost_params_to_kwargs(cost_args)
 
         # Used to optionally increase the cost of long distance trips
-        avg_cost_vals = target_cost_distribution[self._avg_cost_col].values
+        # TODO(BT): TIDY
+        _avg_cost_col = "ave_km"  # Should be more generic
+        avg_cost_vals = target_cost_distribution[_avg_cost_col].values
 
         # Estimate what the cost function will do to the costs - on average
         estimated_cost_vals = self.cost_function.calculate(avg_cost_vals, **cost_kwargs)
@@ -245,16 +225,13 @@ class GravityModelBase(abc.ABC):
 
         This function updates the _perceived_factors class variable.
         """
-        # Init
-        target_band_share = self.target_cost_distribution["band_share"].values
-
         # Calculate the adjustment per band in target band share.
         # Adjustment is clipped between 0.5 and 2 to limit affect
         perc_factors = (
             np.divide(
                 self.achieved_band_share,
-                target_band_share,
-                where=target_band_share > 0,
+                self.target_band_share,
+                where=self.target_band_share > 0,
                 out=np.ones_like(self.achieved_band_share),
             )
             ** 0.5
@@ -263,12 +240,12 @@ class GravityModelBase(abc.ABC):
 
         # Initialise loop
         perc_factors_mat = np.ones_like(self.cost_matrix)
-        min_vals = self.target_cost_distribution["min"]
-        max_vals = self.target_cost_distribution["max"]
+        min_vals = self.target_cost_distribution.min_vals
+        max_vals = self.target_cost_distribution.max_vals
 
         # Convert into factors for the cost matrix
         for min_val, max_val, factor in zip(min_vals, max_vals, perc_factors):
-            # Get proportion of all trips that are in this band
+            # Get location of all trips that are in this band
             distance_mask = (self.cost_matrix >= min_val) & (self.cost_matrix < max_val)
 
             perc_factors_mat = np.multiply(
@@ -288,6 +265,7 @@ class GravityModelBase(abc.ABC):
         self,
         cost_args: list[float],
         diff_step: float,
+        **kwargs,
     ):
         """Calculate residuals to the target cost distribution.
 
@@ -330,7 +308,10 @@ class GravityModelBase(abc.ABC):
             self._jacobian_mats[cost_param] = adj_cost
 
         # Furness trips to trip ends
-        matrix, iters, rmse = self.gravity_furness(seed_matrix=init_matrix)
+        matrix, iters, rmse = self.gravity_furness(
+            seed_matrix=init_matrix,
+            **kwargs,
+        )
 
         # Store for the jacobian calculations
         self._jacobian_mats["final"] = matrix.copy()
@@ -339,9 +320,8 @@ class GravityModelBase(abc.ABC):
         achieved_band_shares = self._cost_distribution(matrix, self.tcd_bin_edges)
 
         # Evaluate this run
-        target_band_shares = self.target_cost_distribution["band_share"].values
-        convergence = math_utils.curve_convergence(target_band_shares, achieved_band_shares)
-        achieved_residuals = target_band_shares - achieved_band_shares
+        convergence = math_utils.curve_convergence(self.target_band_share, achieved_band_shares)
+        achieved_residuals = self.target_band_share - achieved_band_shares
 
         # Calculate the time this loop took
         self._loop_end_time = timing.current_milli_time()
@@ -407,7 +387,7 @@ class GravityModelBase(abc.ABC):
         """
         # pylint: disable=too-many-locals
         # Initialise the output
-        n_bands = len(self.target_cost_distribution["band_share"].values)
+        n_bands = len(self.target_band_share)
         n_cost_params = len(cost_args)
         jacobian = np.zeros((n_bands, n_cost_params))
 
@@ -507,6 +487,8 @@ class GravityModelBase(abc.ABC):
             try:
                 ordered_init_params = self._order_init_params(init_params)
                 result = optimize.least_squares(x0=ordered_init_params, **ls_kwargs)
+                # TODO(BT): Can we make use of result.message and
+                #  result.success? Reply useful messages?
             except ValueError as err:
                 if "infeasible" in str(err):
                     LOG.info(
@@ -558,6 +540,7 @@ class GravityModelBase(abc.ABC):
     def gravity_furness(
         self,
         seed_matrix: np.ndarray,
+        kwargs,
     ) -> tuple[np.ndarray, int, float]:
         """Run a doubly constrained furness on the seed matrix.
 
@@ -568,6 +551,10 @@ class GravityModelBase(abc.ABC):
         ----------
         seed_matrix:
             Initial values for the furness.
+
+        kwargs:
+            Additional arguments from the caller - allows arguments to be
+            passed to this function.
 
         Returns
         -------
@@ -626,6 +613,5 @@ class GravityModelBase(abc.ABC):
             The Root Mean Squared Error difference achieved before exiting
         """
         raise NotImplementedError
-
 
 # # # FUNCTIONS # # #
