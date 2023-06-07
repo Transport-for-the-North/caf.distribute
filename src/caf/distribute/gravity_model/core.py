@@ -5,7 +5,7 @@ import os
 import abc
 import logging
 import warnings
-
+import dataclasses
 
 from typing import Any
 from typing import Optional
@@ -31,6 +31,20 @@ LOG = logging.getLogger(__name__)
 
 
 # # # CLASSES # # #
+@dataclasses.dataclass
+class GravityModelResults:
+
+    cost_distribution: cost_utils.CostDistribution
+    cost_residuals: np.ndarray
+    cost_convergence: float
+    value_distribution: np.ndarray
+
+    # Targets
+    target_cost_distribution: Optional[cost_utils.CostDistribution] = None
+    cost_function: Optional[cost_functions.CostFunction] = None
+    cost_params: Optional[dict[str, Any]] = None
+
+
 class GravityModelBase(abc.ABC):
     """Base Class for gravity models.
 
@@ -47,18 +61,32 @@ class GravityModelBase(abc.ABC):
         self,
         cost_function: cost_functions.CostFunction,
         cost_matrix: np.ndarray,
-        target_cost_distribution: cost_utils.CostDistribution,
-        running_log_path: os.PathLike,
         cost_min_max_buf: float = 0.1,
     ):
-        # Validate attributes
-        if not isinstance(target_cost_distribution, cost_utils.CostDistribution):
-            raise ValueError(
-                "Expected a CostDistribution class for "
-                f"target_cost_distribution, got "
-                f"{type(target_cost_distribution)} instead"
-            )
 
+        # Set attributes
+        self.cost_function = cost_function
+        self.cost_min_max_buf = cost_min_max_buf
+        self.cost_matrix = cost_matrix
+
+        # Running attributes
+        self._loop_num: int = -1
+        self._loop_start_time: float = -1.0
+        self._loop_end_time: float = -1.0
+        # self._jacobian_mats: dict[str, np.ndarray] = dict()
+        self._perceived_factors: np.ndarray = np.ones_like(self.cost_matrix)
+
+        # Additional attributes
+        self.initial_cost_params: dict[str, Any] = dict()
+        self.optimal_cost_params: dict[str, Any] = dict()
+        self.initial_convergence: float = 0
+        self.achieved_convergence: float = 0
+        self.achieved_band_share: Optional[np.ndarray] = None
+        self.achieved_residuals: Optional[np.ndarray] = None
+        self.achieved_distribution: np.ndarray = np.zeros_like(cost_matrix)
+
+    @staticmethod
+    def _validate_running_log(running_log_path: os.PathLike) -> None:
         if running_log_path is not None:
             dir_name, _ = os.path.split(running_log_path)
             if not os.path.exists(dir_name):
@@ -74,40 +102,7 @@ class GravityModelBase(abc.ABC):
                     f"{running_log_path}"
                 )
 
-        # Set attributes
-        self.cost_function = cost_function
-        self.cost_min_max_buf = cost_min_max_buf
-        self.cost_matrix = cost_matrix
-        self.target_cost_distribution = target_cost_distribution
-        self.running_log_path = running_log_path
-
-        # Running attributes
-        self._loop_num: int = -1
-        self._loop_start_time: float = -1.0
-        self._loop_end_time: float = -1.0
-        self._jacobian_mats: dict[str, np.ndarray] = dict()
-        self._perceived_factors: np.ndarray = np.ones_like(self.cost_matrix)
-
-        # Additional attributes
-        self.initial_cost_params: dict[str, Any] = dict()
-        self.optimal_cost_params: dict[str, Any] = dict()
-        self.initial_convergence: float = 0
-        self.achieved_convergence: float = 0
-        self.achieved_band_share: np.ndarray = np.zeros_like(self.target_band_share)
-        self.achieved_residuals: np.ndarray = np.full_like(self.target_band_share, np.inf)
-        self.achieved_distribution: np.ndarray = np.zeros_like(cost_matrix)
-
-    @property
-    def target_band_share(self) -> np.ndarray:
-        """The target band share from target cost distribution."""
-        return self.target_cost_distribution.band_share_vals
-
-    @property
-    def tcd_bin_edges(self) -> np.ndarray:
-        """The bin edges from the target cost distribution."""
-        return self.target_cost_distribution.bin_edges
-
-    def _initialise_calibrate_params(self) -> None:
+    def _initialise_internal_params(self) -> None:
         """Set running params to their default values for a run."""
         self._loop_num = 1
         self._loop_start_time = timing.current_milli_time()
@@ -215,11 +210,43 @@ class GravityModelBase(abc.ABC):
 
         return init_params
 
-    def _calculate_perceived_factors(self) -> None:
-        """Update the perceived cost class variables.
+    @staticmethod
+    def _should_use_perceived_factors(
+        target_convergence: float,
+        achieved_convergence: float,
+        warn: bool = True,
+    ) -> bool:
+        # Init
+        upper_limit = target_convergence + 0.03
+        lower_limit = target_convergence - 0.15
+
+        # Upper limit beaten, all good
+        if achieved_convergence > upper_limit:
+            return False
+
+        # Warn if the lower limit hasn't been reached
+        if achieved_convergence < lower_limit:
+            if warn:
+                warnings.warn(
+                    f"Lower threshold required to use perceived factors was "
+                    f"not reached.\n"
+                    f"Target convergence: {target_convergence}\n"
+                    f"Lower Limit: {lower_limit}\n"
+                    f"Achieved convergence: {achieved_convergence}"
+                )
+            return False
+
+        return True
+
+    def _calculate_perceived_factors(
+        self,
+        target_cost_distribution: cost_utils.CostDistribution,
+        achieved_band_shares: np.ndarray,
+    ) -> None:
+        """Update the perceived cost class variable.
 
         Compares the latest run of the gravity model (as defined by the
-        variables: self.achieved_band_share)
+        variables: self.achieved_band_share) with the `target_cost_distribution`
         and generates a perceived cost factor matrix, which will be applied
         on calls to self._cost_amplify() in the gravity model.
 
@@ -229,10 +256,10 @@ class GravityModelBase(abc.ABC):
         # Adjustment is clipped between 0.5 and 2 to limit affect
         perc_factors = (
             np.divide(
-                self.achieved_band_share,
-                self.target_band_share,
-                where=self.target_band_share > 0,
-                out=np.ones_like(self.achieved_band_share),
+                achieved_band_shares,
+                target_cost_distribution.band_share_vals,
+                where=target_cost_distribution.band_share_vals > 0,
+                out=np.ones_like(achieved_band_shares),
             )
             ** 0.5
         )
@@ -240,14 +267,12 @@ class GravityModelBase(abc.ABC):
 
         # Initialise loop
         perc_factors_mat = np.ones_like(self.cost_matrix)
-        min_vals = self.target_cost_distribution.min_vals
-        max_vals = self.target_cost_distribution.max_vals
+        min_vals = target_cost_distribution.min_vals
+        max_vals = target_cost_distribution.max_vals
 
-        # Convert into factors for the cost matrix
+        # Convert factors to matrix resembling the cost matrix
         for min_val, max_val, factor in zip(min_vals, max_vals, perc_factors):
-            # Get location of all trips that are in this band
             distance_mask = (self.cost_matrix >= min_val) & (self.cost_matrix < max_val)
-
             perc_factors_mat = np.multiply(
                 perc_factors_mat,
                 factor,
@@ -264,7 +289,8 @@ class GravityModelBase(abc.ABC):
     def _gravity_function(
         self,
         cost_args: list[float],
-        diff_step: float,
+        running_log_path: os.PathLike,
+        target_cost_distribution: Optional[cost_utils.CostDistribution] = None,
         **kwargs,
     ):
         """Calculate residuals to the target cost distribution.
@@ -283,51 +309,30 @@ class GravityModelBase(abc.ABC):
             self.optimal_cost_params
         """
         # pylint: disable=too-many-locals
-        # Convert the cost function args back into kwargs
+        # TODO(BT): Tidy up gravity and jacobian function kwargs
+        # Init
         cost_kwargs = self._cost_params_to_kwargs(cost_args)
-
-        # Used to optionally adjust the cost of long distance trips
         cost_matrix = self._apply_perceived_factors(self.cost_matrix)
-
-        # Calculate initial matrix through cost function
-        init_matrix = self.cost_function.calculate(cost_matrix, **cost_kwargs)
-
-        # Do some prep for jacobian calculations
-        # TODO(BT): Move this into the Jacobian function. We don't need it here
-        #  and it's just using it memory before we need to. Could single loop it
-        #  too, so that only one extra cost matrix is needed. NOT n_cost_params
-        self._jacobian_mats = {"base": init_matrix.copy()}
-        for cost_param in self.cost_function.kw_order:
-            # Adjust cost slightly
-            adj_cost_kwargs = cost_kwargs.copy()
-            adj_cost_kwargs[cost_param] += adj_cost_kwargs[cost_param] * diff_step
-
-            # Calculate adjusted cost
-            adj_cost = self.cost_function.calculate(cost_matrix, **adj_cost_kwargs)
-
-            self._jacobian_mats[cost_param] = adj_cost
 
         # Furness trips to trip ends
         matrix, iters, rmse = self.gravity_furness(
-            seed_matrix=init_matrix,
+            seed_matrix=self.cost_function.calculate(cost_matrix, **cost_kwargs),
             **kwargs,
         )
 
-        # Store for the jacobian calculations
-        self._jacobian_mats["final"] = matrix.copy()
-
-        # Convert matrix into an achieved distribution curve
-        achieved_band_shares = self._cost_distribution(matrix, self.tcd_bin_edges)
-
-        # Evaluate this run
-        convergence = math_utils.curve_convergence(self.target_band_share, achieved_band_shares)
-        achieved_residuals = self.target_band_share - achieved_band_shares
+        # Evaluate the performance of this run
+        cost_distribution, achieved_residuals, convergence = cost_distribution_stats(
+            target_cost_distribution,
+            self.achieved_distribution,
+            self.cost_matrix,
+        )
 
         # Calculate the time this loop took
         self._loop_end_time = timing.current_milli_time()
         time_taken = self._loop_end_time - self._loop_start_time
 
         # ## LOG THIS ITERATION ## #
+        # TODO(BT): Turn into internal function
         log_dict = {
             "loop_number": str(self._loop_num),
             "runtime (s)": time_taken / 1000,
@@ -342,12 +347,12 @@ class GravityModelBase(abc.ABC):
         )
 
         # Append this iteration to log file
-        if self.running_log_path is not None:
+        if running_log_path is not None:
             io.safe_dataframe_to_csv(
                 pd.DataFrame(log_dict, index=[0]),
-                self.running_log_path,
+                running_log_path,
                 mode="a",
-                header=(not os.path.exists(self.running_log_path)),
+                header=(not os.path.exists(running_log_path)),
                 index=False,
             )
 
@@ -357,7 +362,8 @@ class GravityModelBase(abc.ABC):
         self._loop_end_time = -1
 
         # Update performance params
-        self.achieved_band_share = achieved_band_shares
+        # TODO(BT): Consolidate top 3 into cost_dist class
+        self.achieved_band_share = cost_distribution.band_share_vals
         self.achieved_convergence = convergence
         self.achieved_residuals = achieved_residuals
         self.achieved_distribution = matrix
@@ -374,7 +380,7 @@ class GravityModelBase(abc.ABC):
         self,
         cost_args: list[float],
         diff_step: float,
-        ignore_result: bool = False,
+        target_cost_distribution: cost_utils.CostDistribution,
     ):
         """Calculate the Jacobian for _gravity_function.
 
@@ -387,61 +393,54 @@ class GravityModelBase(abc.ABC):
         """
         # pylint: disable=too-many-locals
         # Initialise the output
-        n_bands = len(self.target_band_share)
-        n_cost_params = len(cost_args)
-        jacobian = np.zeros((n_bands, n_cost_params))
+        jacobian = np.zeros((target_cost_distribution.n_bins, len(cost_args)))
 
-        # Convert the cost function args back into kwargs
+        # Initialise running params
         cost_kwargs = self._cost_params_to_kwargs(cost_args)
+        cost_matrix = self._apply_perceived_factors(self.cost_matrix)
+        row_targets = self.achieved_distribution.sum(axis=1),
+        col_targets = self.achieved_distribution.sum(axis=0),
 
         # Estimate what the furness does to the matrix
+        base_matrix = self.cost_function.calculate(cost_matrix, **cost_kwargs)
         furness_factor = np.divide(
-            self._jacobian_mats["final"],
-            self._jacobian_mats["base"],
-            where=self._jacobian_mats["base"] != 0,
-            out=np.zeros_like(self._jacobian_mats["base"]),
+            self.achieved_distribution,
+            base_matrix,
+            where=base_matrix != 0,
+            out=np.zeros_like(base_matrix),
         )
 
-        # Estimate how the final matrix would be different with
-        # different input cost parameters
-        estimated_mats = dict.fromkeys(
-            self.cost_function.kw_order,
-            np.zeros_like(self._jacobian_mats["base"]),
-        )
-        for cost_param in self.cost_function.kw_order:
-            # Estimate what the furness would have done
-            furness_mat = self._jacobian_mats[cost_param] * furness_factor
-            if furness_mat.sum() == 0:
-                raise ValueError("estimated furness matrix total is 0")
-            adj_weights = furness_mat / furness_mat.sum()
-            adj_final = self._jacobian_mats["final"].sum() * adj_weights
-
-            # Place in dictionary to send to Jacobian
-            estimated_mats[cost_param] = adj_final
-
-        # Control estimated matrices to final matrix
-        controlled_mats = self.jacobian_furness(
-            seed_matrices=estimated_mats,
-            row_targets=self._jacobian_mats["final"].sum(axis=1),
-            col_targets=self._jacobian_mats["final"].sum(axis=0),
-            ignore_result=ignore_result,
-        )
-
-        # Calculate the Jacobian
         for i, cost_param in enumerate(self.cost_function.kw_order):
-            # Turn into bands
-            achieved_band_shares = self._cost_distribution(
-                matrix=controlled_mats[cost_param],
-                tcd_bin_edges=self.tcd_bin_edges,
+            cost_step = cost_kwargs[cost_param] * diff_step
+
+            # Get slightly adjusted base matrix
+            adj_cost_kwargs = cost_kwargs.copy()
+            adj_cost_kwargs[cost_param] += cost_step
+            adj_base_mat = self.cost_function.calculate(cost_matrix, **adj_cost_kwargs)
+
+            # Estimate the impact of the furness
+            adj_distribution = adj_base_mat * furness_factor
+            if adj_distribution.sum() == 0:
+                raise ValueError("estimated furness matrix total is 0")
+
+            # Convert to weights to estimate impact on output
+            adj_weights = adj_distribution / adj_distribution.sum()
+            adj_final = self.achieved_distribution * adj_weights
+
+            # Finesse to match row / col targets
+            adj_final = self.jacobian_furness(
+                seed_matrix=adj_final,
+                row_targets=row_targets,
+                col_targets=col_targets,
             )
 
-            # Calculate the Jacobian for this cost param
-            jacobian_residuals = self.achieved_band_share - achieved_band_shares
-            cost_step = cost_kwargs[cost_param] * diff_step
-            cost_jacobian = jacobian_residuals / cost_step
-
-            # Store in the Jacobian
-            jacobian[:, i] = cost_jacobian
+            # Calculate the Jacobian values for this cost param
+            adj_band_share = self._cost_distribution(
+                matrix=adj_final,
+                tcd_bin_edges=target_cost_distribution.bin_edges,
+            )
+            jacobian_residuals = self.achieved_band_share - adj_band_share
+            jacobian[:, i] = jacobian_residuals / cost_step
 
         return jacobian
 
@@ -464,7 +463,7 @@ class GravityModelBase(abc.ABC):
         gravity_function with the optimal parameter found before return.
         """
         # Initialise running params
-        self._initialise_calibrate_params()
+        self._initialise_internal_params()
 
         # Calculate the optimal cost parameters if we're calibrating
         if calibrate_params is True:
@@ -572,10 +571,9 @@ class GravityModelBase(abc.ABC):
     @abc.abstractmethod
     def jacobian_furness(
         self,
-        seed_matrices: dict[str, np.ndarray],
+        seed_matrix: np.ndarray,
         row_targets: np.ndarray,
         col_targets: np.ndarray,
-        ignore_result: bool = False,
     ) -> dict[str, np.ndarray]:
         """Run a doubly constrained furness on the seed matrix.
 
@@ -584,10 +582,8 @@ class GravityModelBase(abc.ABC):
 
         Parameters
         ----------
-        seed_matrices:
-            Dictionary of initial values for the furness.
-            Keys are the name of the cost params which has been changed
-            to get this new seed matrix.
+        seed_matrix:
+            Initial values for the furness.
 
         row_targets:
             The target values for the sum of each row.
@@ -596,10 +592,6 @@ class GravityModelBase(abc.ABC):
         col_targets:
             The target values for the sum of each column
             i.e. np.sum(seed_matrix, axis=0)
-
-        ignore_result:
-            Whether to ignore the return result or not. Useful when a Jacobian
-            furness is only being called to satisfy other threads.
 
         Returns
         -------
@@ -614,4 +606,229 @@ class GravityModelBase(abc.ABC):
         """
         raise NotImplementedError
 
+    def run_with_perceived_factors(
+        self,
+        cost_params: dict[str, Any],
+        running_log_path: os.PathLike,
+        target_cost_distribution: cost_utils.CostDistribution,
+        target_cost_convergence: float = 0.9,
+        kwargs: dict[str, Any] = None,
+    ) -> GravityModelResults:
+        """Run the gravity model with set cost parameters.
+
+        This function will run a single iteration of the gravity model using
+        the given cost parameters. It is similar to the default `run` function
+        but uses perceived factors to try to improve the performance of the run.
+
+        Perceived factors can be used to improve model
+        performance. These factors slightly adjust the cost across
+        bands to help nudge demand towards the expected distribution.
+        These factors are only used when the performance is already
+        reasonably good, otherwise they are ineffective. Only used when
+        the achieved R^2 convergence meets the following criteria:
+        `lower_bound = target_cost_convergence - 0.15`
+        `upper_bound = target_cost_convergence + 0.03`
+        `lower_bound < achieved_convergence < upper_bound`
+
+        Parameters
+        ----------
+        cost_params:
+            The cost parameters to use
+
+        running_log_path:
+            Path to output the running log to. This log will detail the
+            performance of the run and is written in .csv format.
+
+        target_cost_convergence:
+            A value between 0 and 1. Ignored unless `use_perceived_factors`
+            is set. Used to define the bounds withing which perceived factors
+            can be used to improve final distribution.
+
+        target_cost_distribution:
+            If given,
+
+        kwargs:
+            Additional arguments passed to self.gravity_furness.
+            Empty by default. The calling signature is:
+            `self.gravity_furness(seed_matrix, **kwargs)`
+
+        Returns
+        -------
+        results:
+            An instance of GravityModelResults containing the
+            results of this run.
+
+        See Also
+        --------
+        `caf.distribute.furness.doubly_constrained_furness()`
+        """
+        # Init
+        kwargs = dict() if kwargs in None else kwargs
+        self._validate_running_log(running_log_path)
+        self._initialise_internal_params()
+
+        self._gravity_function(
+            cost_args=self._order_init_params(cost_params),
+            diff_step=1e-8,
+            running_log_path=running_log_path,
+            kwargs=kwargs,
+        )
+
+        # Run again with perceived factors if good idea
+        should_use_perceived = self._should_use_perceived_factors(target_cost_convergence, self.achieved_convergence)
+        if should_use_perceived:
+            self._calculate_perceived_factors(target_cost_distribution, self.achieved_band_share)
+            self._gravity_function(
+                cost_args=self._order_init_params(cost_params),
+                diff_step=1e-8,
+                running_log_path=running_log_path,
+                kwargs=kwargs,
+            )
+
+        # Create the return object
+        cost_distribution = cost_utils.CostDistribution.from_data(
+            matrix=self.achieved_distribution,
+            cost_matrix=self.cost_matrix,
+            bin_edges=target_cost_distribution.bin_edges
+        )
+        return GravityModelResults(
+            cost_distribution=cost_distribution,
+            cost_residuals=target_cost_distribution.residuals(cost_distribution),
+            cost_convergence=target_cost_distribution.convergence(cost_distribution),
+            value_distribution=self.achieved_distribution,
+            target_cost_distribution=target_cost_distribution,
+            cost_function=self.cost_function,
+            cost_params=cost_params,
+        )
+
+    def run(
+        self,
+        cost_params: dict[str, Any],
+        running_log_path: os.PathLike,
+        target_cost_distribution: Optional[cost_utils.CostDistribution] = None,
+        kwargs: dict[str, Any] = None,
+    ) -> GravityModelResults:
+        """Run the gravity model with set cost parameters.
+
+        This function will run a single iteration of the gravity model using
+        the given cost parameters.
+
+        Parameters
+        ----------
+        cost_params:
+            The cost parameters to use
+
+        running_log_path:
+            Path to output the running log to. This log will detail the
+            performance of the run and is written in .csv format.
+
+        target_cost_distribution:
+            If given, this is used to calculate the residuals in the return.
+            The return cost_distribution will also use the same bins
+            provided here.
+
+        kwargs:
+            Additional arguments passed to self.gravity_furness.
+            Empty by default. The calling signature is:
+            `self.gravity_furness(seed_matrix, **kwargs)`
+
+        Returns
+        -------
+        results:
+            An instance of GravityModelResults containing the
+            results of this run. If a `target_cost_distribution` is not given,
+            the returning results.cost_distribution will dynamically create
+            its own bins; cost_residuals and cost_convergence will also
+            contain dummy values.
+
+        See Also
+        --------
+        `caf.distribute.furness.doubly_constrained_furness()`
+        """
+        # Init
+        kwargs = dict() if kwargs in None else kwargs
+        self._validate_running_log(running_log_path)
+        self._initialise_internal_params()
+
+        self._gravity_function(
+            cost_args=self._order_init_params(cost_params),
+            diff_step=1e-8,
+            running_log_path=running_log_path,
+            kwargs=kwargs,
+        )
+
+        # Build the return objects differently depending on args
+        distribution, residuals, convergence = cost_distribution_stats(
+            target_cost_distribution,
+            self.achieved_distribution,
+            self.cost_matrix,
+        )
+
+        return GravityModelResults(
+            cost_distribution=distribution,
+            cost_residuals=residuals,
+            cost_convergence=convergence,
+            value_distribution=self.achieved_distribution,
+            target_cost_distribution=target_cost_distribution,
+            cost_function=self.cost_function,
+            cost_params=cost_params,
+        )
+
+
 # # # FUNCTIONS # # #
+def cost_distribution_stats(
+    achieved_trip_distribution: np.ndarray,
+    cost_matrix: np.ndarray,
+    target_cost_distribution: Optional[cost_utils.CostDistribution] = None,
+) -> tuple[cost_utils.CostDistribution, np.ndarray, float]:
+    """Generate standard stats for a cost distribution performance.
+
+    Parameters
+    ----------
+    achieved_trip_distribution:
+        The achieved distribution of trips. Must be the same shape as
+        `cost_matrix`.
+
+    cost_matrix:
+        A matrix describing the zone to zone costs. Must be the same shape as
+        `achieved_trip_distribution`.
+
+    target_cost_distribution:
+        The cost distribution that `achieved_trip_distribution` and
+        `cost_matrix` were aiming to recreate.
+
+    Returns
+    -------
+    achieved_cost_distribution:
+        The achieved cost distribution produced by `achieved_trip_distribution`
+        and `cost_matrix`. If `target_cost_distribution` is given, this will
+        use the same bins defined, otherwise dynamic bins will be selected.
+
+    achieved_residuals:
+        The residual difference between `achieved_cost_distribution` and
+        `target_cost_distribution` band share values.
+        Will be an array of np.inf if `target_cost_distribution` is not set.
+
+    achieved_convergence:
+        A float value between 0 and 1. Values closer to 1 indicate a better
+        convergence. Will be -1 if `target_cost_distribution` is not set.
+
+    """
+    if target_cost_distribution is not None:
+        cost_distribution = cost_utils.CostDistribution.from_data(
+            matrix=achieved_trip_distribution,
+            cost_matrix=cost_matrix,
+            bin_edges=target_cost_distribution.bin_edges
+        )
+        cost_residuals = target_cost_distribution.residuals(cost_distribution)
+        cost_convergence = target_cost_distribution.convergence(cost_distribution)
+
+    else:
+        cost_distribution = cost_utils.CostDistribution.from_data_no_bins(
+            matrix=achieved_trip_distribution,
+            cost_matrix=cost_matrix,
+        )
+        cost_residuals = np.full_like(cost_distribution.band_share_vals, np.inf)
+        cost_convergence = -1
+
+    return cost_distribution, cost_residuals, cost_convergence
