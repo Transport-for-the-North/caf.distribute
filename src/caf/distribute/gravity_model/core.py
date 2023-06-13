@@ -20,7 +20,6 @@ from scipy import optimize
 # pylint: disable=import-error,wrong-import-position
 from caf.toolkit import io
 from caf.toolkit import timing
-from caf.toolkit import math_utils
 from caf.toolkit import cost_utils
 from caf.distribute import cost_functions
 
@@ -35,7 +34,6 @@ LOG = logging.getLogger(__name__)
 class GravityModelResults:
 
     cost_distribution: cost_utils.CostDistribution
-    cost_residuals: np.ndarray
     cost_convergence: float
     value_distribution: np.ndarray
 
@@ -72,7 +70,6 @@ class GravityModelBase(abc.ABC):
         # Running attributes
         self._loop_num: int = -1
         self._loop_start_time: float = -1.0
-        self._loop_end_time: float = -1.0
         # self._jacobian_mats: dict[str, np.ndarray] = dict()
         self._perceived_factors: np.ndarray = np.ones_like(self.cost_matrix)
 
@@ -81,9 +78,14 @@ class GravityModelBase(abc.ABC):
         self.optimal_cost_params: dict[str, Any] = dict()
         self.initial_convergence: float = 0
         self.achieved_convergence: float = 0
-        self.achieved_band_share: Optional[np.ndarray] = None
-        self.achieved_residuals: Optional[np.ndarray] = None
+        self.achieved_cost_dist: Optional[cost_utils.CostDistribution] = None
         self.achieved_distribution: np.ndarray = np.zeros_like(cost_matrix)
+
+    @property
+    def achieved_band_share(self) -> np.ndarray:
+        if self.achieved_cost_dist is None:
+            raise ValueError("Gravity model has not been run. achieved_band_share is not set.")
+        return self.achieved_cost_dist.band_share_vals
 
     @staticmethod
     def _validate_running_log(running_log_path: os.PathLike) -> None:
@@ -160,27 +162,22 @@ class GravityModelBase(abc.ABC):
     def _guess_init_params(
         self,
         cost_args: list[float],
-        target_cost_distribution: pd.DataFrame,
+        target_cost_distribution: cost_utils.CostDistribution,
     ):
         """Guess the initial cost arguments.
 
         Internal function of _estimate_init_params().
         Used by the `optimize.least_squares` function.
         """
-        # Convert the cost function args back into kwargs
+        # Need kwargs for calling cost function
         cost_kwargs = self._cost_params_to_kwargs(cost_args)
 
-        # Used to optionally increase the cost of long distance trips
-        # TODO(BT): TIDY
-        _avg_cost_col = "ave_km"  # Should be more generic
-        avg_cost_vals = target_cost_distribution[_avg_cost_col].values
-
         # Estimate what the cost function will do to the costs - on average
+        avg_cost_vals = target_cost_distribution.avg_vals
         estimated_cost_vals = self.cost_function.calculate(avg_cost_vals, **cost_kwargs)
         estimated_band_shares = estimated_cost_vals / estimated_cost_vals.sum()
 
-        # return the residuals to the target
-        return target_cost_distribution["band_share"].values - estimated_band_shares
+        return target_cost_distribution.band_share_vals - estimated_band_shares
 
     def _estimate_init_params(
         self,
@@ -238,6 +235,69 @@ class GravityModelBase(abc.ABC):
 
         return True
 
+    @staticmethod
+    def _log_iteration(
+        log_path: os.PathLike,
+        loop_num: int,
+        loop_time: float,
+        cost_kwargs: dict[str, Any],
+        furness_iters: int,
+        furness_rmse: float,
+        convergence: float,
+    ) -> None:
+        """Write data from an iteration to a log file.
+
+        Parameters
+        ----------
+        log_path:
+            Path to the file to write the log to. Should be a csv file.
+
+        loop_num:
+            The iteration number ID
+
+        loop_time:
+            The time taken to complete this iteration.
+
+        cost_kwargs:
+            The cost values used in this iteration.
+
+        furness_iters:
+            The number of furness iterations completed before exit.
+
+        furness_rmse:
+            The achieved rmse score of the furness before exit.
+
+        convergence:
+            The achieved convergence values of the curve produced in this
+            iteration.
+
+        Returns
+        -------
+        None
+        """
+        log_dict = {
+            "loop_number": str(loop_num),
+            "runtime (s)": loop_time / 1000,
+        }
+        log_dict.update(cost_kwargs)
+        log_dict.update(
+            {
+                "furness_iters": furness_iters,
+                "furness_rmse": np.round(furness_rmse, 6),
+                "bs_con": np.round(convergence, 4),
+            }
+        )
+
+        # Append this iteration to log file
+        if log_path is not None:
+            io.safe_dataframe_to_csv(
+                pd.DataFrame(log_dict, index=[0]),
+                log_path,
+                mode="a",
+                header=(not os.path.exists(log_path)),
+                index=False,
+            )
+
     def _calculate_perceived_factors(
         self,
         target_cost_distribution: cost_utils.CostDistribution,
@@ -291,6 +351,7 @@ class GravityModelBase(abc.ABC):
         cost_args: list[float],
         running_log_path: os.PathLike,
         target_cost_distribution: Optional[cost_utils.CostDistribution] = None,
+        diff_step: float = 0.0,
         **kwargs,
     ):
         """Calculate residuals to the target cost distribution.
@@ -302,14 +363,14 @@ class GravityModelBase(abc.ABC):
         Used by the `optimize.least_squares` function.
 
         This function will populate and update:
-            self.achieved_band_share
+            self.achieved_cost_dist
             self.achieved_convergence
-            self.achieved_residuals
             self.achieved_distribution
             self.optimal_cost_params
         """
-        # pylint: disable=too-many-locals
-        # TODO(BT): Tidy up gravity and jacobian function kwargs
+        # Not used, but need for compatibility with self._jacobian_function
+        del diff_step
+
         # Init
         cost_kwargs = self._cost_params_to_kwargs(cost_args)
         cost_matrix = self._apply_perceived_factors(self.cost_matrix)
@@ -322,50 +383,30 @@ class GravityModelBase(abc.ABC):
 
         # Evaluate the performance of this run
         cost_distribution, achieved_residuals, convergence = cost_distribution_stats(
-            target_cost_distribution,
-            self.achieved_distribution,
-            self.cost_matrix,
+            achieved_trip_distribution=matrix,
+            cost_matrix=cost_matrix,
+            target_cost_distribution=target_cost_distribution,
         )
 
-        # Calculate the time this loop took
-        self._loop_end_time = timing.current_milli_time()
-        time_taken = self._loop_end_time - self._loop_start_time
-
-        # ## LOG THIS ITERATION ## #
-        # TODO(BT): Turn into internal function
-        log_dict = {
-            "loop_number": str(self._loop_num),
-            "runtime (s)": time_taken / 1000,
-        }
-        log_dict.update(cost_kwargs)
-        log_dict.update(
-            {
-                "furness_iters": iters,
-                "furness_rmse": np.round(rmse, 6),
-                "bs_con": np.round(convergence, 4),
-            }
+        # Log this iteration
+        end_time = timing.current_milli_time()
+        self._log_iteration(
+            log_path=running_log_path,
+            loop_num=str(self._loop_num),
+            loop_time=(end_time - self._loop_start_time) / 1000,
+            cost_kwargs=cost_kwargs,
+            furness_iters=iters,
+            furness_rmse=rmse,
+            convergence=convergence,
         )
-
-        # Append this iteration to log file
-        if running_log_path is not None:
-            io.safe_dataframe_to_csv(
-                pd.DataFrame(log_dict, index=[0]),
-                running_log_path,
-                mode="a",
-                header=(not os.path.exists(running_log_path)),
-                index=False,
-            )
 
         # Update loop params and return the achieved band shares
         self._loop_num += 1
         self._loop_start_time = timing.current_milli_time()
-        self._loop_end_time = -1
 
         # Update performance params
-        # TODO(BT): Consolidate top 3 into cost_dist class
-        self.achieved_band_share = cost_distribution.band_share_vals
+        self.achieved_cost_dist = cost_distribution
         self.achieved_convergence = convergence
-        self.achieved_residuals = achieved_residuals
         self.achieved_distribution = matrix
 
         # Store the initial values to log later
@@ -378,20 +419,25 @@ class GravityModelBase(abc.ABC):
 
     def _jacobian_function(
         self,
-        cost_args: list[float],
         diff_step: float,
+        cost_args: list[float],
+        running_log_path: os.PathLike,
         target_cost_distribution: cost_utils.CostDistribution,
+        **kwargs
     ):
         """Calculate the Jacobian for _gravity_function.
 
-        Uses the matrices stored in self._jacobian_mats (which were stored in
-        the previous call to self._gravity function) to estimate what a change
-        in the cost parameters would do to final furnessed matrix. This is
-        then formatted into a Jacobian for optimize.least_squares to use.
+        The Jacobian is shape of (n_cost_bands, n_cost_args), where each index
+        indicates the impact a slight change of a cost parameter has on a
+        cost band.
 
         Used by the `optimize.least_squares` function.
         """
         # pylint: disable=too-many-locals
+        # Not used, but need for compatibility with self._gravity_function
+        del running_log_path
+        del kwargs
+
         # Initialise the output
         jacobian = np.zeros((target_cost_distribution.n_bins, len(cost_args)))
 
@@ -410,6 +456,7 @@ class GravityModelBase(abc.ABC):
             out=np.zeros_like(base_matrix),
         )
 
+        # Build the Jacobian matrix.
         for i, cost_param in enumerate(self.cost_function.kw_order):
             cost_step = cost_kwargs[cost_param] * diff_step
 
@@ -539,7 +586,7 @@ class GravityModelBase(abc.ABC):
     def gravity_furness(
         self,
         seed_matrix: np.ndarray,
-        kwargs,
+        **kwargs,
     ) -> tuple[np.ndarray, int, float]:
         """Run a doubly constrained furness on the seed matrix.
 
@@ -612,7 +659,7 @@ class GravityModelBase(abc.ABC):
         running_log_path: os.PathLike,
         target_cost_distribution: cost_utils.CostDistribution,
         target_cost_convergence: float = 0.9,
-        kwargs: dict[str, Any] = None,
+        **kwargs,
     ) -> GravityModelResults:
         """Run the gravity model with set cost parameters.
 
@@ -663,7 +710,6 @@ class GravityModelBase(abc.ABC):
         `caf.distribute.furness.doubly_constrained_furness()`
         """
         # Init
-        kwargs = dict() if kwargs in None else kwargs
         self._validate_running_log(running_log_path)
         self._initialise_internal_params()
 
@@ -671,7 +717,7 @@ class GravityModelBase(abc.ABC):
             cost_args=self._order_init_params(cost_params),
             diff_step=1e-8,
             running_log_path=running_log_path,
-            kwargs=kwargs,
+            **kwargs,
         )
 
         # Run again with perceived factors if good idea
@@ -682,19 +728,12 @@ class GravityModelBase(abc.ABC):
                 cost_args=self._order_init_params(cost_params),
                 diff_step=1e-8,
                 running_log_path=running_log_path,
-                kwargs=kwargs,
+                **kwargs,
             )
 
-        # Create the return object
-        cost_distribution = cost_utils.CostDistribution.from_data(
-            matrix=self.achieved_distribution,
-            cost_matrix=self.cost_matrix,
-            bin_edges=target_cost_distribution.bin_edges
-        )
         return GravityModelResults(
-            cost_distribution=cost_distribution,
-            cost_residuals=target_cost_distribution.residuals(cost_distribution),
-            cost_convergence=target_cost_distribution.convergence(cost_distribution),
+            cost_distribution=self.achieved_cost_dist,
+            cost_convergence=self.achieved_convergence,
             value_distribution=self.achieved_distribution,
             target_cost_distribution=target_cost_distribution,
             cost_function=self.cost_function,
@@ -706,7 +745,7 @@ class GravityModelBase(abc.ABC):
         cost_params: dict[str, Any],
         running_log_path: os.PathLike,
         target_cost_distribution: Optional[cost_utils.CostDistribution] = None,
-        kwargs: dict[str, Any] = None,
+        **kwargs,
     ) -> GravityModelResults:
         """Run the gravity model with set cost parameters.
 
@@ -746,28 +785,19 @@ class GravityModelBase(abc.ABC):
         `caf.distribute.furness.doubly_constrained_furness()`
         """
         # Init
-        kwargs = dict() if kwargs in None else kwargs
         self._validate_running_log(running_log_path)
         self._initialise_internal_params()
 
         self._gravity_function(
             cost_args=self._order_init_params(cost_params),
-            diff_step=1e-8,
             running_log_path=running_log_path,
-            kwargs=kwargs,
-        )
-
-        # Build the return objects differently depending on args
-        distribution, residuals, convergence = cost_distribution_stats(
-            target_cost_distribution,
-            self.achieved_distribution,
-            self.cost_matrix,
+            target_cost_distribution=target_cost_distribution,
+            **kwargs,
         )
 
         return GravityModelResults(
-            cost_distribution=distribution,
-            cost_residuals=residuals,
-            cost_convergence=convergence,
+            cost_distribution=self.achieved_cost_dist,
+            cost_convergence=self.achieved_convergence,
             value_distribution=self.achieved_distribution,
             target_cost_distribution=target_cost_distribution,
             cost_function=self.cost_function,

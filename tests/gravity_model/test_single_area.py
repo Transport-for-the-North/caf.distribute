@@ -18,7 +18,9 @@ import pandas as pd
 
 # Local Imports
 # pylint: disable=import-error,wrong-import-position
+from caf.toolkit import cost_utils
 from caf.distribute import cost_functions
+from caf.distribute.gravity_model import GravityModelResults
 from caf.distribute.gravity_model import SingleAreaGravityModelCalibrator
 
 # pylint: enable=import-error,wrong-import-position
@@ -36,7 +38,7 @@ class GMCreator:
     col_targets: np.ndarray
     cost_function: cost_functions.CostFunction
     cost_matrix: np.ndarray
-    target_cost_distribution: pd.DataFrame
+    target_cost_distribution: cost_utils.CostDistribution
     running_log_path: os.PathLike
 
     @staticmethod
@@ -52,8 +54,9 @@ class GMCreator:
         return np.loadtxt(home / "cost_matrix.csv", delimiter=",")
 
     @staticmethod
-    def _read_cost_distribution(home: pathlib.Path) -> np.ndarray:
-        return pd.read_csv(home / "target_cost_distribution.csv")
+    def _read_cost_distribution(home: pathlib.Path) -> cost_utils.CostDistribution:
+        path = home / "target_cost_distribution.csv"
+        return cost_utils.CostDistribution.from_file(path)
 
     @staticmethod
     def from_file(
@@ -71,24 +74,45 @@ class GMCreator:
             running_log_path=running_log_path,
         )
 
-    def create_gravity_model(
-        self,
-        target_convergence: float = 0.9,
-        furness_max_iters: int = 1000,
-        furness_tol: float = 1e-3,
-        use_perceived_factors: bool = False,
-    ) -> SingleAreaGravityModelCalibrator:
+    def create_gravity_model(self) -> SingleAreaGravityModelCalibrator:
         return SingleAreaGravityModelCalibrator(
             row_targets=self.row_targets,
             col_targets=self.col_targets,
             cost_function=self.cost_function,
             cost_matrix=self.cost_matrix,
-            target_cost_distribution=self.target_cost_distribution,
+        )
+
+    def create_and_run_gravity_model(
+        self,
+        cost_params: dict[str, Any],
+        target_convergence: float = 0.9,
+        furness_max_iters: int = 1000,
+        furness_tol: float = 1e-3,
+        use_perceived_factors: bool = False,
+    ) -> GravityModelResults:
+        gm = SingleAreaGravityModelCalibrator(
+            row_targets=self.row_targets,
+            col_targets=self.col_targets,
+            cost_function=self.cost_function,
+            cost_matrix=self.cost_matrix,
+        )
+
+        if use_perceived_factors:
+            return gm.run_with_perceived_factors(
+                cost_params=cost_params,
+                running_log_path=self.running_log_path,
+                target_cost_distribution=self.target_cost_distribution,
+                target_cost_convergence=target_convergence,
+                max_iters=furness_max_iters,
+                tol=furness_tol,
+            )
+
+        return gm.run(
+            cost_params=cost_params,
             running_log_path=self.running_log_path,
-            target_convergence=target_convergence,
-            furness_max_iters=furness_max_iters,
-            furness_tol=furness_tol,
-            use_perceived_factors=use_perceived_factors,
+            target_cost_distribution=self.target_cost_distribution,
+            max_iters=furness_max_iters,
+            tol=furness_tol,
         )
 
 
@@ -145,33 +169,29 @@ class GMCalibrateResults(GMCreator):
             best_params=GMCalibrateResults._read_best_params(calib_path),
         )
 
-    def assert_results(
-        self,
-        best_params: dict[str, Any],
-        calibrated_gm: SingleAreaGravityModelCalibrator,
-    ) -> None:
+    def assert_results(self, gm_results: GravityModelResults) -> None:
         """Assert that all the results are as expected"""
         # Check the scalar values
         for key, val in self.best_params.items():
-            assert key in best_params
-            np.testing.assert_almost_equal(best_params[key], val, decimal=5)
+            assert key in gm_results.cost_params
+            np.testing.assert_almost_equal(gm_results.cost_params[key], val, decimal=5)
 
         np.testing.assert_almost_equal(
-            calibrated_gm.achieved_convergence, self.convergence, decimal=5
+            gm_results.cost_convergence, self.convergence, decimal=5,
         )
         # Check the matrices
         np.testing.assert_allclose(
-            calibrated_gm.achieved_band_share,
+            gm_results.cost_distribution.band_share_vals,
             self.band_share,
             rtol=1e-3,
         )
         np.testing.assert_allclose(
-            calibrated_gm.achieved_residuals,
+            self.target_cost_distribution.residuals(gm_results.cost_distribution),
             self.residuals,
             rtol=1e-3,
         )
         np.testing.assert_allclose(
-            calibrated_gm.achieved_distribution,
+            gm_results.value_distribution,
             self.distribution,
             rtol=1e-3,
         )
@@ -423,6 +443,19 @@ class TestSimpleTanner:
         simple_tanner_run.assert_results(
             best_params=best_params,
             calibrated_gm=gm,
+        )
+
+
+@pytest.mark.usefixtures("simple_tanner_run")
+class TestRunMethods:
+    """Thoroughly tests the run functions using a simple example."""
+
+    def test_normal_run(self, simple_tanner_run: GMRunResults):
+        """Test a correct run."""
+        best_params = simple_tanner_run.get_optimal_params()
+        gm_results = simple_tanner_run.create_and_run_gravity_model(best_params)
+        simple_tanner_run.assert_results(
+            gm_results=gm_results,
         )
 
 

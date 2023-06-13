@@ -12,10 +12,10 @@ from typing import Optional
 import numpy as np
 import pandas as pd
 
-from caf.toolkit import toolbox
 
 # Local Imports
 # pylint: disable=import-error,wrong-import-position
+from caf.toolkit import toolbox
 from caf.distribute import furness
 from caf.distribute import cost_functions
 from caf.distribute.gravity_model import core
@@ -51,38 +51,6 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
         A matrix detailing the cost between each and every zone. This
         matrix must be the same size as
         `(len(row_targets), len(col_targets))`.
-
-    target_cost_distribution:
-        The cost distribution to target during calibration. The cost should
-        be in the same units as the `cost_matrix`. It should contain four
-        columns: ["min", "max", "ave", "trips"]. Where "min" and "max"
-        contain the minimum and maximum bounds for each row, "ave" contains
-        the average cost for each row, and "trips" is the number of trips
-        in each boundary.
-
-    target_convergence:
-        A value between 0 and 1, the convergence to aim for during
-        calibration. Values closer to 1 mean a better convergence.
-
-    furness_max_iters:
-        The maximum number of furness iterations to complete before exiting.
-
-    furness_tol:
-        The maximum difference between the achieved and the target values
-        to tolerate before exiting the furness early. R^2 is used to
-        calculate the difference.
-
-    running_log_path:
-        Path to output the running log to. This log will detail the
-        performance of each iteration of the calibration and is written in
-        .csv format.
-
-    use_perceived_factors:
-        Whether to utilise perceived factors while calibrating the
-        gravity model. These factors are good to improve convergence when
-        the performance is near the target already.
-
-    # TODO(BT) : Fully Document this class
     """
 
     def __init__(
@@ -91,33 +59,20 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
         col_targets: np.ndarray,
         cost_function: cost_functions.CostFunction,
         cost_matrix: np.ndarray,
-        target_cost_distribution: pd.DataFrame,
-        target_convergence: float,
-        furness_max_iters: int,
-        furness_tol: float,
-        running_log_path: os.PathLike,
-        use_perceived_factors: bool = True,
     ):
-        # pylint: disable=too-many-arguments
         super().__init__(
             cost_function=cost_function,
             cost_matrix=cost_matrix,
-            target_cost_distribution=target_cost_distribution,
-            running_log_path=running_log_path,
         )
 
         # Set attributes
         self.row_targets = row_targets
         self.col_targets = col_targets
-        self.furness_max_iters = furness_max_iters
-        self.furness_tol = furness_tol
-        self.use_perceived_factors = use_perceived_factors
-
-        self.target_convergence = target_convergence
 
     def gravity_furness(
         self,
         seed_matrix: np.ndarray,
+        **kwargs,
     ) -> tuple[np.ndarray, int, float]:
         """Run a doubly constrained furness on the seed matrix.
 
@@ -128,6 +83,10 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
         ----------
         seed_matrix:
             Initial values for the furness.
+
+        kwargs:
+            Additional arguments from the caller to pass to
+            `self.doubly_constrained_furness`.
 
         Returns
         -------
@@ -144,16 +103,14 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
             seed_vals=seed_matrix,
             row_targets=self.row_targets,
             col_targets=self.col_targets,
-            tol=self.furness_tol,
-            max_iters=self.furness_max_iters,
+            **kwargs
         )
 
     def jacobian_furness(
         self,
-        seed_matrices: dict[str, np.ndarray],
+        seed_matrix: np.ndarray,
         row_targets: np.ndarray,
         col_targets: np.ndarray,
-        ignore_result: bool = False,
     ) -> dict[str, np.ndarray]:
         """Run a doubly constrained furness on the seed matrix.
 
@@ -162,10 +119,8 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
 
         Parameters
         ----------
-        seed_matrices:
-            Dictionary of initial values for the furness.
-            Keys are the name of the cost params which has been changed
-            to get this new seed matrix.
+        seed_matrix:
+            Initial values for the furness.
 
         row_targets:
             The target values for the sum of each row.
@@ -174,10 +129,6 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
         col_targets:
             The target values for the sum of each column
             i.e. np.sum(seed_matrix, axis=0)
-
-        ignore_result:
-            Whether to ignore the return result or not. Useful when a Jacobian
-            furness is only being called to satisfy other threads.
 
         Returns
         -------
@@ -190,24 +141,21 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
         achieved_rmse:
             The Root Mean Squared Error difference achieved before exiting
         """
-        return_dict = dict.fromkeys(seed_matrices.keys(), np.zeros_like(seed_matrices))
-        for cost_param, seed_matrix in seed_matrices.items():
-            return_dict[cost_param], *_ = furness.doubly_constrained_furness(
-                seed_vals=seed_matrix,
-                row_targets=row_targets,
-                col_targets=col_targets,
-                tol=1e-6,
-                max_iters=20,
-                warning=False,
-            )
-
-        return return_dict
+        return furness.doubly_constrained_furness(
+            seed_vals=seed_matrix,
+            row_targets=row_targets,
+            col_targets=col_targets,
+            tol=1e-6,
+            max_iters=20,
+            warning=False,
+        )
 
     def calibrate(
         self,
         init_params: Optional[dict[str, Any]] = None,
         estimate_init_params: bool = False,
         calibrate_params: bool = True,
+        target_convergence: float = 0.9,
         diff_step: float = 1e-8,
         ftol: float = 1e-4,
         xtol: float = 1e-4,
@@ -242,6 +190,10 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
             Whether to calibrate the cost parameters or not. If not
             calibrating, the given init_params will be assumed to be
             optimal.
+
+        target_convergence:
+            A value between 0 and 1, the convergence to aim for during
+            calibration. Values closer to 1 mean a better convergence.
 
         diff_step:
             Copied from scipy.optimize.least_squares documentation, where it
@@ -310,7 +262,7 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
         if estimate_init_params:
             init_params = self._estimate_init_params(
                 init_params=init_params,
-                target_cost_distribution=self.target_cost_distribution,
+                target_cost_distribution=target_cost_distribution,
             )
 
         # Figure out the optimal cost params
@@ -330,8 +282,8 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
             return self.optimal_cost_params
 
         # ## APPLY PERCEIVED FACTORS IF WE CAN ## #
-        upper_limit = self.target_convergence + 0.03
-        lower_limit = self.target_convergence - 0.15
+        upper_limit = target_convergence + 0.03
+        lower_limit = target_convergence - 0.15
 
         # Just return if upper limit has been beaten
         if self.achieved_convergence > upper_limit:
@@ -342,7 +294,7 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
             warnings.warn(
                 f"Calibration was not able to reach the lower threshold "
                 f"required to use perceived factors.\n"
-                f"Target convergence: {self.target_convergence}\n"
+                f"Target convergence: {target_convergence}\n"
                 f"Upper Limit: {upper_limit}\n"
                 f"Achieved convergence: {self.achieved_convergence}"
             )
@@ -362,11 +314,11 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
             verbose=verbose,
         )
 
-        if self.achieved_convergence < self.target_convergence:
+        if self.achieved_convergence < target_convergence:
             warnings.warn(
                 f"Calibration with perceived factors was not able to reach "
                 f"the target_convergence.\n"
-                f"Target convergence: {self.target_convergence}\n"
+                f"Target convergence: {target_convergence}\n"
                 f"Achieved convergence: {self.achieved_convergence}"
             )
 
