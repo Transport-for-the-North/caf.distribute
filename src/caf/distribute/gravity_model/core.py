@@ -32,6 +32,34 @@ LOG = logging.getLogger(__name__)
 # # # CLASSES # # #
 @dataclasses.dataclass
 class GravityModelResults:
+    """A collection of results from a run of the Gravity Model.
+
+    Parameters
+    ----------
+    cost_distribution:
+        The achieved cost distribution of the run.
+
+    cost_convergence:
+        The achieved cost convergence value of the run. If
+        `target_cost_distribution` is not set, then this should be 0.
+        This will be the same as calculating the convergence of
+        `cost_distribution` and `target_cost_distribution`.
+
+    value_distribution:
+        The achieved distribution of the given values (usually trip values
+        between different places).
+
+    target_cost_distribution:
+        If set, this will be the cost distribution the gravity
+        model was aiming for during its run.
+
+    cost_function:
+        If set, this will be the cost function used in the gravity model run.
+
+    cost_params:
+        If set, the cost parameters used with the cost_function to achieve
+        the results.
+    """
 
     cost_distribution: cost_utils.CostDistribution
     cost_convergence: float
@@ -61,7 +89,6 @@ class GravityModelBase(abc.ABC):
         cost_matrix: np.ndarray,
         cost_min_max_buf: float = 0.1,
     ):
-
         # Set attributes
         self.cost_function = cost_function
         self.cost_min_max_buf = cost_min_max_buf
@@ -83,6 +110,7 @@ class GravityModelBase(abc.ABC):
 
     @property
     def achieved_band_share(self) -> np.ndarray:
+        """The achieved band share values during the last run."""
         if self.achieved_cost_dist is None:
             raise ValueError("Gravity model has not been run. achieved_band_share is not set.")
         return self.achieved_cost_dist.band_share_vals
@@ -423,7 +451,7 @@ class GravityModelBase(abc.ABC):
         cost_args: list[float],
         running_log_path: os.PathLike,
         target_cost_distribution: cost_utils.CostDistribution,
-        **kwargs
+        **kwargs,
     ):
         """Calculate the Jacobian for _gravity_function.
 
@@ -444,8 +472,8 @@ class GravityModelBase(abc.ABC):
         # Initialise running params
         cost_kwargs = self._cost_params_to_kwargs(cost_args)
         cost_matrix = self._apply_perceived_factors(self.cost_matrix)
-        row_targets = self.achieved_distribution.sum(axis=1),
-        col_targets = self.achieved_distribution.sum(axis=0),
+        row_targets = (self.achieved_distribution.sum(axis=1),)
+        col_targets = (self.achieved_distribution.sum(axis=0),)
 
         # Estimate what the furness does to the matrix
         base_matrix = self.cost_function.calculate(cost_matrix, **cost_kwargs)
@@ -721,9 +749,13 @@ class GravityModelBase(abc.ABC):
         )
 
         # Run again with perceived factors if good idea
-        should_use_perceived = self._should_use_perceived_factors(target_cost_convergence, self.achieved_convergence)
+        should_use_perceived = self._should_use_perceived_factors(
+            target_cost_convergence, self.achieved_convergence
+        )
         if should_use_perceived:
-            self._calculate_perceived_factors(target_cost_distribution, self.achieved_band_share)
+            self._calculate_perceived_factors(
+                target_cost_distribution, self.achieved_band_share
+            )
             self._gravity_function(
                 cost_args=self._order_init_params(cost_params),
                 diff_step=1e-8,
@@ -848,7 +880,7 @@ def cost_distribution_stats(
         cost_distribution = cost_utils.CostDistribution.from_data(
             matrix=achieved_trip_distribution,
             cost_matrix=cost_matrix,
-            bin_edges=target_cost_distribution.bin_edges
+            bin_edges=target_cost_distribution.bin_edges,
         )
         cost_residuals = target_cost_distribution.residuals(cost_distribution)
         cost_convergence = target_cost_distribution.convergence(cost_distribution)

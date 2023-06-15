@@ -177,7 +177,9 @@ class GMCalibrateResults(GMCreator):
             np.testing.assert_almost_equal(gm_results.cost_params[key], val, decimal=5)
 
         np.testing.assert_almost_equal(
-            gm_results.cost_convergence, self.convergence, decimal=5,
+            gm_results.cost_convergence,
+            self.convergence,
+            decimal=5,
         )
         # Check the matrices
         np.testing.assert_allclose(

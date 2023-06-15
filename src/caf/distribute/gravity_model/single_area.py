@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """Implementation of a self-calibrating single area gravity model."""
 # Built-Ins
-import os
 import logging
 import warnings
 
@@ -10,8 +9,6 @@ from typing import Optional
 
 # Third Party
 import numpy as np
-import pandas as pd
-
 
 # Local Imports
 # pylint: disable=import-error,wrong-import-position
@@ -103,7 +100,7 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
             seed_vals=seed_matrix,
             row_targets=self.row_targets,
             col_targets=self.col_targets,
-            **kwargs
+            **kwargs,
         )
 
     def jacobian_furness(
@@ -252,6 +249,7 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
         gravity_model
         scipy.optimize.least_squares
         """
+        # pylint: disable=too-many-arguments
         # Validate init_params
         if init_params is None:
             init_params = self.cost_function.default_params
