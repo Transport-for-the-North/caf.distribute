@@ -13,7 +13,6 @@ from typing import Any
 # Third Party
 import pytest
 import numpy as np
-import pandas as pd
 
 
 # Local Imports
@@ -257,6 +256,33 @@ class GMRunResults(GMCalibrateResults):
         return self.best_params
 
 
+@dataclasses.dataclass
+class GMRunPerceivedResults(GMRunResults):
+    """Stores the expected results alongside the inputs for calibration"""
+
+    @staticmethod
+    def from_file(
+        path: pathlib.Path,
+        running_log_path: os.PathLike,
+        cost_function: cost_functions.CostFunction,
+    ) -> GMCreator:
+        """Load data from files to create this test"""
+        calib_path = path / cost_function.name.lower() / "run_perceived"
+        return GMRunResults(
+            row_targets=GMCalibrateResults._read_row_targets(path),
+            col_targets=GMCalibrateResults._read_col_targets(path),
+            cost_matrix=GMCalibrateResults._read_cost_matrix(path),
+            target_cost_distribution=GMCalibrateResults._read_cost_distribution(path),
+            cost_function=cost_function,
+            running_log_path=running_log_path,
+            convergence=GMCalibrateResults._read_convergence(calib_path),
+            band_share=GMCalibrateResults._read_band_share(calib_path),
+            distribution=GMCalibrateResults._read_distribution(calib_path),
+            residuals=GMCalibrateResults._read_residuals(calib_path),
+            best_params=GMCalibrateResults._read_best_params(calib_path),
+        )
+
+
 # # # FIXTURES # # #
 def simple_gm_calib_results(tmp_path, cost_function) -> GMCalibrateResults:
     """Load in the small_and_simple test"""
@@ -307,6 +333,17 @@ def real_gm_run_results(tmp_path, cost_function) -> GMRunResults:
     running_log_path = tmp_path / "run_log.csv"
     data_path = TEST_DATA_PATH / "realistic"
     return GMRunResults.from_file(
+        path=data_path,
+        running_log_path=running_log_path,
+        cost_function=cost_function,
+    )
+
+
+def real_gm_run_perceived_results(tmp_path, cost_function) -> GMRunResults:
+    """Load in the real world test"""
+    running_log_path = tmp_path / "run_log.csv"
+    data_path = TEST_DATA_PATH / "realistic"
+    return GMRunPerceivedResults.from_file(
         path=data_path,
         running_log_path=running_log_path,
         cost_function=cost_function,
@@ -380,11 +417,22 @@ def fixture_real_log_normal_calib_perceived(tmp_path) -> GMCalibrateResults:
 
 
 @pytest.fixture(name="real_log_normal_run")
-def fixture_real_log_normal_run(tmp_path) -> GMCalibrateResults:
+def fixture_real_log_normal_run(tmp_path) -> GMRunResults:
     """Load in the realistic log normal test"""
     path = tmp_path / "real_log_normal_run"
     path.mkdir()
     return real_gm_run_results(
+        tmp_path=path,
+        cost_function=cost_functions.BuiltInCostFunction.LOG_NORMAL.get_cost_function(),
+    )
+
+
+@pytest.fixture(name="real_log_normal_run_perceived")
+def fixture_real_log_normal_run_perceived(tmp_path) -> GMRunResults:
+    """Load in the realistic log normal test"""
+    path = tmp_path / "real_log_normal_run_perceived"
+    path.mkdir()
+    return real_gm_run_perceived_results(
         tmp_path=path,
         cost_function=cost_functions.BuiltInCostFunction.LOG_NORMAL.get_cost_function(),
     )
@@ -448,15 +496,33 @@ class TestSimpleTanner:
         )
 
 
-@pytest.mark.usefixtures("simple_tanner_run")
+@pytest.mark.usefixtures("simple_tanner_run", "simple_log_normal_run", "real_log_normal_run")
 class TestRunMethods:
     """Thoroughly tests the run functions using a simple example."""
 
-    def test_normal_run(self, simple_tanner_run: GMRunResults):
-        """Test a correct run."""
-        best_params = simple_tanner_run.get_optimal_params()
-        gm_results = simple_tanner_run.create_and_run_gravity_model(best_params)
-        simple_tanner_run.assert_results(
+    @pytest.mark.parametrize(
+        "fixture_str",
+        ["simple_tanner_run", "simple_log_normal_run", "real_log_normal_run"],
+    )
+    def test_normal_run(self, fixture_str, request):
+        """Test a default run."""
+        run_and_results = request.getfixturevalue(fixture_str)
+        best_params = run_and_results.get_optimal_params()
+        gm_results = run_and_results.create_and_run_gravity_model(best_params)
+        run_and_results.assert_results(
+            gm_results=gm_results,
+        )
+
+    @pytest.mark.parametrize(
+        "fixture_str",
+        ["simple_tanner_run", "simple_log_normal_run", "real_log_normal_run_perceived"],
+    )
+    def test_perceived_run(self, fixture_str, request):
+        """Test a perceived factor run."""
+        run_and_results = request.getfixturevalue(fixture_str)
+        best_params = run_and_results.get_optimal_params()
+        gm_results = run_and_results.create_and_run_gravity_model(best_params, use_perceived_factors=True)
+        run_and_results.assert_results(
             gm_results=gm_results,
         )
 
