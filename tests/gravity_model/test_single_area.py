@@ -57,20 +57,27 @@ class GMCreator:
         path = home / "target_cost_distribution.csv"
         return cost_utils.CostDistribution.from_file(path)
 
-    @staticmethod
+    @classmethod
+    def get_common_constructor_kwargs(cls, path: pathlib.Path) -> dict[str, Any]:
+        return {
+            "row_targets": cls._read_row_targets(path),
+            "col_targets": cls._read_col_targets(path),
+            "cost_matrix": cls._read_cost_matrix(path),
+            "target_cost_distribution": cls._read_cost_distribution(path),
+        }
+
+    @classmethod
     def from_file(
+        cls,
         path: pathlib.Path,
         running_log_path: os.PathLike,
         cost_function: cost_functions.CostFunction,
     ) -> GMCreator:
         """Load data from files to create this test"""
-        return GMCreator(
-            row_targets=GMCreator._read_row_targets(path),
-            col_targets=GMCreator._read_col_targets(path),
-            cost_matrix=GMCreator._read_cost_matrix(path),
-            target_cost_distribution=GMCreator._read_cost_distribution(path),
+        return cls(
             cost_function=cost_function,
             running_log_path=running_log_path,
+            **cls.get_common_constructor_kwargs(path),
         )
 
     def create_gravity_model(self) -> SingleAreaGravityModelCalibrator:
@@ -146,26 +153,30 @@ class GMCalibrateResults(GMCreator):
         with open(home / "best_params.json", "r") as fp:
             return json.load(fp)
 
-    @staticmethod
+    @classmethod
+    def get_specific_constructor_kwargs(cls, path: pathlib.Path) -> dict[str, Any]:
+        return {
+            "convergence": GMCalibrateResults._read_convergence(path),
+            "band_share": GMCalibrateResults._read_band_share(path),
+            "distribution": GMCalibrateResults._read_distribution(path),
+            "residuals": GMCalibrateResults._read_residuals(path),
+            "best_params": GMCalibrateResults._read_best_params(path),
+        }
+
+    @classmethod
     def from_file(
+        cls,
         path: pathlib.Path,
         running_log_path: os.PathLike,
         cost_function: cost_functions.CostFunction,
     ) -> GMCreator:
         """Load data from files to create this test"""
         calib_path = path / cost_function.name.lower() / "calibrate"
-        return GMCalibrateResults(
-            row_targets=GMCalibrateResults._read_row_targets(path),
-            col_targets=GMCalibrateResults._read_col_targets(path),
-            cost_matrix=GMCalibrateResults._read_cost_matrix(path),
-            target_cost_distribution=GMCalibrateResults._read_cost_distribution(path),
+        return cls(
             cost_function=cost_function,
             running_log_path=running_log_path,
-            convergence=GMCalibrateResults._read_convergence(calib_path),
-            band_share=GMCalibrateResults._read_band_share(calib_path),
-            distribution=GMCalibrateResults._read_distribution(calib_path),
-            residuals=GMCalibrateResults._read_residuals(calib_path),
-            best_params=GMCalibrateResults._read_best_params(calib_path),
+            **cls.get_common_constructor_kwargs(path),
+            **cls.get_specific_constructor_kwargs(calib_path),
         )
 
     def assert_results(self, gm_results: GravityModelResults) -> None:
@@ -202,26 +213,20 @@ class GMCalibrateResults(GMCreator):
 class GMCalibratePerceivedResults(GMCalibrateResults):
     """Stores the expected results alongside the inputs for calibration"""
 
-    @staticmethod
+    @classmethod
     def from_file(
+        cls,
         path: pathlib.Path,
         running_log_path: os.PathLike,
         cost_function: cost_functions.CostFunction,
     ) -> GMCreator:
         """Load data from files to create this test"""
         calib_path = path / cost_function.name.lower() / "calibrate_perceived"
-        return GMCalibrateResults(
-            row_targets=GMCalibrateResults._read_row_targets(path),
-            col_targets=GMCalibrateResults._read_col_targets(path),
-            cost_matrix=GMCalibrateResults._read_cost_matrix(path),
-            target_cost_distribution=GMCalibrateResults._read_cost_distribution(path),
+        return cls(
             cost_function=cost_function,
             running_log_path=running_log_path,
-            convergence=GMCalibrateResults._read_convergence(calib_path),
-            band_share=GMCalibrateResults._read_band_share(calib_path),
-            distribution=GMCalibrateResults._read_distribution(calib_path),
-            residuals=GMCalibrateResults._read_residuals(calib_path),
-            best_params=GMCalibrateResults._read_best_params(calib_path),
+            **cls.get_common_constructor_kwargs(path),
+            **cls.get_specific_constructor_kwargs(calib_path),
         )
 
 
@@ -229,26 +234,20 @@ class GMCalibratePerceivedResults(GMCalibrateResults):
 class GMRunResults(GMCalibrateResults):
     """Stores the expected results alongside the inputs for run"""
 
-    @staticmethod
+    @classmethod
     def from_file(
+        cls,
         path: pathlib.Path,
         running_log_path: os.PathLike,
         cost_function: cost_functions.CostFunction,
     ) -> GMCreator:
         """Load data from files to create this test"""
         calib_path = path / cost_function.name.lower() / "run"
-        return GMRunResults(
-            row_targets=GMCalibrateResults._read_row_targets(path),
-            col_targets=GMCalibrateResults._read_col_targets(path),
-            cost_matrix=GMCalibrateResults._read_cost_matrix(path),
-            target_cost_distribution=GMCalibrateResults._read_cost_distribution(path),
+        return cls(
             cost_function=cost_function,
             running_log_path=running_log_path,
-            convergence=GMCalibrateResults._read_convergence(calib_path),
-            band_share=GMCalibrateResults._read_band_share(calib_path),
-            distribution=GMCalibrateResults._read_distribution(calib_path),
-            residuals=GMCalibrateResults._read_residuals(calib_path),
-            best_params=GMCalibrateResults._read_best_params(calib_path),
+            **cls.get_common_constructor_kwargs(path),
+            **cls.get_specific_constructor_kwargs(calib_path),
         )
 
     def get_optimal_params(self) -> dict[str, Any]:
@@ -260,26 +259,20 @@ class GMRunResults(GMCalibrateResults):
 class GMRunPerceivedResults(GMRunResults):
     """Stores the expected results alongside the inputs for calibration"""
 
-    @staticmethod
+    @classmethod
     def from_file(
+        cls,
         path: pathlib.Path,
         running_log_path: os.PathLike,
         cost_function: cost_functions.CostFunction,
     ) -> GMCreator:
         """Load data from files to create this test"""
         calib_path = path / cost_function.name.lower() / "run_perceived"
-        return GMRunResults(
-            row_targets=GMCalibrateResults._read_row_targets(path),
-            col_targets=GMCalibrateResults._read_col_targets(path),
-            cost_matrix=GMCalibrateResults._read_cost_matrix(path),
-            target_cost_distribution=GMCalibrateResults._read_cost_distribution(path),
+        return cls(
             cost_function=cost_function,
             running_log_path=running_log_path,
-            convergence=GMCalibrateResults._read_convergence(calib_path),
-            band_share=GMCalibrateResults._read_band_share(calib_path),
-            distribution=GMCalibrateResults._read_distribution(calib_path),
-            residuals=GMCalibrateResults._read_residuals(calib_path),
-            best_params=GMCalibrateResults._read_best_params(calib_path),
+            **cls.get_common_constructor_kwargs(path),
+            **cls.get_specific_constructor_kwargs(calib_path),
         )
 
 
@@ -521,7 +514,9 @@ class TestRunMethods:
         """Test a perceived factor run."""
         run_and_results = request.getfixturevalue(fixture_str)
         best_params = run_and_results.get_optimal_params()
-        gm_results = run_and_results.create_and_run_gravity_model(best_params, use_perceived_factors=True)
+        gm_results = run_and_results.create_and_run_gravity_model(
+            best_params, use_perceived_factors=True
+        )
         run_and_results.assert_results(
             gm_results=gm_results,
         )
