@@ -743,8 +743,8 @@ class GravityModelBase(abc.ABC):
 
         self._gravity_function(
             cost_args=self._order_init_params(cost_params),
-            diff_step=1e-8,
             running_log_path=running_log_path,
+            target_cost_distribution=target_cost_distribution,
             **kwargs,
         )
 
@@ -758,8 +758,8 @@ class GravityModelBase(abc.ABC):
             )
             self._gravity_function(
                 cost_args=self._order_init_params(cost_params),
-                diff_step=1e-8,
                 running_log_path=running_log_path,
+                target_cost_distribution=target_cost_distribution,
                 **kwargs,
             )
 
