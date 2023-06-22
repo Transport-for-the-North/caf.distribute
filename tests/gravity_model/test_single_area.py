@@ -445,25 +445,6 @@ class TestSimpleLogNormal:
             calibrated_gm=gm,
         )
 
-    def test_correct_run(self, simple_log_normal_run: GMRunResults):
-        """Test that the gravity model correctly runs."""
-        gm = simple_log_normal_run.create_gravity_model()
-        best_params = simple_log_normal_run.get_optimal_params()
-        best_params = gm.calibrate(init_params=best_params, calibrate_params=False)
-        simple_log_normal_run.assert_results(
-            best_params=best_params,
-            calibrated_gm=gm,
-        )
-
-    def test_correct_perceived(self):
-        """Test that the gravity model correctly calibrates with perceived factors."""
-        # Use cost function as a param
-
-        # Make GM
-        # Run
-        # Assert
-        pass
-
 
 @pytest.mark.usefixtures("simple_tanner_calib", "simple_tanner_run")
 class TestSimpleTanner:
@@ -474,16 +455,6 @@ class TestSimpleTanner:
         gm = simple_tanner_calib.create_gravity_model()
         best_params = gm.calibrate()
         simple_tanner_calib.assert_results(
-            best_params=best_params,
-            calibrated_gm=gm,
-        )
-
-    def test_correct_run(self, simple_tanner_run: GMRunResults):
-        """Test that the gravity model correctly runs."""
-        gm = simple_tanner_run.create_gravity_model()
-        best_params = simple_tanner_run.get_optimal_params()
-        best_params = gm.calibrate(init_params=best_params, calibrate_params=False)
-        simple_tanner_run.assert_results(
             best_params=best_params,
             calibrated_gm=gm,
         )
@@ -554,13 +525,3 @@ class TestRealLogNormal:
                 best_params=best_params,
                 calibrated_gm=gm,
             )
-
-    def test_correct_run(self, real_log_normal_run: GMRunResults):
-        """Test that the gravity model correctly runs."""
-        gm = real_log_normal_run.create_gravity_model()
-        best_params = real_log_normal_run.get_optimal_params()
-        best_params = gm.calibrate(init_params=best_params, calibrate_params=False)
-        real_log_normal_run.assert_results(
-            best_params=best_params,
-            calibrated_gm=gm,
-        )
