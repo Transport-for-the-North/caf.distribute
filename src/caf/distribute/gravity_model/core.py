@@ -180,67 +180,6 @@ class GravityModelBase(abc.ABC):
 
         return min_vals, max_vals
 
-    def _cost_distribution(
-        self,
-        matrix: np.ndarray,
-        tcd_bin_edges: list[float],
-    ) -> np.ndarray:
-        """Calculate the distribution of matrix across tcd_bin_edges."""
-        _, normalised = cost_utils.normalised_cost_distribution(
-            matrix=matrix,
-            cost_matrix=self.cost_matrix,
-            bin_edges=tcd_bin_edges,
-        )
-        return normalised
-
-    def _guess_init_params(
-        self,
-        cost_args: list[float],
-        target_cost_distribution: cost_utils.CostDistribution,
-    ):
-        """Guess the initial cost arguments.
-
-        Internal function of _estimate_init_params().
-        Used by the `optimize.least_squares` function.
-        """
-        # Need kwargs for calling cost function
-        cost_kwargs = self._cost_params_to_kwargs(cost_args)
-
-        # Estimate what the cost function will do to the costs - on average
-        avg_cost_vals = target_cost_distribution.avg_vals
-        estimated_cost_vals = self.cost_function.calculate(avg_cost_vals, **cost_kwargs)
-        estimated_band_shares = estimated_cost_vals / estimated_cost_vals.sum()
-
-        return target_cost_distribution.band_share_vals - estimated_band_shares
-
-    def _estimate_init_params(
-        self,
-        init_params: dict[str, Any],
-        target_cost_distribution: pd.DataFrame,
-    ) -> dict[str, Any]:
-        """Guesses what the initial params should be.
-
-        Uses the average cost in each band to estimate what changes in
-        the cost_params would do to the final cost distributions. This is a
-        very coarse-grained estimation, but can be used to guess around about
-        where the best init params are.
-        """
-        result = optimize.least_squares(
-            fun=self._guess_init_params,
-            x0=self._order_cost_params(init_params),
-            method=self._least_squares_method,
-            bounds=self._order_bounds(),
-            kwargs={"target_cost_distribution": target_cost_distribution},
-        )
-        init_params = self._cost_params_to_kwargs(result.x)
-
-        # TODO(BT): standardise this
-        if self.cost_function.name == "LOG_NORMAL":
-            init_params["sigma"] *= 0.8
-            init_params["mu"] *= 0.5
-
-        return init_params
-
     @staticmethod
     def _should_use_perceived_factors(
         target_convergence: float,
@@ -516,11 +455,13 @@ class GravityModelBase(abc.ABC):
             )
 
             # Calculate the Jacobian values for this cost param
-            adj_band_share = self._cost_distribution(
+            adj_cost_dist = cost_utils.CostDistribution.from_data(
                 matrix=adj_final,
-                tcd_bin_edges=target_cost_distribution.bin_edges,
+                cost_matrix=self.cost_matrix,
+                bin_edges=target_cost_distribution.bin_edges,
             )
-            jacobian_residuals = self.achieved_band_share - adj_band_share
+
+            jacobian_residuals = self.achieved_band_share - adj_cost_dist.band_share_vals
             jacobian[:, i] = jacobian_residuals / cost_step
 
         return jacobian
