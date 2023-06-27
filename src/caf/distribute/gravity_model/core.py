@@ -478,7 +478,7 @@ class GravityModelBase(abc.ABC):
         failure_tol: float = 0,
         n_random_tries: int = 3,
         verbose: int = 0,
-        **kwargs
+        **kwargs,
     ) -> GravityModelResults:
         """Find the optimal parameters for self.cost_function.
 
@@ -563,7 +563,7 @@ class GravityModelBase(abc.ABC):
         gravity_kwargs = {
             "running_log_path": running_log_path,
             "target_cost_distribution": target_cost_distribution,
-            "diff_step": diff_step
+            "diff_step": diff_step,
         }
         optimise_cost_params = functools.partial(
             optimize.least_squares,
@@ -629,7 +629,7 @@ class GravityModelBase(abc.ABC):
         init_params: dict[str, Any],
         running_log_path: os.PathLike,
         *args,
-        **kwargs
+        **kwargs,
     ) -> GravityModelResults:
         """Find the optimal parameters for self.cost_function.
 
@@ -716,7 +716,7 @@ class GravityModelBase(abc.ABC):
             *args,
             init_params=init_params,
             running_log_path=running_log_path,
-            **kwargs
+            **kwargs,
         )
 
     def calibrate_with_perceived_factors(
@@ -726,7 +726,7 @@ class GravityModelBase(abc.ABC):
         target_cost_distribution: cost_utils.CostDistribution,
         target_cost_convergence: float,
         *args,
-        **kwargs
+        **kwargs,
     ) -> None:
         """Find the optimal parameters for self.cost_function.
 
@@ -819,7 +819,7 @@ class GravityModelBase(abc.ABC):
             *args,
             init_params=init_params,
             running_log_path=running_log_path,
-            **kwargs
+            **kwargs,
         )
 
         # If performance not good enough, apply perceived factors
@@ -834,7 +834,7 @@ class GravityModelBase(abc.ABC):
                 *args,
                 init_params=init_params,
                 running_log_path=running_log_path,
-                **kwargs
+                **kwargs,
             )
         return results
 
