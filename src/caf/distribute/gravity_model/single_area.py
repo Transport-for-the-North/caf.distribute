@@ -2,10 +2,8 @@
 """Implementation of a self-calibrating single area gravity model."""
 # Built-Ins
 import logging
-import warnings
 
 from typing import Any
-from typing import Optional
 
 # Third Party
 import numpy as np
@@ -110,7 +108,7 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
         seed_matrix: np.ndarray,
         row_targets: np.ndarray,
         col_targets: np.ndarray,
-    ) -> dict[str, np.ndarray]:
+    ) -> tuple[np.ndarray, int, float]:
         """Run a doubly constrained furness on the seed matrix.
 
         Wrapper around furness.doubly_constrained_furness, to be used when

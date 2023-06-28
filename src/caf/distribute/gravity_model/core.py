@@ -365,7 +365,7 @@ class GravityModelBase(abc.ABC):
         end_time = timing.current_milli_time()
         self._log_iteration(
             log_path=running_log_path,
-            loop_num=str(self._loop_num),
+            loop_num=self._loop_num,
             loop_time=(end_time - self._loop_start_time) / 1000,
             cost_kwargs=cost_kwargs,
             furness_iters=iters,
@@ -417,8 +417,8 @@ class GravityModelBase(abc.ABC):
         # Initialise running params
         cost_kwargs = self._cost_params_to_kwargs(cost_args)
         cost_matrix = self._apply_perceived_factors(self.cost_matrix)
-        row_targets = (self.achieved_distribution.sum(axis=1),)
-        col_targets = (self.achieved_distribution.sum(axis=0),)
+        row_targets = self.achieved_distribution.sum(axis=1)
+        col_targets = self.achieved_distribution.sum(axis=0)
 
         # Estimate what the furness does to the matrix
         base_matrix = self.cost_function.calculate(cost_matrix, **cost_kwargs)
@@ -448,7 +448,7 @@ class GravityModelBase(abc.ABC):
             adj_final = self.achieved_distribution * adj_weights
 
             # Finesse to match row / col targets
-            adj_final = self.jacobian_furness(
+            adj_final, *_ = self.jacobian_furness(
                 seed_matrix=adj_final,
                 row_targets=row_targets,
                 col_targets=col_targets,
@@ -558,9 +558,10 @@ class GravityModelBase(abc.ABC):
         `caf.distribute.furness.doubly_constrained_furness()`
         `scipy.optimize.least_squares()`
         """
+        # pylint: disable=too-many-arguments, too-many-locals
 
         # We use this a couple of times - ensure consistent calls
-        gravity_kwargs = {
+        gravity_kwargs: dict[str, Any] = {
             "running_log_path": running_log_path,
             "target_cost_distribution": target_cost_distribution,
             "diff_step": diff_step,
@@ -582,17 +583,19 @@ class GravityModelBase(abc.ABC):
         ordered_init_params = self._order_cost_params(init_params)
         result = optimise_cost_params(x0=ordered_init_params)
         LOG.info(
-            f"{self.unique_id}calibration process ended with "
-            f"success={result.success}, and the following message:\n"
-            f"{result.message}"
+            "%scalibration process ended with "
+            "success=%s, and the following message:\n"
+            "%s",
+            self.unique_id, result.success, result.message,
         )
 
         # Bad init params might have been given, try default
         if self.achieved_convergence <= failure_tol:
             LOG.info(
-                f"{self.unique_id}achieved a convergence of {self.achieved_convergence}, "
-                f"however the failure tolerance is set to {failure_tol}. Trying again with "
-                f"default cost parameters."
+                "%sachieved a convergence of %s, "
+                "however the failure tolerance is set to %s. Trying again with "
+                "default cost parameters.",
+                self.unique_id, self.achieved_convergence, failure_tol,
             )
             ordered_init_params = self._order_cost_params(self.cost_function.default_params)
             result = optimise_cost_params(x0=ordered_init_params)
@@ -600,11 +603,12 @@ class GravityModelBase(abc.ABC):
         # Last chance, try again with random values
         if self.achieved_convergence <= failure_tol:
             LOG.info(
-                f"{self.unique_id}achieved a convergence of {self.achieved_convergence}, "
-                f"however the failure tolerance is set to {failure_tol}. Trying again with "
-                f"random cost parameters."
+                "%sachieved a convergence of %s, "
+                "however the failure tolerance is set to %s. Trying again with "
+                "random cost parameters.",
+                self.unique_id, self.achieved_convergence, failure_tol,
             )
-            for _ in n_random_tries:
+            for _ in range(n_random_tries):
                 random_params = self.cost_function.random_valid_params()
                 ordered_init_params = self._order_cost_params(random_params)
                 result = optimise_cost_params(x0=ordered_init_params)
@@ -615,6 +619,7 @@ class GravityModelBase(abc.ABC):
         optimal_params = result.x
         self.optimal_cost_params = self._cost_params_to_kwargs(optimal_params)
         self._gravity_function(optimal_params, **gravity_kwargs)
+        assert self.achieved_cost_dist is not None
         return GravityModelResults(
             cost_distribution=self.achieved_cost_dist,
             cost_convergence=self.achieved_convergence,
@@ -712,7 +717,7 @@ class GravityModelBase(abc.ABC):
         self.cost_function.validate_params(init_params)
         self._validate_running_log(running_log_path)
         self._initialise_internal_params()
-        return self._calibrate(
+        return self._calibrate(     # type: ignore
             *args,
             init_params=init_params,
             running_log_path=running_log_path,
@@ -727,7 +732,7 @@ class GravityModelBase(abc.ABC):
         target_cost_convergence: float,
         *args,
         **kwargs,
-    ) -> None:
+    ) -> GravityModelResults:
         """Find the optimal parameters for self.cost_function.
 
         Optimal parameters are found using `scipy.optimize.least_squares`
@@ -815,7 +820,7 @@ class GravityModelBase(abc.ABC):
         self._initialise_internal_params()
 
         # Run as normal first
-        results = self._calibrate(
+        results = self._calibrate(      # type: ignore
             *args,
             init_params=init_params,
             running_log_path=running_log_path,
@@ -830,7 +835,7 @@ class GravityModelBase(abc.ABC):
             self._calculate_perceived_factors(
                 target_cost_distribution, self.achieved_band_share
             )
-            results = self._calibrate(
+            results = self._calibrate(      # type: ignore
                 *args,
                 init_params=init_params,
                 running_log_path=running_log_path,
@@ -877,7 +882,7 @@ class GravityModelBase(abc.ABC):
         seed_matrix: np.ndarray,
         row_targets: np.ndarray,
         col_targets: np.ndarray,
-    ) -> dict[str, np.ndarray]:
+    ) -> tuple[np.ndarray, int, float]:
         """Run a doubly constrained furness on the seed matrix.
 
         Wrapper around furness.doubly_constrained_furness, to be used when
@@ -991,6 +996,7 @@ class GravityModelBase(abc.ABC):
                 **kwargs,
             )
 
+        assert self.achieved_cost_dist is not None
         return GravityModelResults(
             cost_distribution=self.achieved_cost_dist,
             cost_convergence=self.achieved_convergence,
@@ -1055,6 +1061,7 @@ class GravityModelBase(abc.ABC):
             **kwargs,
         )
 
+        assert self.achieved_cost_dist is not None
         return GravityModelResults(
             cost_distribution=self.achieved_cost_dist,
             cost_convergence=self.achieved_convergence,
