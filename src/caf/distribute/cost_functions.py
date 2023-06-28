@@ -4,6 +4,7 @@ from __future__ import annotations
 
 # Built-Ins
 import enum
+import random
 import inspect
 import logging
 
@@ -149,6 +150,13 @@ class CostFunction:
 
             if value > self.param_max[name]:
                 raise ValueError()
+
+    def random_valid_params(self) -> dict[str, Any]:
+        """Get random parameter values for this cost function."""
+        return_val = dict.fromkeys(self.param_names)
+        for name in return_val:
+            return_val[name] = random.uniform(self.param_min[name], self.param_max[name])
+        return return_val
 
     def calculate(self, base_cost: np.ndarray, **kwargs) -> np.ndarray:
         """Calculate the actual cost using self.function.

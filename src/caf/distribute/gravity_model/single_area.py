@@ -1,21 +1,18 @@
 # -*- coding: utf-8 -*-
 """Implementation of a self-calibrating single area gravity model."""
 # Built-Ins
-import os
 import logging
-import warnings
 
 from typing import Any
-from typing import Optional
 
 # Third Party
 import numpy as np
-import pandas as pd
-
-from caf.toolkit import toolbox
+from scipy import optimize
 
 # Local Imports
 # pylint: disable=import-error,wrong-import-position
+from caf.toolkit import toolbox
+from caf.toolkit import cost_utils
 from caf.distribute import furness
 from caf.distribute import cost_functions
 from caf.distribute.gravity_model import core
@@ -51,38 +48,6 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
         A matrix detailing the cost between each and every zone. This
         matrix must be the same size as
         `(len(row_targets), len(col_targets))`.
-
-    target_cost_distribution:
-        The cost distribution to target during calibration. The cost should
-        be in the same units as the `cost_matrix`. It should contain four
-        columns: ["min", "max", "ave", "trips"]. Where "min" and "max"
-        contain the minimum and maximum bounds for each row, "ave" contains
-        the average cost for each row, and "trips" is the number of trips
-        in each boundary.
-
-    target_convergence:
-        A value between 0 and 1, the convergence to aim for during
-        calibration. Values closer to 1 mean a better convergence.
-
-    furness_max_iters:
-        The maximum number of furness iterations to complete before exiting.
-
-    furness_tol:
-        The maximum difference between the achieved and the target values
-        to tolerate before exiting the furness early. R^2 is used to
-        calculate the difference.
-
-    running_log_path:
-        Path to output the running log to. This log will detail the
-        performance of each iteration of the calibration and is written in
-        .csv format.
-
-    use_perceived_factors:
-        Whether to utilise perceived factors while calibrating the
-        gravity model. These factors are good to improve convergence when
-        the performance is near the target already.
-
-    # TODO(BT) : Fully Document this class
     """
 
     def __init__(
@@ -91,33 +56,20 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
         col_targets: np.ndarray,
         cost_function: cost_functions.CostFunction,
         cost_matrix: np.ndarray,
-        target_cost_distribution: pd.DataFrame,
-        target_convergence: float,
-        furness_max_iters: int,
-        furness_tol: float,
-        running_log_path: os.PathLike,
-        use_perceived_factors: bool = True,
     ):
-        # pylint: disable=too-many-arguments
         super().__init__(
             cost_function=cost_function,
             cost_matrix=cost_matrix,
-            target_cost_distribution=target_cost_distribution,
-            running_log_path=running_log_path,
         )
 
         # Set attributes
         self.row_targets = row_targets
         self.col_targets = col_targets
-        self.furness_max_iters = furness_max_iters
-        self.furness_tol = furness_tol
-        self.use_perceived_factors = use_perceived_factors
-
-        self.target_convergence = target_convergence
 
     def gravity_furness(
         self,
         seed_matrix: np.ndarray,
+        **kwargs,
     ) -> tuple[np.ndarray, int, float]:
         """Run a doubly constrained furness on the seed matrix.
 
@@ -128,6 +80,10 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
         ----------
         seed_matrix:
             Initial values for the furness.
+
+        kwargs:
+            Additional arguments from the caller to pass to
+            `self.doubly_constrained_furness`.
 
         Returns
         -------
@@ -144,17 +100,15 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
             seed_vals=seed_matrix,
             row_targets=self.row_targets,
             col_targets=self.col_targets,
-            tol=self.furness_tol,
-            max_iters=self.furness_max_iters,
+            **kwargs,
         )
 
     def jacobian_furness(
         self,
-        seed_matrices: dict[str, np.ndarray],
+        seed_matrix: np.ndarray,
         row_targets: np.ndarray,
         col_targets: np.ndarray,
-        ignore_result: bool = False,
-    ) -> dict[str, np.ndarray]:
+    ) -> tuple[np.ndarray, int, float]:
         """Run a doubly constrained furness on the seed matrix.
 
         Wrapper around furness.doubly_constrained_furness, to be used when
@@ -162,10 +116,8 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
 
         Parameters
         ----------
-        seed_matrices:
-            Dictionary of initial values for the furness.
-            Keys are the name of the cost params which has been changed
-            to get this new seed matrix.
+        seed_matrix:
+            Initial values for the furness.
 
         row_targets:
             The target values for the sum of each row.
@@ -174,10 +126,6 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
         col_targets:
             The target values for the sum of each column
             i.e. np.sum(seed_matrix, axis=0)
-
-        ignore_result:
-            Whether to ignore the return result or not. Useful when a Jacobian
-            furness is only being called to satisfy other threads.
 
         Returns
         -------
@@ -190,187 +138,62 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
         achieved_rmse:
             The Root Mean Squared Error difference achieved before exiting
         """
-        return_dict = dict.fromkeys(seed_matrices.keys(), np.zeros_like(seed_matrices))
-        for cost_param, seed_matrix in seed_matrices.items():
-            return_dict[cost_param], *_ = furness.doubly_constrained_furness(
-                seed_vals=seed_matrix,
-                row_targets=row_targets,
-                col_targets=col_targets,
-                tol=1e-6,
-                max_iters=20,
-                warning=False,
-            )
+        return furness.doubly_constrained_furness(
+            seed_vals=seed_matrix,
+            row_targets=row_targets,
+            col_targets=col_targets,
+            tol=1e-6,
+            max_iters=20,
+            warning=False,
+        )
 
-        return return_dict
-
-    def calibrate(
+    def _guess_init_params(
         self,
-        init_params: Optional[dict[str, Any]] = None,
-        estimate_init_params: bool = False,
-        calibrate_params: bool = True,
-        diff_step: float = 1e-8,
-        ftol: float = 1e-4,
-        xtol: float = 1e-4,
-        grav_max_iters: int = 100,
-        failure_tol: float = 0,
-        verbose: int = 0,
-    ) -> dict[str, Any]:
-        """Find the optimal parameters for self.cost_function.
+        cost_args: list[float],
+        target_cost_distribution: cost_utils.CostDistribution,
+    ):
+        """Guess the initial cost arguments.
 
-        Optimal parameters are found using `scipy.optimize.least_squares`
-        to fit the distributed row/col targets to self.target_tld. Once
-        the optimal parameters are found, the gravity model is run one last
-        time to check the self.target_convergence has been met. This also
-        populates a number of attributes with values from the optimal run:
-        self.achieved_band_share
-        self.achieved_convergence
-        self.achieved_residuals
-        self.achieved_distribution
-
-        Parameters
-        ----------
-        init_params:
-            A dictionary of {parameter_name: parameter_value} to pass
-            into the cost function as initial parameters.
-
-        estimate_init_params:
-            Whether to ignore the given init_params and estimate new ones
-            using least-squares, or just use the given init_params to start
-            with.
-
-        calibrate_params:
-            Whether to calibrate the cost parameters or not. If not
-            calibrating, the given init_params will be assumed to be
-            optimal.
-
-        diff_step:
-            Copied from scipy.optimize.least_squares documentation, where it
-            is passed to:
-            Determines the relative step size for the finite difference
-            approximation of the Jacobian. The actual step is computed as
-            `x * diff_step`. If None (default), then diff_step is taken to be a
-            conventional “optimal” power of machine epsilon for the finite
-            difference scheme used
-
-        ftol:
-            The tolerance to pass to `scipy.optimize.least_squares`. The search
-            will stop once this tolerance has been met. This is the
-            tolerance for termination by the change of the cost function
-
-        xtol:
-            The tolerance to pass to `scipy.optimize.least_squares`. The search
-            will stop once this tolerance has been met. This is the
-            tolerance for termination by the change of the independent
-            variables.
-
-        grav_max_iters:
-            The maximum number of calibration iterations to complete before
-            termination if the ftol has not been met.
-
-        failure_tol:
-            The threshold that a convergence needs to pass to not be
-            considered a failure. Any convergence values less than or equal
-            to this value will be considered a failure. If this is met,
-            the gravity model will be re-ran with
-            `self.cost_function.default_params` to try to get better performance
-
-        verbose:
-            Copied from scipy.optimize.least_squares documentation, where it
-            is passed to:
-            Level of algorithm’s verbosity:
-            - 0 (default) : work silently.
-            - 1 : display a termination report.
-            - 2 : display progress during iterations (not supported by ‘lm’ method).
-
-        Returns
-        -------
-        optimal_cost_params:
-            Returns a dictionary of the same shape as init_params. The values
-            will be the optimal cost parameters to get the best band share
-            convergence.
-
-        Raises
-        ------
-        ValueError
-            If the generated trip matrix contains any
-            non-finite values.
-
-        See Also
-        --------
-        gravity_model
-        scipy.optimize.least_squares
+        Internal function of _estimate_init_params().
+        Used by the `optimize.least_squares` function.
         """
-        # Validate init_params
-        if init_params is None:
-            init_params = self.cost_function.default_params
-        assert init_params is not None
-        self.cost_function.validate_params(init_params)
+        # Need kwargs for calling cost function
+        cost_kwargs = self._cost_params_to_kwargs(cost_args)
 
-        # Estimate what the initial params should be
-        if estimate_init_params:
-            init_params = self._estimate_init_params(
-                init_params=init_params,
-                target_cost_distribution=self.target_cost_distribution,
-            )
+        # Estimate what the cost function will do to the costs - on average
+        avg_cost_vals = target_cost_distribution.avg_vals
+        estimated_cost_vals = self.cost_function.calculate(avg_cost_vals, **cost_kwargs)
+        estimated_band_shares = estimated_cost_vals / estimated_cost_vals.sum()
 
-        # Figure out the optimal cost params
-        self._calibrate(
-            init_params=init_params,
-            calibrate_params=calibrate_params,
-            diff_step=diff_step,
-            ftol=ftol,
-            xtol=xtol,
-            grav_max_iters=grav_max_iters,
-            failure_tol=failure_tol,
-            verbose=verbose,
+        return target_cost_distribution.band_share_vals - estimated_band_shares
+
+    def estimate_optimal_cost_params(
+        self,
+        init_params: dict[str, Any],
+        target_cost_distribution: cost_utils.CostDistribution,
+    ) -> dict[str, Any]:
+        """Guesses what the initial params should be.
+
+        Uses the average cost in each band to estimate what changes in
+        the cost_params would do to the final cost distributions. This is a
+        very coarse-grained estimation, but can be used to guess around about
+        where the best init params are.
+        """
+        result = optimize.least_squares(
+            fun=self._guess_init_params,
+            x0=self._order_cost_params(init_params),
+            method=self._least_squares_method,
+            bounds=self._order_bounds(),
+            kwargs={"target_cost_distribution": target_cost_distribution},
         )
+        init_params = self._cost_params_to_kwargs(result.x)
 
-        # Just return if not using perceived factors
-        if not self.use_perceived_factors:
-            return self.optimal_cost_params
+        # TODO(BT): standardise this
+        if self.cost_function.name == "LOG_NORMAL":
+            init_params["sigma"] *= 0.8
+            init_params["mu"] *= 0.5
 
-        # ## APPLY PERCEIVED FACTORS IF WE CAN ## #
-        upper_limit = self.target_convergence + 0.03
-        lower_limit = self.target_convergence - 0.15
-
-        # Just return if upper limit has been beaten
-        if self.achieved_convergence > upper_limit:
-            return self.optimal_cost_params
-
-        # Warn if the lower limit hasn't been reached
-        if self.achieved_convergence < lower_limit:
-            warnings.warn(
-                f"Calibration was not able to reach the lower threshold "
-                f"required to use perceived factors.\n"
-                f"Target convergence: {self.target_convergence}\n"
-                f"Upper Limit: {upper_limit}\n"
-                f"Achieved convergence: {self.achieved_convergence}"
-            )
-            return self.optimal_cost_params
-
-        # If here, it's safe to use perceived factors
-        self._calculate_perceived_factors()
-
-        # Calibrate again, using the perceived factors
-        self._calibrate(
-            init_params=self.optimal_cost_params.copy(),
-            calibrate_params=calibrate_params,
-            diff_step=diff_step,
-            ftol=ftol,
-            xtol=xtol,
-            grav_max_iters=grav_max_iters,
-            verbose=verbose,
-        )
-
-        if self.achieved_convergence < self.target_convergence:
-            warnings.warn(
-                f"Calibration with perceived factors was not able to reach "
-                f"the target_convergence.\n"
-                f"Target convergence: {self.target_convergence}\n"
-                f"Achieved convergence: {self.achieved_convergence}"
-            )
-
-        return self.optimal_cost_params
+        return init_params
 
 
 # # # FUNCTIONS # # #
