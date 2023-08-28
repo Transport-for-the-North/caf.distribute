@@ -399,7 +399,7 @@ class GravityModelBase(abc.ABC):
         # Evaluate the performance of this run
         cost_distribution, achieved_residuals, convergence = cost_distribution_stats(
             achieved_trip_distribution=matrix,
-            cost_matrix=cost_matrix,
+            cost_matrix=self.cost_matrix,
             target_cost_distribution=target_cost_distribution,
         )
 
@@ -931,7 +931,6 @@ class GravityModelBase(abc.ABC):
             )
             results = self._calibrate(      # type: ignore
                 *args,
-                # init_params=init_params,
                 init_params=results.cost_params,
                 running_log_path=running_log_path,
                 failure_tol=failure_tol,
@@ -1083,6 +1082,8 @@ class GravityModelBase(abc.ABC):
             target_cost_convergence, self.achieved_convergence
         )
         if should_use_perceived:
+            # Start with 1000 if perceived factor run
+            self._attempt_id = 1000
             self._calculate_perceived_factors(
                 target_cost_distribution, self.achieved_band_share
             )

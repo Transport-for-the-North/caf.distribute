@@ -144,8 +144,7 @@ class GMCreator:
         if use_perceived_factors:
             return gm.calibrate_with_perceived_factors(
                 init_params=init_params,
-                # running_log_path=self.running_log_path,
-                running_log_path=r"E:\temp\test.csv",
+                running_log_path=self.running_log_path,
                 target_cost_distribution=self.target_cost_distribution,
                 diff_step=diff_step,
                 ftol=ftol,
@@ -250,6 +249,7 @@ class GMRunResults(GMCreator):
             self.convergence,
             decimal=5,
         )
+
         # Check the matrices
         np.testing.assert_allclose(
             gm_results.cost_distribution.band_share_vals,
@@ -556,38 +556,15 @@ class TestCalibrationMethods:
 
     def test_perceived_calibrate(self, real_log_normal_calib_perceived: GMCalibratePerceivedResults):
         """Test that the perceived cost calibration works correctly."""
-        msg = "Calibration with perceived factors was not able to reach the target_convergence"
-        with pytest.warns(UserWarning, match=msg):
-            gm_results = real_log_normal_calib_perceived.create_and_calibrate_gravity_model(
-                init_params=real_log_normal_calib_perceived.calib_init_params,
-                n_random_tries=0,
-                use_perceived_factors=True
-            )
-            real_log_normal_calib_perceived.assert_results(
-                gm_results=gm_results,
-            )
+        gm_results = real_log_normal_calib_perceived.create_and_calibrate_gravity_model(
+            init_params=real_log_normal_calib_perceived.calib_init_params,
+            n_random_tries=0,
+            use_perceived_factors=True
+        )
+        real_log_normal_calib_perceived.assert_results(
+            gm_results=gm_results,
+        )
 
+    # TODO(BT): Add tests for error checking as well
+    # TODO(BT): Add tests to ensure perceived is not triggered when it shouldn't be
 
-@pytest.mark.usefixtures(
-    "real_log_normal_calib",
-    "real_log_normal_calib_perceived",
-    "real_log_normal_run",
-)
-class TestRealLogNormal:
-    """Test the log normal calibrator with real world data."""
-
-    def test_correct_calibrate_perceived(
-        self,
-        real_log_normal_calib_perceived: GMCalibratePerceivedResults,
-    ):
-        """Test that the gravity model correctly calibrates."""
-        msg = "Calibration with perceived factors was not able to reach the target_convergence"
-        with pytest.warns(UserWarning, match=msg):
-            gm = real_log_normal_calib_perceived.create_gravity_model(
-                use_perceived_factors=True
-            )
-            best_params = gm.calibrate()
-            real_log_normal_calib_perceived.assert_results(
-                best_params=best_params,
-                calibrated_gm=gm,
-            )
