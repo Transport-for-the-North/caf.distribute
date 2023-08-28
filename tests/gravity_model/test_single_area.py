@@ -160,10 +160,9 @@ class GMCreator:
 
 
 @dataclasses.dataclass
-class GMCalibrateResults(GMCreator):
-    """Stores the expected results alongside the inputs for calibration"""
+class GMRunResults(GMCreator):
+    """Stores the expected results alongside the inputs for run"""
 
-    calib_init_params: dict[str, Any]
     convergence: float
     band_share: np.ndarray
     distribution: np.ndarray
@@ -199,7 +198,6 @@ class GMCalibrateResults(GMCreator):
     @classmethod
     def get_specific_constructor_kwargs(cls, path: pathlib.Path) -> dict[str, Any]:
         return {
-            "calib_init_params": GMCalibrateResults._read_calib_init_params(path),
             "convergence": GMCalibrateResults._read_convergence(path),
             "band_share": GMCalibrateResults._read_band_share(path),
             "distribution": GMCalibrateResults._read_distribution(path),
@@ -215,13 +213,17 @@ class GMCalibrateResults(GMCreator):
         cost_function: cost_functions.CostFunction,
     ) -> GMCreator:
         """Load data from files to create this test"""
-        calib_path = path / cost_function.name.lower() / "calibrate"
+        calib_path = path / cost_function.name.lower() / "run"
         return cls(
             cost_function=cost_function,
             running_log_path=running_log_path,
             **cls.get_common_constructor_kwargs(path),
             **cls.get_specific_constructor_kwargs(calib_path),
         )
+
+    def get_optimal_params(self) -> dict[str, Any]:
+        """Get the optimal parameters from disk"""
+        return self.best_params
 
     def assert_results(self, gm_results: GravityModelResults) -> None:
         """Assert that all the results are as expected"""
@@ -254,6 +256,40 @@ class GMCalibrateResults(GMCreator):
 
 
 @dataclasses.dataclass
+class GMCalibrateResults(GMRunResults):
+    """Stores the expected results alongside the inputs for calibration"""
+
+    calib_init_params: dict[str, Any]
+
+    @classmethod
+    def get_specific_constructor_kwargs(cls, path: pathlib.Path) -> dict[str, Any]:
+        return {
+            "calib_init_params": GMCalibrateResults._read_calib_init_params(path),
+            "convergence": GMCalibrateResults._read_convergence(path),
+            "band_share": GMCalibrateResults._read_band_share(path),
+            "distribution": GMCalibrateResults._read_distribution(path),
+            "residuals": GMCalibrateResults._read_residuals(path),
+            "best_params": GMCalibrateResults._read_best_params(path),
+        }
+
+    @classmethod
+    def from_file(
+        cls,
+        path: pathlib.Path,
+        running_log_path: os.PathLike,
+        cost_function: cost_functions.CostFunction,
+    ) -> GMCreator:
+        """Load data from files to create this test"""
+        calib_path = path / cost_function.name.lower() / "calibrate"
+        return cls(
+            cost_function=cost_function,
+            running_log_path=running_log_path,
+            **cls.get_common_constructor_kwargs(path),
+            **cls.get_specific_constructor_kwargs(calib_path),
+        )
+
+
+@dataclasses.dataclass
 class GMCalibratePerceivedResults(GMCalibrateResults):
     """Stores the expected results alongside the inputs for calibration"""
 
@@ -272,31 +308,6 @@ class GMCalibratePerceivedResults(GMCalibrateResults):
             **cls.get_common_constructor_kwargs(path),
             **cls.get_specific_constructor_kwargs(calib_path),
         )
-
-
-@dataclasses.dataclass
-class GMRunResults(GMCalibrateResults):
-    """Stores the expected results alongside the inputs for run"""
-
-    @classmethod
-    def from_file(
-        cls,
-        path: pathlib.Path,
-        running_log_path: os.PathLike,
-        cost_function: cost_functions.CostFunction,
-    ) -> GMCreator:
-        """Load data from files to create this test"""
-        calib_path = path / cost_function.name.lower() / "run"
-        return cls(
-            cost_function=cost_function,
-            running_log_path=running_log_path,
-            **cls.get_common_constructor_kwargs(path),
-            **cls.get_specific_constructor_kwargs(calib_path),
-        )
-
-    def get_optimal_params(self) -> dict[str, Any]:
-        """Get the optimal parameters from disk"""
-        return self.best_params
 
 
 @dataclasses.dataclass
@@ -476,34 +487,6 @@ def fixture_real_log_normal_run_perceived(tmp_path) -> GMRunResults:
 
 
 # # # TESTS # # #
-@pytest.mark.usefixtures("simple_log_normal_calib", "simple_log_normal_run")
-class TestSimpleLogNormal:
-    """Tests the log normal calibrator with a simple example"""
-
-    def test_correct_calibrate(self, simple_log_normal_calib: GMCalibrateResults):
-        """Test that the gravity model correctly calibrates."""
-        gm = simple_log_normal_calib.create_gravity_model()
-        best_params = gm.calibrate()
-        simple_log_normal_calib.assert_results(
-            best_params=best_params,
-            calibrated_gm=gm,
-        )
-
-
-@pytest.mark.usefixtures("simple_tanner_calib", "simple_tanner_run")
-class TestSimpleTanner:
-    """Tests the tanner calibrator with a simple example"""
-
-    def test_correct_calibrate(self, simple_tanner_calib: GMCalibrateResults):
-        """Test that the gravity model correctly calibrates."""
-        gm = simple_tanner_calib.create_gravity_model()
-        best_params = gm.calibrate()
-        simple_tanner_calib.assert_results(
-            best_params=best_params,
-            calibrated_gm=gm,
-        )
-
-
 @pytest.mark.usefixtures("simple_tanner_run", "simple_log_normal_run", "real_log_normal_run")
 class TestRunMethods:
     """Thoroughly tests the run functions using various examples."""
@@ -566,15 +549,6 @@ class TestCalibrationMethods:
 )
 class TestRealLogNormal:
     """Test the log normal calibrator with real world data."""
-
-    def test_correct_calibrate(self, real_log_normal_calib: GMCalibrateResults):
-        """Test that the gravity model correctly calibrates."""
-        gm = real_log_normal_calib.create_gravity_model()
-        best_params = gm.calibrate()
-        real_log_normal_calib.assert_results(
-            best_params=best_params,
-            calibrated_gm=gm,
-        )
 
     def test_correct_calibrate_perceived(
         self,
