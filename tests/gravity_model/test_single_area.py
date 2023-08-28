@@ -121,16 +121,59 @@ class GMCreator:
             tol=furness_tol,
         )
 
+    def create_and_calibrate_gravity_model(
+        self,
+        init_params: dict[str, Any],
+        diff_step: float = 1e-8,
+        ftol: float = 1e-4,
+        xtol: float = 1e-4,
+        grav_max_iters: int = 100,
+        failure_tol: float = 0.9,
+        n_random_tries: int = 3,
+        furness_max_iters: int = 1000,
+        furness_tol: float = 1e-3,
+        use_perceived_factors: bool = False,
+    ) -> GravityModelResults:
+        gm = SingleAreaGravityModelCalibrator(
+            row_targets=self.row_targets,
+            col_targets=self.col_targets,
+            cost_function=self.cost_function,
+            cost_matrix=self.cost_matrix,
+        )
+
+        if use_perceived_factors:
+            pass
+
+        return gm.calibrate(
+            init_params=init_params,
+            running_log_path=self.running_log_path,
+            target_cost_distribution=self.target_cost_distribution,
+            diff_step=diff_step,
+            ftol=ftol,
+            xtol=xtol,
+            grav_max_iters=grav_max_iters,
+            failure_tol=failure_tol,
+            n_random_tries=n_random_tries,
+            max_iters=furness_max_iters,
+            tol=furness_tol,
+        )
+
 
 @dataclasses.dataclass
 class GMCalibrateResults(GMCreator):
     """Stores the expected results alongside the inputs for calibration"""
 
+    calib_init_params: dict[str, Any]
     convergence: float
     band_share: np.ndarray
     distribution: np.ndarray
     residuals: np.ndarray
     best_params: dict[str, Any]
+
+    @staticmethod
+    def _read_calib_init_params(home: pathlib.Path) -> dict[str, Any]:
+        with open(home / "init_params.json", "r") as fp:
+            return json.load(fp)
 
     @staticmethod
     def _read_convergence(home: pathlib.Path) -> np.ndarray:
@@ -156,6 +199,7 @@ class GMCalibrateResults(GMCreator):
     @classmethod
     def get_specific_constructor_kwargs(cls, path: pathlib.Path) -> dict[str, Any]:
         return {
+            "calib_init_params": GMCalibrateResults._read_calib_init_params(path),
             "convergence": GMCalibrateResults._read_convergence(path),
             "band_share": GMCalibrateResults._read_band_share(path),
             "distribution": GMCalibrateResults._read_distribution(path),
@@ -462,7 +506,7 @@ class TestSimpleTanner:
 
 @pytest.mark.usefixtures("simple_tanner_run", "simple_log_normal_run", "real_log_normal_run")
 class TestRunMethods:
-    """Thoroughly tests the run functions using a simple example."""
+    """Thoroughly tests the run functions using various examples."""
 
     @pytest.mark.parametrize(
         "fixture_str",
@@ -470,7 +514,7 @@ class TestRunMethods:
     )
     def test_normal_run(self, fixture_str, request):
         """Test a default run."""
-        run_and_results = request.getfixturevalue(fixture_str)
+        run_and_results: GMRunResults = request.getfixturevalue(fixture_str)
         best_params = run_and_results.get_optimal_params()
         gm_results = run_and_results.create_and_run_gravity_model(best_params)
         run_and_results.assert_results(
@@ -483,10 +527,32 @@ class TestRunMethods:
     )
     def test_perceived_run(self, fixture_str, request):
         """Test a perceived factor run."""
-        run_and_results = request.getfixturevalue(fixture_str)
+        run_and_results: GMRunResults = request.getfixturevalue(fixture_str)
         best_params = run_and_results.get_optimal_params()
         gm_results = run_and_results.create_and_run_gravity_model(
             best_params, use_perceived_factors=True
+        )
+        run_and_results.assert_results(
+            gm_results=gm_results,
+        )
+
+    # TODO(BT): Add tests for error checking as well
+
+
+@pytest.mark.usefixtures("simple_tanner_calib", "simple_log_normal_calib", "real_log_normal_calib")
+class TestCalibrationMethods:
+    """Thoroughly tests the calibration functions using various examples."""
+
+    @pytest.mark.parametrize(
+        "fixture_str",
+        ["simple_tanner_calib", "simple_log_normal_calib", "real_log_normal_calib"],
+    )
+    def test_normal_calibrate(self, fixture_str, request):
+        """Test that the gravity model correctly calibrates."""
+        run_and_results: GMCalibrateResults = request.getfixturevalue(fixture_str)
+        gm_results = run_and_results.create_and_calibrate_gravity_model(
+            init_params=run_and_results.calib_init_params,
+            n_random_tries=0,
         )
         run_and_results.assert_results(
             gm_results=gm_results,
