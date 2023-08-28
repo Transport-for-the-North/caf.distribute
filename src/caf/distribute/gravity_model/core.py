@@ -98,6 +98,7 @@ class GravityModelBase(abc.ABC):
         self.unique_id = self._tidy_unique_id(unique_id)
 
         # Running attributes
+        self._attempt_id: int = -1
         self._loop_num: int = -1
         self._loop_start_time: float = -1.0
         self._perceived_factors: np.ndarray = np.ones_like(self.cost_matrix)
@@ -144,6 +145,7 @@ class GravityModelBase(abc.ABC):
 
     def _initialise_internal_params(self) -> None:
         """Set running params to their default values for a run."""
+        self._attempt_id = 1
         self._loop_num = 1
         self._loop_start_time = timing.current_milli_time()
         self.initial_cost_params = dict()
@@ -211,6 +213,7 @@ class GravityModelBase(abc.ABC):
     @staticmethod
     def _log_iteration(
         log_path: os.PathLike,
+        attempt_id: int,
         loop_num: int,
         loop_time: float,
         cost_kwargs: dict[str, Any],
@@ -224,6 +227,11 @@ class GravityModelBase(abc.ABC):
         ----------
         log_path:
             Path to the file to write the log to. Should be a csv file.
+
+        attempt_id:
+            Identifier indicating which section of a run / calibration the
+            current log refers to.
+            # TODO(BT): Detail what each number means.
 
         loop_num:
             The iteration number ID
@@ -249,6 +257,7 @@ class GravityModelBase(abc.ABC):
         None
         """
         log_dict = {
+            "attempt_id": str(attempt_id),
             "loop_number": str(loop_num),
             "runtime (s)": loop_time / 1000,
         }
@@ -365,6 +374,7 @@ class GravityModelBase(abc.ABC):
         end_time = timing.current_milli_time()
         self._log_iteration(
             log_path=running_log_path,
+            attempt_id=self._attempt_id,
             loop_num=self._loop_num,
             loop_time=(end_time - self._loop_start_time) / 1000,
             cost_kwargs=cost_kwargs,
@@ -597,6 +607,7 @@ class GravityModelBase(abc.ABC):
                 "default cost parameters.",
                 self.unique_id, self.achieved_convergence, failure_tol,
             )
+            self._attempt_id = 2
             ordered_init_params = self._order_cost_params(self.cost_function.default_params)
             result = optimise_cost_params(x0=ordered_init_params)
 
@@ -608,7 +619,8 @@ class GravityModelBase(abc.ABC):
                 "random cost parameters.",
                 self.unique_id, self.achieved_convergence, failure_tol,
             )
-            for _ in range(n_random_tries):
+            for i in range(n_random_tries):
+                self._attempt_id = 100 + i
                 random_params = self.cost_function.random_valid_params()
                 ordered_init_params = self._order_cost_params(random_params)
                 result = optimise_cost_params(x0=ordered_init_params)
