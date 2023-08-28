@@ -142,7 +142,20 @@ class GMCreator:
         )
 
         if use_perceived_factors:
-            pass
+            return gm.calibrate_with_perceived_factors(
+                init_params=init_params,
+                # running_log_path=self.running_log_path,
+                running_log_path=r"E:\temp\test.csv",
+                target_cost_distribution=self.target_cost_distribution,
+                diff_step=diff_step,
+                ftol=ftol,
+                xtol=xtol,
+                grav_max_iters=grav_max_iters,
+                failure_tol=failure_tol,
+                n_random_tries=n_random_tries,
+                max_iters=furness_max_iters,
+                tol=furness_tol,
+            )
 
         return gm.calibrate(
             init_params=init_params,
@@ -540,6 +553,19 @@ class TestCalibrationMethods:
         run_and_results.assert_results(
             gm_results=gm_results,
         )
+
+    def test_perceived_calibrate(self, real_log_normal_calib_perceived: GMCalibratePerceivedResults):
+        """Test that the perceived cost calibration works correctly."""
+        msg = "Calibration with perceived factors was not able to reach the target_convergence"
+        with pytest.warns(UserWarning, match=msg):
+            gm_results = real_log_normal_calib_perceived.create_and_calibrate_gravity_model(
+                init_params=real_log_normal_calib_perceived.calib_init_params,
+                n_random_tries=0,
+                use_perceived_factors=True
+            )
+            real_log_normal_calib_perceived.assert_results(
+                gm_results=gm_results,
+            )
 
 
 @pytest.mark.usefixtures(

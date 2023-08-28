@@ -186,11 +186,44 @@ class GravityModelBase(abc.ABC):
     def _should_use_perceived_factors(
         target_convergence: float,
         achieved_convergence: float,
+        upper_tol: float = 0.03,
+        lower_tol: float = 0.15,
         warn: bool = True,
     ) -> bool:
+        """Decide whether to use perceived factors.
+
+        Parameters
+        ----------
+        target_convergence:
+            The desired convergence target.
+
+        achieved_convergence
+            The current best achieved convergence.
+
+        upper_tol:
+            The upper tolerance to apply to `target_convergence` when
+            calculating the upper limit it is acceptable to apply perceived
+            factors.
+
+        lower_tol:
+            The lower tolerance to apply to `target_convergence` when
+            calculating the lower limit it is acceptable to apply perceived
+            factors.
+
+        warn:
+            Whether to raise a warning when the achieved convergence is too
+            low to apply perceived factors.
+            i.e. `achieved_convergence` < `target_convergence - lower_tol`
+
+        Returns
+        -------
+        bool:
+            True if
+            `target_convergence - lower_tol` < `achieved_convergence` < `target_convergence + upper_tol`
+        """
         # Init
-        upper_limit = target_convergence + 0.03
-        lower_limit = target_convergence - 0.15
+        upper_limit = target_convergence + upper_tol
+        lower_limit = target_convergence - lower_tol
 
         # Upper limit beaten, all good
         if achieved_convergence > upper_limit:
@@ -487,6 +520,7 @@ class GravityModelBase(abc.ABC):
         grav_max_iters: int = 100,
         failure_tol: float = 0,
         n_random_tries: int = 3,
+        default_retry: bool = True,
         verbose: int = 0,
         **kwargs,
     ) -> GravityModelResults:
@@ -538,9 +572,16 @@ class GravityModelBase(abc.ABC):
             convergence is less than this value, calibration will be run again with
             the default parameters from `self.cost_function`.
 
+        default_retry:
+            If, after running with `init_params`, the achieved convergence
+            is less than `failure_tol`, calibration will be run again with the
+            default parameters of `self.cost_function`.
+            This argument is ignored if the default parameters are given
+            as `init_params.
+
         n_random_tries:
-            If, after running with default parameters of self.cost_function,
-            the achieved convergence is less than this value, calibration will
+            If, after running with default parameters of `self.cost_function`,
+            the achieved convergence is less than `failure_tol`, calibration will
             be run again using random values for the cost parameters this
             number of times.
 
@@ -569,6 +610,9 @@ class GravityModelBase(abc.ABC):
         `scipy.optimize.least_squares()`
         """
         # pylint: disable=too-many-arguments, too-many-locals
+        # Init
+        if init_params == self.cost_function.default_params:
+            default_retry = False
 
         # We use this a couple of times - ensure consistent calls
         gravity_kwargs: dict[str, Any] = {
@@ -599,17 +643,25 @@ class GravityModelBase(abc.ABC):
             self.unique_id, result.success, result.message,
         )
 
+        # Track the best performance through the runs
+        best_convergence = self.achieved_convergence
+        best_params = result.x
+
         # Bad init params might have been given, try default
-        if self.achieved_convergence <= failure_tol:
+        if self.achieved_convergence <= failure_tol and default_retry:
             LOG.info(
                 "%sachieved a convergence of %s, "
                 "however the failure tolerance is set to %s. Trying again with "
                 "default cost parameters.",
                 self.unique_id, self.achieved_convergence, failure_tol,
             )
-            self._attempt_id = 2
+            self._attempt_id += 1
             ordered_init_params = self._order_cost_params(self.cost_function.default_params)
             result = optimise_cost_params(x0=ordered_init_params)
+
+            # Update the best params only if this was better
+            if self.achieved_convergence > best_convergence:
+                best_params = result.x
 
         # Last chance, try again with random values
         if self.achieved_convergence <= failure_tol and n_random_tries > 0:
@@ -619,18 +671,29 @@ class GravityModelBase(abc.ABC):
                 "random cost parameters.",
                 self.unique_id, self.achieved_convergence, failure_tol,
             )
+            self._attempt_id += 100
             for i in range(n_random_tries):
-                self._attempt_id = 100 + i
+                self._attempt_id += i
                 random_params = self.cost_function.random_valid_params()
                 ordered_init_params = self._order_cost_params(random_params)
                 result = optimise_cost_params(x0=ordered_init_params)
+
+                # Update the best params only if this was better
+                if self.achieved_convergence > best_convergence:
+                    best_params = result.x
+
                 if self.achieved_convergence > failure_tol:
                     break
 
+        # Run one final time with the optimal parameters
+        self.optimal_cost_params = self._cost_params_to_kwargs(best_params)
+        self._attempt_id = -2
+        self._gravity_function(
+            cost_args=best_params,
+            **(gravity_kwargs | kwargs),
+        )
+
         # Populate internal arguments with optimal run results.
-        optimal_params = result.x
-        self.optimal_cost_params = self._cost_params_to_kwargs(optimal_params)
-        self._gravity_function(optimal_params, **gravity_kwargs)
         assert self.achieved_cost_dist is not None
         return GravityModelResults(
             cost_distribution=self.achieved_cost_dist,
@@ -696,9 +759,16 @@ class GravityModelBase(abc.ABC):
             convergence is less than this value, calibration will be run again with
             the default parameters from `self.cost_function`.
 
+        default_retry:
+            If, after running with `init_params`, the achieved convergence
+            is less than `failure_tol`, calibration will be run again with the
+            default parameters of `self.cost_function`.
+            This argument is ignored if the default parameters are given
+            as `init_params.
+
         n_random_tries:
-            If, after running with default parameters of self.cost_function,
-            the achieved convergence is less than this value, calibration will
+            If, after running with default parameters of `self.cost_function`,
+            the achieved convergence is less than `failure_tol`, calibration will
             be run again using random values for the cost parameters this
             number of times.
 
@@ -741,7 +811,7 @@ class GravityModelBase(abc.ABC):
         init_params: dict[str, Any],
         running_log_path: os.PathLike,
         target_cost_distribution: cost_utils.CostDistribution,
-        target_cost_convergence: float,
+        failure_tol: float = 0.5,
         *args,
         **kwargs,
     ) -> GravityModelResults:
@@ -763,10 +833,6 @@ class GravityModelBase(abc.ABC):
         target_cost_distribution:
             The cost distribution to calibrate towards during the calibration
             process.
-
-        target_cost_convergence:
-            A value between 0 and 1. Used to define the bounds within which
-            perceived factors can be used to improve final distribution.
 
         diff_step:
             Copied from scipy.optimize.least_squares documentation, where it
@@ -796,10 +862,20 @@ class GravityModelBase(abc.ABC):
             If, after initial calibration using `init_params`, the achieved
             convergence is less than this value, calibration will be run again with
             the default parameters from `self.cost_function`.
+            Also used to determine whether perceived factors should be used,
+            passed to `cls._should_use_perceived_factors()`.
+            See docs for further info
+
+        default_retry:
+            If, after running with `init_params`, the achieved convergence
+            is less than `failure_tol`, calibration will be run again with the
+            default parameters of `self.cost_function`.
+            This argument is ignored if the default parameters are given
+            as `init_params.
 
         n_random_tries:
-            If, after running with default parameters of self.cost_function,
-            the achieved convergence is less than this value, calibration will
+            If, after running with default parameters of `self.cost_function`,
+            the achieved convergence is less than `failure_tol`, calibration will
             be run again using random values for the cost parameters this
             number of times.
 
@@ -826,6 +902,7 @@ class GravityModelBase(abc.ABC):
         --------
         `caf.distribute.furness.doubly_constrained_furness()`
         `scipy.optimize.least_squares()`
+        `cls._should_use_perceived_factors()`
         """
         self.cost_function.validate_params(init_params)
         self._validate_running_log(running_log_path)
@@ -836,21 +913,29 @@ class GravityModelBase(abc.ABC):
             *args,
             init_params=init_params,
             running_log_path=running_log_path,
+            failure_tol=failure_tol,
+            target_cost_distribution=target_cost_distribution,
             **kwargs,
         )
 
         # If performance not good enough, apply perceived factors
         should_use_perceived = self._should_use_perceived_factors(
-            target_cost_convergence, results.cost_convergence
+            failure_tol, results.cost_convergence
         )
         if should_use_perceived:
+            # Start with 1000 if perceived factor run
+            self._attempt_id = 1000
+
             self._calculate_perceived_factors(
                 target_cost_distribution, self.achieved_band_share
             )
             results = self._calibrate(      # type: ignore
                 *args,
-                init_params=init_params,
+                # init_params=init_params,
+                init_params=results.cost_params,
                 running_log_path=running_log_path,
+                failure_tol=failure_tol,
+                target_cost_distribution=target_cost_distribution,
                 **kwargs,
             )
         return results
