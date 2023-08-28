@@ -392,8 +392,8 @@ class GravityModelBase(abc.ABC):
 
     def _jacobian_function(
         self,
-        diff_step: float,
         cost_args: list[float],
+        diff_step: float,
         running_log_path: os.PathLike,
         target_cost_distribution: cost_utils.CostDistribution,
         **kwargs,
@@ -445,7 +445,7 @@ class GravityModelBase(abc.ABC):
 
             # Convert to weights to estimate impact on output
             adj_weights = adj_distribution / adj_distribution.sum()
-            adj_final = self.achieved_distribution * adj_weights
+            adj_final = self.achieved_distribution.sum() * adj_weights
 
             # Finesse to match row / col targets
             adj_final, *_ = self.jacobian_furness(
@@ -626,7 +626,7 @@ class GravityModelBase(abc.ABC):
             value_distribution=self.achieved_distribution,
             target_cost_distribution=target_cost_distribution,
             cost_function=self.cost_function,
-            cost_params=optimal_params,
+            cost_params=self.optimal_cost_params,
         )
 
     def calibrate(
