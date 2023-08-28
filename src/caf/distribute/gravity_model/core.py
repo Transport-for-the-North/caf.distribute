@@ -612,7 +612,7 @@ class GravityModelBase(abc.ABC):
             result = optimise_cost_params(x0=ordered_init_params)
 
         # Last chance, try again with random values
-        if self.achieved_convergence <= failure_tol:
+        if self.achieved_convergence <= failure_tol and n_random_tries > 0:
             LOG.info(
                 "%sachieved a convergence of %s, "
                 "however the failure tolerance is set to %s. Trying again with "
