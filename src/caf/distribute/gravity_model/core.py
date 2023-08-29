@@ -640,7 +640,9 @@ class GravityModelBase(abc.ABC):
             "%scalibration process ended with "
             "success=%s, and the following message:\n"
             "%s",
-            self.unique_id, result.success, result.message,
+            self.unique_id,
+            result.success,
+            result.message,
         )
 
         # Track the best performance through the runs
@@ -653,7 +655,9 @@ class GravityModelBase(abc.ABC):
                 "%sachieved a convergence of %s, "
                 "however the failure tolerance is set to %s. Trying again with "
                 "default cost parameters.",
-                self.unique_id, self.achieved_convergence, failure_tol,
+                self.unique_id,
+                self.achieved_convergence,
+                failure_tol,
             )
             self._attempt_id += 1
             ordered_init_params = self._order_cost_params(self.cost_function.default_params)
@@ -669,7 +673,9 @@ class GravityModelBase(abc.ABC):
                 "%sachieved a convergence of %s, "
                 "however the failure tolerance is set to %s. Trying again with "
                 "random cost parameters.",
-                self.unique_id, self.achieved_convergence, failure_tol,
+                self.unique_id,
+                self.achieved_convergence,
+                failure_tol,
             )
             self._attempt_id += 100
             for i in range(n_random_tries):
@@ -799,7 +805,7 @@ class GravityModelBase(abc.ABC):
         self.cost_function.validate_params(init_params)
         self._validate_running_log(running_log_path)
         self._initialise_internal_params()
-        return self._calibrate(     # type: ignore
+        return self._calibrate(  # type: ignore
             *args,
             init_params=init_params,
             running_log_path=running_log_path,
@@ -909,7 +915,7 @@ class GravityModelBase(abc.ABC):
         self._initialise_internal_params()
 
         # Run as normal first
-        results = self._calibrate(      # type: ignore
+        results = self._calibrate(  # type: ignore
             *args,
             init_params=init_params,
             running_log_path=running_log_path,
@@ -929,7 +935,7 @@ class GravityModelBase(abc.ABC):
             self._calculate_perceived_factors(
                 target_cost_distribution, self.achieved_band_share
             )
-            results = self._calibrate(      # type: ignore
+            results = self._calibrate(  # type: ignore
                 *args,
                 init_params=results.cost_params,
                 running_log_path=running_log_path,

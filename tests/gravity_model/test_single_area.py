@@ -535,7 +535,9 @@ class TestRunMethods:
     # TODO(BT): Add tests for error checking as well
 
 
-@pytest.mark.usefixtures("simple_tanner_calib", "simple_log_normal_calib", "real_log_normal_calib")
+@pytest.mark.usefixtures(
+    "simple_tanner_calib", "simple_log_normal_calib", "real_log_normal_calib"
+)
 class TestCalibrationMethods:
     """Thoroughly tests the calibration functions using various examples."""
 
@@ -554,12 +556,14 @@ class TestCalibrationMethods:
             gm_results=gm_results,
         )
 
-    def test_perceived_calibrate(self, real_log_normal_calib_perceived: GMCalibratePerceivedResults):
+    def test_perceived_calibrate(
+        self, real_log_normal_calib_perceived: GMCalibratePerceivedResults
+    ):
         """Test that the perceived cost calibration works correctly."""
         gm_results = real_log_normal_calib_perceived.create_and_calibrate_gravity_model(
             init_params=real_log_normal_calib_perceived.calib_init_params,
             n_random_tries=0,
-            use_perceived_factors=True
+            use_perceived_factors=True,
         )
         real_log_normal_calib_perceived.assert_results(
             gm_results=gm_results,
@@ -567,4 +571,3 @@ class TestCalibrationMethods:
 
     # TODO(BT): Add tests for error checking as well
     # TODO(BT): Add tests to ensure perceived is not triggered when it shouldn't be
-
