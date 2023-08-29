@@ -51,6 +51,75 @@ class GravityModelResults:
         between different places).
 
     target_cost_distribution:
+        The cost distribution the gravity model was aiming for during its run.
+
+    cost_function:
+        The cost function used in the gravity model run.
+
+    cost_params:
+        The cost parameters used with the cost_function to achieve the results.
+    """
+
+    cost_distribution: cost_utils.CostDistribution
+    cost_convergence: float
+    value_distribution: np.ndarray
+
+
+@dataclasses.dataclass
+class GravityModelCalibrateResults(GravityModelResults):
+    """A collection of results from a run of the Gravity Model.
+
+    Parameters
+    ----------
+    cost_distribution:
+        The achieved cost distribution of the run.
+
+    cost_convergence:
+        The achieved cost convergence value of the run. If
+        `target_cost_distribution` is not set, then this should be 0.
+        This will be the same as calculating the convergence of
+        `cost_distribution` and `target_cost_distribution`.
+
+    value_distribution:
+        The achieved distribution of the given values (usually trip values
+        between different places).
+
+    target_cost_distribution:
+        The cost distribution the gravity model was aiming for during its run.
+
+    cost_function:
+        The cost function used in the gravity model run.
+
+    cost_params:
+        The cost parameters used with the cost_function to achieve the results.
+    """
+
+    # Targets
+    target_cost_distribution: cost_utils.CostDistribution
+    cost_function: cost_functions.CostFunction
+    cost_params: dict[str, Any]
+
+
+@dataclasses.dataclass
+class GravityModelRunResults(GravityModelResults):
+    """A collection of results from a run of the Gravity Model.
+
+    Parameters
+    ----------
+    cost_distribution:
+        The achieved cost distribution of the run.
+
+    cost_convergence:
+        The achieved cost convergence value of the run. If
+        `target_cost_distribution` is not set, then this should be 0.
+        This will be the same as calculating the convergence of
+        `cost_distribution` and `target_cost_distribution`.
+
+    value_distribution:
+        The achieved distribution of the given values (usually trip values
+        between different places).
+
+    target_cost_distribution:
         If set, this will be the cost distribution the gravity
         model was aiming for during its run.
 
@@ -61,10 +130,6 @@ class GravityModelResults:
         If set, the cost parameters used with the cost_function to achieve
         the results.
     """
-
-    cost_distribution: cost_utils.CostDistribution
-    cost_convergence: float
-    value_distribution: np.ndarray
 
     # Targets
     target_cost_distribution: Optional[cost_utils.CostDistribution] = None
@@ -523,7 +588,7 @@ class GravityModelBase(abc.ABC):
         default_retry: bool = True,
         verbose: int = 0,
         **kwargs,
-    ) -> GravityModelResults:
+    ) -> GravityModelCalibrateResults:
         """Find the optimal parameters for self.cost_function.
 
         Optimal parameters are found using `scipy.optimize.least_squares`
@@ -601,7 +666,7 @@ class GravityModelBase(abc.ABC):
         Returns
         -------
         results:
-            An instance of GravityModelResults containing the
+            An instance of GravityModelCalibrateResults containing the
             results of this run.
 
         See Also
@@ -701,7 +766,7 @@ class GravityModelBase(abc.ABC):
 
         # Populate internal arguments with optimal run results.
         assert self.achieved_cost_dist is not None
-        return GravityModelResults(
+        return GravityModelCalibrateResults(
             cost_distribution=self.achieved_cost_dist,
             cost_convergence=self.achieved_convergence,
             value_distribution=self.achieved_distribution,
@@ -716,7 +781,7 @@ class GravityModelBase(abc.ABC):
         running_log_path: os.PathLike,
         *args,
         **kwargs,
-    ) -> GravityModelResults:
+    ) -> GravityModelCalibrateResults:
         """Find the optimal parameters for self.cost_function.
 
         Optimal parameters are found using `scipy.optimize.least_squares`
@@ -794,7 +859,7 @@ class GravityModelBase(abc.ABC):
         Returns
         -------
         results:
-            An instance of GravityModelResults containing the
+            An instance of GravityModelCalibrateResults containing the
             results of this run.
 
         See Also
@@ -817,10 +882,10 @@ class GravityModelBase(abc.ABC):
         init_params: dict[str, Any],
         running_log_path: os.PathLike,
         target_cost_distribution: cost_utils.CostDistribution,
-        failure_tol: float = 0.5,
         *args,
+        failure_tol: float = 0.5,
         **kwargs,
-    ) -> GravityModelResults:
+    ) -> GravityModelCalibrateResults:
         """Find the optimal parameters for self.cost_function.
 
         Optimal parameters are found using `scipy.optimize.least_squares`
@@ -901,7 +966,7 @@ class GravityModelBase(abc.ABC):
         Returns
         -------
         results:
-            An instance of GravityModelResults containing the
+            An instance of GravityModelCalibrateResults containing the
             results of this run.
 
         See Also
@@ -1023,7 +1088,7 @@ class GravityModelBase(abc.ABC):
         target_cost_distribution: cost_utils.CostDistribution,
         target_cost_convergence: float = 0.9,
         **kwargs,
-    ) -> GravityModelResults:
+    ) -> GravityModelRunResults:
         """Run the gravity model with set cost parameters.
 
         This function will run a single iteration of the gravity model using
@@ -1065,7 +1130,7 @@ class GravityModelBase(abc.ABC):
         Returns
         -------
         results:
-            An instance of GravityModelResults containing the
+            An instance of GravityModelRunResults containing the
             results of this run.
 
         See Also
@@ -1101,7 +1166,7 @@ class GravityModelBase(abc.ABC):
             )
 
         assert self.achieved_cost_dist is not None
-        return GravityModelResults(
+        return GravityModelRunResults(
             cost_distribution=self.achieved_cost_dist,
             cost_convergence=self.achieved_convergence,
             value_distribution=self.achieved_distribution,
@@ -1116,7 +1181,7 @@ class GravityModelBase(abc.ABC):
         running_log_path: os.PathLike,
         target_cost_distribution: Optional[cost_utils.CostDistribution] = None,
         **kwargs,
-    ) -> GravityModelResults:
+    ) -> GravityModelRunResults:
         """Run the gravity model with set cost parameters.
 
         This function will run a single iteration of the gravity model using
@@ -1144,7 +1209,7 @@ class GravityModelBase(abc.ABC):
         Returns
         -------
         results:
-            An instance of GravityModelResults containing the
+            An instance of GravityModelRunResults containing the
             results of this run. If a `target_cost_distribution` is not given,
             the returning results.cost_distribution will dynamically create
             its own bins; cost_residuals and cost_convergence will also
@@ -1166,7 +1231,7 @@ class GravityModelBase(abc.ABC):
         )
 
         assert self.achieved_cost_dist is not None
-        return GravityModelResults(
+        return GravityModelRunResults(
             cost_distribution=self.achieved_cost_dist,
             cost_convergence=self.achieved_convergence,
             value_distribution=self.achieved_distribution,

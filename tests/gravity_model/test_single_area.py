@@ -20,6 +20,8 @@ import numpy as np
 from caf.toolkit import cost_utils
 from caf.distribute import cost_functions
 from caf.distribute.gravity_model import GravityModelResults
+from caf.distribute.gravity_model import GravityModelRunResults
+from caf.distribute.gravity_model import GravityModelCalibrateResults
 from caf.distribute.gravity_model import SingleAreaGravityModelCalibrator
 
 # pylint: enable=import-error,wrong-import-position
@@ -95,7 +97,7 @@ class GMCreator:
         furness_max_iters: int = 1000,
         furness_tol: float = 1e-3,
         use_perceived_factors: bool = False,
-    ) -> GravityModelResults:
+    ) -> GravityModelRunResults:
         gm = SingleAreaGravityModelCalibrator(
             row_targets=self.row_targets,
             col_targets=self.col_targets,
@@ -133,7 +135,7 @@ class GMCreator:
         furness_max_iters: int = 1000,
         furness_tol: float = 1e-3,
         use_perceived_factors: bool = False,
-    ) -> GravityModelResults:
+    ) -> GravityModelCalibrateResults:
         gm = SingleAreaGravityModelCalibrator(
             row_targets=self.row_targets,
             col_targets=self.col_targets,
@@ -237,7 +239,9 @@ class GMRunResults(GMCreator):
         """Get the optimal parameters from disk"""
         return self.best_params
 
-    def assert_results(self, gm_results: GravityModelResults) -> None:
+    def assert_results(
+        self, gm_results: GravityModelRunResults | GravityModelCalibrateResults
+    ) -> None:
         """Assert that all the results are as expected"""
         # Check the scalar values
         for key, val in self.best_params.items():
