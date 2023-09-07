@@ -448,6 +448,7 @@ class GravityModelBase(abc.ABC):
             self.achieved_distribution
             self.optimal_cost_params
         """
+        # TODO(MB) Move definition to single area class and change to ABC method
         # Not used, but need for compatibility with self._jacobian_function
         del diff_step
 
@@ -514,6 +515,7 @@ class GravityModelBase(abc.ABC):
 
         Used by the `optimize.least_squares` function.
         """
+        # TODO(MB) Move definition to single area class and change to ABC method
         # pylint: disable=too-many-locals
         # Not used, but need for compatibility with self._gravity_function
         del running_log_path
@@ -774,6 +776,11 @@ class GravityModelBase(abc.ABC):
             cost_function=self.cost_function,
             cost_params=self.optimal_cost_params,
         )
+
+    def _calculate_initial_parameters(self) -> dict[str, Any]:
+        ...
+        # TODO(MB) Make an abstract method for calculating initial parameters
+        # This already exists in SingleArea class
 
     def calibrate(
         self,
@@ -1042,6 +1049,7 @@ class GravityModelBase(abc.ABC):
             The Root Mean Squared Error difference achieved before exiting
         """
         raise NotImplementedError
+        # TODO(MB) Remove once gravity function method has been moved
 
     @abc.abstractmethod
     def jacobian_furness(
@@ -1080,6 +1088,7 @@ class GravityModelBase(abc.ABC):
             The Root Mean Squared Error difference achieved before exiting
         """
         raise NotImplementedError
+        # TODO(MB) Remove once jacobian function method has been moved
 
     def run_with_perceived_factors(
         self,
@@ -1280,6 +1289,8 @@ def cost_distribution_stats(
         convergence. Will be -1 if `target_cost_distribution` is not set.
 
     """
+    # TODO(MB) Calculate extra stats / metrics
+    # r squared, ratio of coincidence, possible others?
     if target_cost_distribution is not None:
         cost_distribution = cost_utils.CostDistribution.from_data(
             matrix=achieved_trip_distribution,
