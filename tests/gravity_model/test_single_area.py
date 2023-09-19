@@ -261,7 +261,7 @@ class GMRunResults(GMCreator):
             rtol=1e-3,
         )
         np.testing.assert_allclose(
-            self.target_cost_distribution.residuals(gm_results.cost_distribution),
+            self.target_cost_distribution.band_share_residuals(gm_results.cost_distribution),
             self.residuals,
             rtol=1e-3,
         )
