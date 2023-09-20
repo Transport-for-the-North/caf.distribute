@@ -76,7 +76,7 @@ disable = [
 
 # Pylint settings
 [tool.pylint.basic]
-good-names = ["df", "fn", "ca", "tp", "to", "x", "x1", "x2", "i", "f", "q"]
+good-names = ["df", "fn", "ca", "tp", "to", "x", "x1", "x2", "i", "f", "q", "mu"]
 extension-pkg-allow-list = ["pydantic"]
 
 [tool.pylint.main]
@@ -89,15 +89,8 @@ max-statements = 100
 
 [tool.mypy]
 packages = ["caf.distribute"]
-namespace_packages = true
 ignore_missing_imports = true
 allow_redefinition = true
-
-[[tool.mypy.overrides]]
-module = [
-  "caf.distribute._version",
-]
-ignore_errors = true
 
 [tool.pydocstyle]
 convention = "numpy"
@@ -113,6 +106,9 @@ addopts = '--cov=caf --cov-report=xml -n auto'
 
 [tool.coverage.run]
 omit = ["*/_version.py"]
+
+[tool.coverage.report]
+include_namespace_packages = true
 
 # Versioning
 [tool.versioningit.vcs]
