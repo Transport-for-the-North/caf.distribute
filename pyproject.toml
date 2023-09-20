@@ -24,7 +24,7 @@ dependencies = [
     "numpy>=1.19.0",
     "pandas>=1.4.0",
     "tqdm>=4.50.2",
-    "caf.toolkit>=0.1.4",
+    "caf.toolkit>=0.2.1",
 ]
 
 [project.optional-dependencies]
