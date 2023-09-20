@@ -57,7 +57,13 @@ class GMCreator:
     @staticmethod
     def _read_cost_distribution(home: pathlib.Path) -> cost_utils.CostDistribution:
         path = home / "target_cost_distribution.csv"
-        return cost_utils.CostDistribution.from_file(path)
+        return cost_utils.CostDistribution.from_file(
+            filepath=path,
+            min_col="min",
+            max_col="max",
+            avg_col="ave_km",
+            trips_col="trips",
+        )
 
     @classmethod
     def get_common_constructor_kwargs(cls, path: pathlib.Path) -> dict[str, Any]:
