@@ -56,6 +56,8 @@ extensions = [
     "sphinx_automodapi.automodapi",
 ]
 
+automodapi_inheritance_diagram = False
+
 numpydoc_show_class_members = False
 
 # Add any paths that contain templates here, relative to this directory.
