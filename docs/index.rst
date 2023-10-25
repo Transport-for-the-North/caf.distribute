@@ -8,7 +8,7 @@ Welcome to caf.distribute's documentation!
 
 A module of CAF for distributing demand across matrices.
 
-The Common Analytical Framework (CAF) is a toolkit of transport planning and appraisal functionalities. It's part of a project to make a lot of the useful transport related functionality more widely available and easily accessible. Other modules include:
+The Common Analytical Framework (CAF) is a collection of transport planning and appraisal functionalities. It's part of a project to make useful transport related functionality more widely available and easily accessible. Other modules include:
 
 * `CAF.Toolkit <https://caftoolkit.readthedocs.io/en/latest/>`_
 
