@@ -1,6 +1,4 @@
-# Required libraries
-
-# Example
+# Required libraries for a doc build
 scipy>=1.9.3
 numpy>=1.19.0
 pandas>=1.4.0
