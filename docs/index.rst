@@ -12,7 +12,7 @@ The Common Analytical Framework (CAF) is a toolkit of transport planning and app
 
 * `CAF.Toolkit <https://caftoolkit.readthedocs.io/en/latest/>`_
 
-* `CAF.Space <https://cafspcae.readthedocs.io/en/latest/>`_
+* `CAF.Space <https://cafspace.readthedocs.io/en/latest/>`_
 
 Tool info
 ---------
