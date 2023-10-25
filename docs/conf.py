@@ -25,10 +25,6 @@ dir_path = Path(__file__).parents[1]
 source = dir_path / "src" / "caf" / "distribute"
 
 sys.path.insert(0, os.path.abspath(str(source)))
-sys.path.insert(
-    0,
-    os.path.abspath(r"C:\Users\IsaacScott\anaconda3\envs\distribute\Lib\site-packages"),
-)
 
 project = "caf.distribute"
 copyright = "2023, Transport for the North"
