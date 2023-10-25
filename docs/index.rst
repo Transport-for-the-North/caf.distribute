@@ -17,7 +17,11 @@ The Common Analytical Framework (CAF) is a toolkit of transport planning and app
 Tool info
 ---------
 
-{Add any necessary tool info here Ben}
+CAF.distribute focusses on tools and models to distribute vectors of data into matrices.
+Currently, it only contains a self calibrating gravity model that is capable of calibrating data to a single cost distribution area.
+
+Future plans involve enhancing this gravity model to handle multiple cost distribution areas, that is if the gravity model data covered two counties, a different cost distribution could be used for each county, while ensuring all totals still match.
+There are also plans to move the `Iterative Proportional Fitting <https://en.wikipedia.org/wiki/Iterative_proportional_fitting>`_ algorithm over that currently exists in `CAF.Toolkit <https://github.com/Transport-for-the-North/caf.toolkit/blob/3c7ba4b7d770e90fcadb81672c9c485bcf08cecf/src/caf/toolkit/iterative_proportional_fitting.py#L837>`_.
 
 Installation
 ------------
