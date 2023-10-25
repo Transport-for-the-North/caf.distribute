@@ -31,8 +31,8 @@ sys.path.insert(
 )
 
 project = "caf.distribute"
-copyright = "2023, Benjamin Taylor"
-author = "Benjamin Taylor"
+copyright = "2023, Transport for the North"
+author = "Transport for the North"
 
 napoleon_google_docstring = False
 napoleon_numpy_docstring = True
