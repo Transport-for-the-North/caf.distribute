@@ -13,9 +13,6 @@
 # import os
 # import sys
 # sys.path.insert(0, os.path.abspath('.'))
-
-
-# -- Project information -----------------------------------------------------
 import sys
 import os
 from pathlib import Path
@@ -25,6 +22,7 @@ source = dir_path / "src" / "caf" / "distribute"
 
 sys.path.insert(0, os.path.abspath(str(source)))
 
+# -- Project information -----------------------------------------------------
 project = "caf.distribute"
 copyright = "2023, Transport for the North"
 author = "Transport for the North"
