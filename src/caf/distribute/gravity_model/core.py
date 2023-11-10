@@ -1297,8 +1297,8 @@ def cost_distribution_stats(
             cost_matrix=cost_matrix,
             bin_edges=target_cost_distribution.bin_edges,
         )
-        cost_residuals = target_cost_distribution.residuals(cost_distribution)
-        cost_convergence = target_cost_distribution.convergence(cost_distribution)
+        cost_residuals = target_cost_distribution.band_share_residuals(cost_distribution)
+        cost_convergence = target_cost_distribution.band_share_convergence(cost_distribution)
 
     else:
         cost_distribution = cost_utils.CostDistribution.from_data_no_bins(

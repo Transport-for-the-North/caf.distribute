@@ -57,7 +57,13 @@ class GMCreator:
     @staticmethod
     def _read_cost_distribution(home: pathlib.Path) -> cost_utils.CostDistribution:
         path = home / "target_cost_distribution.csv"
-        return cost_utils.CostDistribution.from_file(path)
+        return cost_utils.CostDistribution.from_file(
+            filepath=path,
+            min_col="min",
+            max_col="max",
+            avg_col="ave_km",
+            trips_col="trips",
+        )
 
     @classmethod
     def get_common_constructor_kwargs(cls, path: pathlib.Path) -> dict[str, Any]:
@@ -261,7 +267,7 @@ class GMRunResults(GMCreator):
             rtol=1e-3,
         )
         np.testing.assert_allclose(
-            self.target_cost_distribution.residuals(gm_results.cost_distribution),
+            self.target_cost_distribution.band_share_residuals(gm_results.cost_distribution),
             self.residuals,
             rtol=1e-3,
         )
