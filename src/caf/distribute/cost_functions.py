@@ -15,6 +15,8 @@ from typing import Callable
 
 # Third Party
 import numpy as np
+from scipy.stats import lognorm
+
 
 # Local Imports
 # pylint: disable=import-error,wrong-import-position
@@ -314,3 +316,5 @@ def log_normal(
     exp = np.exp(-exp_numerator / exp_denominator)
 
     return np.maximum(frac * exp, min_return_val)
+
+
