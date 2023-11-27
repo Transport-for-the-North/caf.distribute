@@ -7,7 +7,7 @@ import functools
 import logging
 import os
 import warnings
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 # Third Party
 import numpy as np
@@ -161,7 +161,10 @@ class GravityModelBase(abc.ABC):
         self._attempt_id: int = -1
         self._loop_num: int = -1
         self._loop_start_time: float = -1.0
-        self._perceived_factors: np.ndarray = np.ones_like(self.cost_matrix)
+        if isinstance(cost_matrix, pd.DataFrame):
+            self._perceived_factors: pd.DataFrame = pd.DataFrame(np.ones_like(self.cost_matrix), index=self.cost_matrix.index)
+        else:
+            self._perceived_factors: np.ndarray = np.ones_like(self.cost_matrix)
 
         # Additional attributes
         self.initial_cost_params: dict[str, Any] = dict()
@@ -418,8 +421,11 @@ class GravityModelBase(abc.ABC):
         # Assign to class attribute
         self._perceived_factors = perc_factors_mat
 
-    def _apply_perceived_factors(self, cost_matrix: np.ndarray) -> np.ndarray:
-        return cost_matrix * self._perceived_factors
+    def _apply_perceived_factors(self, cost_matrix: Union[np.ndarray, pd.DataFrame]) -> np.ndarray:
+        if isinstance(cost_matrix, pd.DataFrame):
+            return cost_matrix * self._perceived_factors.loc[cost_matrix.index]
+        else:
+            return cost_matrix * self._perceived_factors
 
     @abc.abstractmethod
     def _gravity_function(

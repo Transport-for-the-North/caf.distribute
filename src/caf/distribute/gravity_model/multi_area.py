@@ -5,6 +5,7 @@ import logging
 from dataclasses import dataclass
 from typing import Iterator
 import os
+from copy import deepcopy
 # Third Party
 import numpy as np
 import pandas as pd
@@ -25,10 +26,11 @@ LOG = logging.getLogger(__name__)
 @dataclass
 class MultiCostDistribution:
     name: str
-    cost_function: cost_functions.CostFunction
     cost_distribution: cost_utils.CostDistribution
     zones: np.ndarray
     function_params: dict[str, float]
+    cost_function: cost_functions.CostFunction = None
+
 
 
 
@@ -38,20 +40,30 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
     # adjusted cost matrix (optional) instead could be callable
 
     # Need to update functions in base class to allow for giving multiple cost distributions
-    # Ideally calibrate and calibrate_with_percieved factors should be defined flexibly
+    # Ideally calibrate and calibrate_with_perceived factors should be defined flexibly
     # in base class
 
     def __init__(
             self,
-            row_targets: np.ndarray,
-            col_targets: np.ndarray,
-            cost_matrix: np.ndarray,
+            row_targets: pd.Series,
+            col_targets: pd.Series,
+            cost_matrix: pd.DataFrame,
+            cost_function: cost_functions.CostFunction,
             target_cost_distributions: list[MultiCostDistribution]
     ):
-        self.row_targets = row_targets = pd.Series(row_targets, index=range(1, len(row_targets) + 1))
+        super().__init__(
+            cost_function=cost_function,
+            cost_matrix=cost_matrix
+        )
+        self.row_targets = row_targets
         self.col_targets = col_targets
-        self.cost_matrix = pd.DataFrame(cost_matrix, index=range(1, len(row_targets) + 1), columns=range(1, len(col_targets) + 1))
-        self.target_cost_distributions = target_cost_distributions
+        self.target_cost_distributions = []
+        for dist in target_cost_distributions:
+            if dist.cost_function is None:
+                dist.cost_function = cost_function
+            self.target_cost_distributions.append(dist)
+
+
     def _calculate_perceived_factors(self) -> None:
         raise NotImplementedError("WIP")
 
@@ -71,97 +83,109 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         # hopefully can use alot of the same code
         seed_mat_slices = []
         for distribution in self.target_cost_distributions:
-            seed_mat_slice = distribution.cost_function.calculate(self.cost_matrix.loc[distribution.zones].values)
+            seed_mat_slice = distribution.cost_function.calculate(self.cost_matrix.loc[distribution.zones].values, **distribution.function_params)
             seed_mat_slices.append(pd.DataFrame(seed_mat_slice, index=distribution.zones))
         seed_mat = pd.concat(seed_mat_slices).sort_index()
-        best_params = {}
-        for distribution in self.target_cost_distributions:
-            init_params = distribution.cost_function.default_params
-            gravity_kwargs = {
-                "running_log_path": running_log_path,
-                "target_cost_distribution": distribution.cost_distribution,
-                "diff_step": diff_step,
-                "seed_mat": seed_mat
-            }
+        while True:
+            best_parmas = {}
+            current_params = deepcopy(self.target_cost_distributions)
+            for distribution in self.target_cost_distributions:
+                init_params = distribution.cost_function.default_params
+                gravity_kwargs = {
+                    "running_log_path": running_log_path,
+                    "target_cost_distribution": distribution.cost_distribution,
+                    "diff_step": diff_step,
+                    "seed_mat": seed_mat,
+                    "zones": distribution.zones
+                }
 
-            optimise_cost_params = functools.partial(
-                optimize.least_squares,
-                fun=self._gravity_function,
-                method=self._least_squares_method,
-                bounds=self._order_bounds(),
-                jac=self._jacobian_function,
-                verbose=verbose,
-                ftol=ftol,
-                xtol=xtol,
-                max_nfev=grav_max_iters,
-                kwargs=gravity_kwargs | kwargs,
-            )
-            ordered_init_params = self._order_cost_params(init_params)
-            result = optimise_cost_params(x0=ordered_init_params)
-            LOG.info(
-                "%scalibration process ended with "
-                "success=%s, and the following message:\n"
-                "%s",
-                distribution.name,
-                result.success,
-                result.message,
-            )
-            # Track the best performance through the runs
-            best_convergence = self.achieved_convergence
-            best_params = result.x
-
-            # Bad init params might have been given, try default
-            if self.achieved_convergence <= failure_tol and default_retry:
-                LOG.info(
-                    "%sachieved a convergence of %s, "
-                    "however the failure tolerance is set to %s. Trying again with "
-                    "default cost parameters.",
-                    self.unique_id,
-                    self.achieved_convergence,
-                    failure_tol,
+                optimise_cost_params = functools.partial(
+                    optimize.least_squares,
+                    fun=self._gravity_function,
+                    method=self._least_squares_method,
+                    bounds=self._order_bounds(),
+                    jac=self._jacobian_function,
+                    verbose=verbose,
+                    ftol=ftol,
+                    xtol=xtol,
+                    max_nfev=grav_max_iters,
+                    kwargs=gravity_kwargs | kwargs,
                 )
-                self._attempt_id += 1
-                ordered_init_params = self._order_cost_params(self.cost_function.default_params)
+                ordered_init_params = self._order_cost_params(init_params)
                 result = optimise_cost_params(x0=ordered_init_params)
-
-                # Update the best params only if this was better
-                if self.achieved_convergence > best_convergence:
-                    best_params = result.x
-
-            # Last chance, try again with random values
-            if self.achieved_convergence <= failure_tol and n_random_tries > 0:
                 LOG.info(
-                    "%sachieved a convergence of %s, "
-                    "however the failure tolerance is set to %s. Trying again with "
-                    "random cost parameters.",
-                    self.unique_id,
-                    self.achieved_convergence,
-                    failure_tol,
+                    "%scalibration process ended with "
+                    "success=%s, and the following message:\n"
+                    "%s",
+                    distribution.name,
+                    result.success,
+                    result.message,
                 )
-                self._attempt_id += 100
-                for i in range(n_random_tries):
-                    self._attempt_id += i
-                    random_params = self.cost_function.random_valid_params()
-                    ordered_init_params = self._order_cost_params(random_params)
+                # Track the best performance through the runs
+                best_convergence = self.achieved_convergence
+                best_params = result.x
+
+                # Bad init params might have been given, try default
+                if self.achieved_convergence <= failure_tol and default_retry:
+                    LOG.info(
+                        "%sachieved a convergence of %s, "
+                        "however the failure tolerance is set to %s. Trying again with "
+                        "default cost parameters.",
+                        self.unique_id,
+                        self.achieved_convergence,
+                        failure_tol,
+                    )
+                    self._attempt_id += 1
+                    ordered_init_params = self._order_cost_params(self.cost_function.default_params)
                     result = optimise_cost_params(x0=ordered_init_params)
 
                     # Update the best params only if this was better
                     if self.achieved_convergence > best_convergence:
                         best_params = result.x
 
-                    if self.achieved_convergence > failure_tol:
-                        break
+                # Last chance, try again with random values
+                if self.achieved_convergence <= failure_tol and n_random_tries > 0:
+                    LOG.info(
+                        "%sachieved a convergence of %s, "
+                        "however the failure tolerance is set to %s. Trying again with "
+                        "random cost parameters.",
+                        self.unique_id,
+                        self.achieved_convergence,
+                        failure_tol,
+                    )
+                    self._attempt_id += 100
+                    for i in range(n_random_tries):
+                        self._attempt_id += i
+                        random_params = self.cost_function.random_valid_params()
+                        ordered_init_params = self._order_cost_params(random_params)
+                        result = optimise_cost_params(x0=ordered_init_params)
 
-            # Run one final time with the optimal parameters
-            self.optimal_cost_params = self._cost_params_to_kwargs(best_params)
-            self._attempt_id = -2
-            self._gravity_function(
-                cost_args=best_params,
-                **(gravity_kwargs | kwargs),
-            )
-            assert self.achieved_cost_dist is not None
-            distribution.function_params = self.optimal_cost_params
-            best_params[distribution.name] = distribution
+                        # Update the best params only if this was better
+                        if self.achieved_convergence > best_convergence:
+                            best_params = result.x
+
+                        if self.achieved_convergence > failure_tol:
+                            break
+
+                # Run one final time with the optimal parameters
+                self.optimal_cost_params = self._cost_params_to_kwargs(best_params)
+                self._attempt_id = -2
+                self._gravity_function(
+                    cost_args=best_params,
+                    **(gravity_kwargs | kwargs),
+                )
+                assert self.achieved_cost_dist is not None
+                distribution.function_params = self.optimal_cost_params
+                best_parmas[distribution.name] = distribution
+            self.target_cost_distributions = list(best_parmas.values())
+            checks = []
+            for i, pars in enumerate(current_params):
+                for name, val in pars.function_params.items():
+                    diff = val - self.target_cost_distributions[i].function_params[name]
+                    checks.append(diff ** 2)
+            if all(check < 0.01 for check in checks):
+                break
+
         return best_params
 
     def _gravity_function(self,
@@ -169,19 +193,21 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
                           running_log_path: os.PathLike,
                           zones: list[int],
                           seed_mat: pd.DataFrame,
-                          diff_step: float = 0.0,
                           target_cost_distribution: cost_utils.CostDistribution,
+                          diff_step: float = 0.0,
                           **kwargs
                           ) -> np.ndarray:
         del diff_step
-
+        del kwargs['init_params']
         cost_kwargs = self._cost_params_to_kwargs(cost_args)
-        cost_matrix = self._apply_perceived_factors(self.cost_matrix[zones])
+        cost_matrix = self.cost_matrix.loc[zones]
+        seed_slice = self.cost_function.calculate(cost_matrix, **cost_kwargs)
+        seed_mat.loc[zones] = seed_slice
 
         matrix, iters, rmse = furness.doubly_constrained_furness(
-            seed_vals=seed_mat,
-            row_targets=self.row_targets,
-            col_targets=self.col_targets,
+            seed_vals=seed_mat.values,
+            row_targets=self.row_targets.values,
+            col_targets=self.col_targets.values,
             **kwargs,
         )
         matrix = pd.DataFrame(matrix, index=seed_mat.index)
@@ -241,7 +267,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
 
         # Initialise running params
         cost_kwargs = self._cost_params_to_kwargs(cost_args)
-        cost_matrix = self._apply_perceived_factors(self.cost_matrix)
+        cost_matrix = self.cost_matrix
         row_targets = self.achieved_distribution.sum(axis=1)
         col_targets = self.achieved_distribution.sum(axis=0)
 
@@ -262,23 +288,23 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             adj_cost_kwargs[cost_param] += cost_step
             adj_base_mat_slice = self.cost_function.calculate(cost_matrix.loc[zones], **adj_cost_kwargs)
             adj_base_mat_slice = pd.DataFrame(adj_base_mat_slice, index=zones)
-            adj_base_mat = self.achieved_distribution.copy()
+            adj_base_mat = seed_mat.copy()
             adj_base_mat.loc[zones] = adj_base_mat_slice
 
             # Estimate the impact of the furness
             adj_distribution = adj_base_mat * furness_factor
-            if adj_distribution.sum() == 0:
+            if adj_distribution.sum().sum() == 0:
                 raise ValueError("estimated furness matrix total is 0")
 
             # Convert to weights to estimate impact on output
-            adj_weights = adj_distribution / adj_distribution.sum()
-            adj_final = self.achieved_distribution.sum() * adj_weights
+            adj_weights = adj_distribution / adj_distribution.sum().sum()
+            adj_final = self.achieved_distribution.sum().sum() * adj_weights
 
             # Finesse to match row / col targets
             adj_final, *_ = furness.doubly_constrained_furness(
-                seed_vals=adj_final,
-                row_targets=row_targets,
-                col_targets=col_targets,
+                seed_vals=adj_final.values,
+                row_targets=row_targets.values,
+                col_targets=col_targets.values,
                 tol=1e-6,
                 max_iters=20,
                 warning=False,
