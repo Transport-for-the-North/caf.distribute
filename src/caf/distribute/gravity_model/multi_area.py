@@ -79,16 +79,21 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
                    verbose: int = 0,
                    **kwargs,
                    ) -> GravityModelCalibrateResults:
-        # TODO(MB) Some small amount of refactoring in core but
-        # hopefully can use alot of the same code
-        seed_mat_slices = []
-        for distribution in self.target_cost_distributions:
-            seed_mat_slice = distribution.cost_function.calculate(self.cost_matrix.loc[distribution.zones].values, **distribution.function_params)
-            seed_mat_slices.append(pd.DataFrame(seed_mat_slice, index=distribution.zones))
-        seed_mat = pd.concat(seed_mat_slices).sort_index()
+        # This while loop terminates when cist function params stabilise.
+        # More rigorous convergence checks are then performed.
         while True:
+            # Create whole seed matrix by concatenating sections.
+            seed_mat_slices = []
+            for distribution in self.target_cost_distributions:
+                seed_mat_slice = distribution.cost_function.calculate(
+                    self.cost_matrix.loc[distribution.zones].values,
+                    **distribution.function_params)
+                seed_mat_slices.append(pd.DataFrame(seed_mat_slice, index=distribution.zones))
+            seed_mat = pd.concat(seed_mat_slices).sort_index()
             best_parmas = {}
+            # Copy initial params to compare to updated at the end
             current_params = deepcopy(self.target_cost_distributions)
+            # Similar process to single_area calibrate for each TLD
             for distribution in self.target_cost_distributions:
                 init_params = distribution.cost_function.default_params
                 gravity_kwargs = {
@@ -131,7 +136,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
                         "%sachieved a convergence of %s, "
                         "however the failure tolerance is set to %s. Trying again with "
                         "default cost parameters.",
-                        self.unique_id,
+                        distribution.name,
                         self.achieved_convergence,
                         failure_tol,
                     )
@@ -149,7 +154,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
                         "%sachieved a convergence of %s, "
                         "however the failure tolerance is set to %s. Trying again with "
                         "random cost parameters.",
-                        self.unique_id,
+                        distribution.name,
                         self.achieved_convergence,
                         failure_tol,
                     )
@@ -177,16 +182,21 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
                 assert self.achieved_cost_dist is not None
                 distribution.function_params = self.optimal_cost_params
                 best_parmas[distribution.name] = distribution
+            # Set target_cost_distribution's params to the newly calculated
             self.target_cost_distributions = list(best_parmas.values())
             checks = []
+            # Check difference between params of consecutive runs
             for i, pars in enumerate(current_params):
                 for name, val in pars.function_params.items():
                     diff = val - self.target_cost_distributions[i].function_params[name]
                     checks.append(diff ** 2)
+            # Difference below threshold for all, end loop. Otherwise it will
+            # start again with init params equal to final params.
             if all(check < 0.01 for check in checks):
                 break
 
-        return best_params
+
+        return best_parmas
 
     def _gravity_function(self,
                           cost_args: list[float],
@@ -324,6 +334,27 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
 
         return jacobian
 
+    def _convergence_check(self, distributions, costs):
+        final_mat = []
+        for dist in distributions:
+            slice = dist.cost_function.calculate(costs.loc[dist.zones], **dist.function_params)
+            final_mat.append(slice)
+        final_mat = furness.doubly_constrained_furness(pd.concat(final_mat),
+                                                       self.row_targets.values,
+                                                       self.col_targets.values)
+        for dist in distributions:
+            cost_distribution, achieved_residuals, convergence = core.cost_distribution_stats(
+                achieved_trip_distribution=final_mat.loc[dist.zones],
+                cost_matrix=costs.loc[dist.zones],
+                target_cost_distribution=dist.target_cost_distribution,
+            )
+            
+
+
+
+
+
+
 def gravity_model(
     row_targets: pd.Series,
     col_targets: np.ndarray,
@@ -411,7 +442,6 @@ def gravity_model(
     )
 
     return matrix, iters, rmse
-
 
 
 # # # FUNCTIONS # # #
