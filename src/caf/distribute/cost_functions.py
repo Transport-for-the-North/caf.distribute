@@ -316,5 +316,3 @@ def log_normal(
     exp = np.exp(-exp_numerator / exp_denominator)
 
     return np.maximum(frac * exp, min_return_val)
-
-
