@@ -195,7 +195,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             if all(check < 0.01 for check in checks):
                 break
 
-
+        self._convergence_check(self.target_cost_distributions, self.cost_matrix)
         return best_parmas
 
     def _gravity_function(self,
@@ -339,15 +339,27 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         for dist in distributions:
             slice = dist.cost_function.calculate(costs.loc[dist.zones], **dist.function_params)
             final_mat.append(slice)
-        final_mat = furness.doubly_constrained_furness(pd.concat(final_mat),
+        final_mat,_,_ = furness.doubly_constrained_furness(pd.concat(final_mat).sort_index().values,
                                                        self.row_targets.values,
                                                        self.col_targets.values)
+        final_mat = pd.DataFrame(final_mat, index=costs.index)
+        results = {}
         for dist in distributions:
             cost_distribution, achieved_residuals, convergence = core.cost_distribution_stats(
-                achieved_trip_distribution=final_mat.loc[dist.zones],
-                cost_matrix=costs.loc[dist.zones],
-                target_cost_distribution=dist.target_cost_distribution,
+                achieved_trip_distribution=final_mat.loc[dist.zones].values,
+                cost_matrix=costs.loc[dist.zones].values,
+                target_cost_distribution=dist.cost_distribution,
             )
+            results[dist.name] = GravityModelCalibrateResults(
+                cost_distribution=cost_distribution,
+                cost_convergence=convergence,
+                value_distribution=final_mat.loc[dist.zones],
+                target_cost_distribution=dist.cost_distribution,
+                cost_function=dist.cost_function,
+                cost_params=dist.function_params,
+            )
+        return results
+
             
 
 
