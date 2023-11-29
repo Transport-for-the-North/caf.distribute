@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Iterator
 import os
 from copy import deepcopy
+import warnings
 
 # Third Party
 import numpy as np
@@ -96,6 +97,11 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
                     self.cost_matrix[distribution.zones], **init_params
                 )
                 seed_mat[distribution.zones] = seed_mat_slice
+            zeros = len(seed_mat[seed_mat==0])
+            if zeros > 0:
+                warnings.warn(f"There are {zeros} zeros in the seed matrix. "
+                              f"This could sometimes be desired but too many "
+                              f"will prevent furnessing from converging.")
             # Copy initial params to compare to updated at the end
             current_params = deepcopy(self.target_cost_distributions)
             # Similar process to single_area calibrate for each TLD
