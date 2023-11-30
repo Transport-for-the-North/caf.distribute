@@ -269,6 +269,71 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
 
         return jacobian
 
+    def _alternate_jacobian(self,
+                            distributions: list[MultiCostDistribution],
+                            diff_step: float,
+                            cost_matrix,
+                            row_targets,
+                            col_targets):
+        jac_length = sum([len(dist.cost_distribution) for dist in distributions])
+        jac_width = len(distributions) * 2
+        jacobian = np.zeros((jac_length, jac_width))
+        base_mat = np.zeros(self.achieved_distribution.shape)
+        for dist in distributions:
+            mat_slice = dist.cost_function.calculate(cost_matrix[dist.zones],
+                                                       **dist.function_params)
+            base_mat[dist.zones] = mat_slice
+        furness_factor = np.divide(
+                self.achieved_distribution,
+                base_mat,
+                where=base_mat != 0,
+                out=np.zeros_like(base_mat),
+            )
+        inner_dists = distributions.copy()
+        for j, dist in enumerate(distributions):
+            inner_jac = np.zeros((jac_length, len(dist.function_params)))
+            for i, cost_param in enumerate(dist.cost_function.kw_order):
+                cost_step = dist.function_params[cost_param] * diff_step
+                adj_cost_kwargs = dist.function_params.copy()
+                adj_cost_kwargs[cost_param] += cost_step
+                adj_mat_slice = dist.cost_function.calculate(cost_matrix[dist.zones],
+                                                             **adj_cost_kwargs)
+                adj_mat = base_mat.copy()
+                adj_mat[dist.zones] = adj_mat_slice
+                adj_dist = adj_mat * furness_factor
+                adj_weights = adj_dist / adj_dist.sum()
+                adj_final = self.achieved_distribution.sum() * adj_weights
+                adj_final, *_ = furness.doubly_constrained_furness(
+                    seed_vals=adj_final,
+                    row_targets=row_targets,
+                    col_targets=col_targets,
+                    tol=1e-1,
+                    max_iters=20,
+                    warning=False
+                )
+                cost_dists = []
+                for inner_dist in inner_dists:
+                    adj_cost_dist = cost_utils.CostDistribution.from_data(
+                        matrix=adj_final[inner_dist.zones],
+                        cost_matrix=cost_matrix[dist.zones],
+                        bin_edges=dist.cost_distribution,
+                    )
+                    cost_dists.append(adj_cost_dist.df)
+                outer_jac = cost_utils.CostDistribution(df=pd.concat(cost_dists))
+                jac_res = self.achieved_band_share - outer_jac.band_share_vals
+                jacobian[:, 2 * j + i] = jac_res / cost_step
+        return jacobian
+
+    
+
+
+
+
+
+
+
+
+
     def _convergence_check(self, distributions, costs):
         final_mat = np.zeros(costs.shape)
         for dist in distributions:
