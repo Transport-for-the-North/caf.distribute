@@ -274,7 +274,8 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
                             diff_step: float,
                             cost_matrix,
                             row_targets,
-                            col_targets):
+                            col_targets,
+                            running_log_path):
         jac_length = sum([len(dist.cost_distribution) for dist in distributions])
         jac_width = len(distributions) * 2
         jacobian = np.zeros((jac_length, jac_width))
@@ -324,12 +325,58 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
                 jacobian[:, 2 * j + i] = jac_res / cost_step
         return jacobian
 
-    
+    def alternate_gravity(self,
+                          distributions,
+                          diff_step,
+                          cost_matrix,
+                          row_targets,
+                          col_targets,
+                          running_log_path):
 
+        base_mat = np.zeros(self.achieved_distribution.shape)
+        for dist in distributions:
+            mat_slice = dist.cost_function.calculate(cost_matrix[dist.zones],
+                                                     **dist.function_params)
+            base_mat[dist.zones] = mat_slice
+        matrix, iters, rmse = furness.doubly_constrained_furness(
+            seed_vals=base_mat,
+            row_targets=self.row_targets,
+            col_targets=self.col_targets,
+            tol=1e-1,
+        )
+        convergences, cost_distributions, residuals = {}, [], []
+        for dist in distributions:
+            single_cost_distribution, single_achieved_residuals, single_convergence = core.cost_distribution_stats(
+                achieved_trip_distribution=matrix[dist.zones],
+                cost_matrix=cost_matrix,
+                target_cost_distribution=dist.cost_distribution,
+            )
+            convergences[dist.name] = single_convergence
+            cost_distributions.append(single_cost_distribution)
+            residuals.append(single_achieved_residuals)
 
+        end_time = timing.current_milli_time()
+        self._log_iteration(
+            log_path=running_log_path,
+            attempt_id=self._attempt_id,
+            loop_num=self._loop_num,
+            loop_time=(end_time - self._loop_start_time) / 1000,
+            cost_kwargs=cost_kwargs,
+            furness_iters=iters,
+            furness_rmse=rmse,
+            convergence=np.mean(convergences.keys()),
+        )
 
+        self._loop_num += 1
+        self._loop_start_time = timing.current_milli_time()
 
+        self.achieved_cost_dist = cost_distributions
+        self.achieved_convergence = convergences
+        self.achieved_distribution = matrix
 
+        achieved_residuals = np.array(residuals)
+        
+        return achieved_residuals
 
 
 
