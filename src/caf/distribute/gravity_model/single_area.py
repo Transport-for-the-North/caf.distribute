@@ -197,53 +197,6 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
 
         return jacobian
 
-    def _guess_init_params(
-        self,
-        cost_args: list[float],
-        target_cost_distribution: cost_utils.CostDistribution,
-    ):
-        """Guess the initial cost arguments.
-
-        Internal function of _estimate_init_params().
-        Used by the `optimize.least_squares` function.
-        """
-        # Need kwargs for calling cost function
-        cost_kwargs = self._cost_params_to_kwargs(cost_args)
-
-        # Estimate what the cost function will do to the costs - on average
-        avg_cost_vals = target_cost_distribution.avg_vals
-        estimated_cost_vals = self.cost_function.calculate(avg_cost_vals, **cost_kwargs)
-        estimated_band_shares = estimated_cost_vals / estimated_cost_vals.sum()
-
-        return target_cost_distribution.band_share_vals - estimated_band_shares
-
-    def estimate_optimal_cost_params(
-        self,
-        init_params: dict[str, Any],
-        target_cost_distribution: cost_utils.CostDistribution,
-    ) -> dict[str, Any]:
-        """Guesses what the initial params should be.
-
-        Uses the average cost in each band to estimate what changes in
-        the cost_params would do to the final cost distributions. This is a
-        very coarse-grained estimation, but can be used to guess around about
-        where the best init params are.
-        """
-        result = optimize.least_squares(
-            fun=self._guess_init_params,
-            x0=self._order_cost_params(init_params),
-            method=self._least_squares_method,
-            bounds=self._order_bounds(),
-            kwargs={"target_cost_distribution": target_cost_distribution},
-        )
-        init_params = self._cost_params_to_kwargs(result.x)
-
-        # TODO(BT): standardise this
-        if self.cost_function.name == "LOG_NORMAL":
-            init_params["sigma"] *= 0.8
-            init_params["mu"] *= 0.5
-
-        return init_params
 
 
 # # # FUNCTIONS # # #

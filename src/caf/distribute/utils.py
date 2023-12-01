@@ -1,14 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Created on: 29/11/2023
-Updated on:
-
-Original author: Ben Taylor
-Last update made by:
-Other updates made by:
-
-File purpose:
-
+Module for miscellaneous utilities for the package
 """
 # Built-Ins
 
