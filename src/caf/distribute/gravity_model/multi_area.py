@@ -5,8 +5,6 @@ import logging
 from dataclasses import dataclass
 from typing import Any
 import os
-from copy import deepcopy
-import warnings
 
 # Third Party
 import numpy as np
@@ -34,7 +32,20 @@ class MultiCostDistribution:
     Parameters
     ----------
 
-
+    name: str
+        The name of the distribution (this will usually identify the area
+        applicable e.g. City, Rural)
+    cost_distribution: cost_utils.CostDistribution
+        A cost distribution in a CostDistribution class from toolkit. This
+        will often be a trip-length distribution but cost can be in any units
+        as long as they match the cost matrix
+    zones: np.ndarray
+        The zones this distribution applies to. This is NOT zone number, or zone
+        ID but the indices of the relevant zones in your cost matrix/target_rows
+    function_params: dict[str,str]
+        Initial parameters for your cost function to start guessing at. There
+        is a method included for choosing these which hasn't yet been
+        implemented.
     """
     name: str
     cost_distribution: cost_utils.CostDistribution
@@ -65,81 +76,18 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         self.target_cost_distributions = target_cost_distributions
 
     def _calculate_perceived_factors(self) -> None:
+        # TODO this
         raise NotImplementedError("WIP")
 
     @property
     def multi_achieved_band_shares(self) -> np.ndarray:
+        """Analogus to _achieved_band_shares but for a multi-tld"""
         if self.achieved_cost_dist is None:
             raise ValueError("Gravity model has not been run. achieved_band_share is not set.")
         shares = []
         for dist in self.achieved_cost_dist:
             shares.append(dist.band_share_vals)
         return np.concatenate(shares)
-    def prev_calibrate(
-        self,
-        running_log_path: os.PathLike,
-        diff_step: float = 1e-8,
-        ftol: float = 1e-6,
-        xtol: float = 1e-4,
-        grav_max_iters: int = 100,
-        failure_tol: float = 0,
-        n_random_tries: int = 3,
-        default_retry: bool = True,
-        verbose: int = 0,
-        **kwargs,
-    ) -> GravityModelCalibrateResults:
-        # This while loop terminates when cist function params stabilise.
-        # More rigorous convergence checks are then performed.
-        while True:
-            # Create whole seed matrix by concatenating sections.
-            seed_mat = np.zeros(self.cost_matrix.shape)
-            for distribution in self.target_cost_distributions:
-                init_params = (
-                    distribution.function_params
-                )  # self.estimate_optimal_cost_params(distribution.function_params,
-                #    distribution.cost_distribution)
-                seed_mat_slice = distribution.cost_function.calculate(
-                    self.cost_matrix[distribution.zones], **init_params
-                )
-                seed_mat[distribution.zones] = seed_mat_slice
-            zeros = len(seed_mat[seed_mat==0])
-            if zeros > 0:
-                warnings.warn(f"There are {zeros} zeros in the seed matrix. "
-                              f"This could sometimes be desired but too many "
-                              f"will prevent furnessing from converging.")
-            # Copy initial params to compare to updated at the end
-            current_params = deepcopy(self.target_cost_distributions)
-            # Similar process to single_area calibrate for each TLD
-            arg_list = [
-                (i, diff_step, seed_mat, kwargs) for i in self.target_cost_distributions
-            ]
-            items = []
-            for dist in self.target_cost_distributions:
-                items.append(
-                    self.multi_loop(
-                        dist,
-                        diff_step,
-                        seed_mat,
-                        kwargs,
-                        running_log_path=running_log_path,
-                        verbose=verbose,
-                    )
-                )
-            # items = multiprocess(self.multi_loop, arg_list=arg_list)
-            # Set target_cost_distribution's params to the newly calculated
-            self.target_cost_distributions = items
-            checks = []
-            # Check difference between params of consecutive runs
-            for i, pars in enumerate(current_params):
-                for name, val in pars.function_params.items():
-                    diff = val - self.target_cost_distributions[i].function_params[name]
-                    checks.append(diff**2)
-            # Difference below threshold for all, end loop. Otherwise it will
-            # start again with init params equal to final params.
-            if all(check < 0.01 for check in checks):
-                break
-
-        return self._convergence_check(self.target_cost_distributions, self.cost_matrix)
 
 
     def _calibrate(
@@ -239,9 +187,6 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
                            diff_step: float,
                            running_log_path,
                            params_len):
-        """
-        Create
-        """
 
         del running_log_path
 
