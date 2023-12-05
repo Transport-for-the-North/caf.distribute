@@ -146,7 +146,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
 
         gravity_kwargs: dict[str, Any] = {
             "running_log_path": running_log_path,
-            "distributions": init_params,
+            "cost_distributions": init_params,
             "diff_step": diff_step,
             "params_len": params_len
         }
@@ -401,7 +401,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             col_targets=self.col_targets,
             tol=1e-6,
         )
-        convergences, cost_distributions, residuals = {}, [], []
+        convergences, distributions, residuals = {}, [], []
         for dist in cost_distributions:
             single_cost_distribution, single_achieved_residuals, single_convergence = core.cost_distribution_stats(
                 achieved_trip_distribution=matrix[dist.zones],
@@ -409,14 +409,14 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
                 target_cost_distribution=dist.cost_distribution,
             )
             convergences[dist.name] = single_convergence
-            cost_distributions.append(single_cost_distribution)
+            distributions.append(single_cost_distribution)
             residuals.append(single_achieved_residuals)
 
         log_costs = {}
 
         for i, dist in enumerate(cost_distributions):
+            j=0
             for name, val in dist.function_params.items():
-                j = 0
                 log_costs[f"{name}_{i}"] = cost_args[params_len * i + j]
                 j+=1
 
@@ -435,7 +435,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         self._loop_num += 1
         self._loop_start_time = timing.current_milli_time()
 
-        self.achieved_cost_dist = cost_distributions
+        self.achieved_cost_dist = distributions
         self.achieved_convergence = convergences
         self.achieved_distribution = matrix
 
