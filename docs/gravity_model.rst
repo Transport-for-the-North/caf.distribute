@@ -5,3 +5,4 @@ Gravity Model sub-package
 
     core
     single_area
+    multi_area
