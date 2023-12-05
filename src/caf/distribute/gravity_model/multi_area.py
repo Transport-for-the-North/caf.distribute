@@ -54,7 +54,36 @@ class MultiCostDistribution:
 
 
 class MultiAreaGravityModelCalibrator(core.GravityModelBase):
-    # TODO(MB) Implement functionality for the abstract methods
+    """
+    A self-calibrating multi-area gravity model.
+
+    Parameters
+    ----------
+    row_targets:
+        The targets for each row that the gravity model should be aiming to
+        match. This can alternatively be thought of as the rows that wish to
+        be distributed.
+
+    col_targets:
+        The targets for each column that the gravity model should be
+        aiming to match. This can alternatively be thought of as the
+        columns that wish to be distributed.
+
+    cost_matrix:
+        A matrix detailing the cost between each and every zone. This
+        matrix must be the same size as
+        `(len(row_targets), len(col_targets))`.
+
+    cost_function:
+        The cost function to use when calibrating the gravity model. This
+        function is applied to `cost_matrix` before Furnessing during
+        calibration.
+
+    target_cost_distributions:
+        A list of cost distributions for the model. See documentation for the
+        class MultiCostDistribution. All zones in the cost_matrix/targets must
+        be accounted for, and should only appear in one distribution each.
+    """
     # actual cost matrix
     # adjusted cost matrix (optional) instead could be callable
 
@@ -68,12 +97,16 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         col_targets: np.ndarray,
         cost_matrix: np.ndarray,
         cost_function: cost_functions.CostFunction,
-        target_cost_distributions: list[MultiCostDistribution],
     ):
         super().__init__(cost_function=cost_function, cost_matrix=cost_matrix)
         self.row_targets = row_targets
         self.col_targets = col_targets
-        self.target_cost_distributions = target_cost_distributions
+        if len(row_targets) != cost_matrix.shape[0]:
+            raise IndexError("row_targets doesn't match cost_matrix")
+        if len(col_targets) != cost_matrix.shape[1]:
+            raise IndexError("col_targets doesn't match cost_matrix")
+
+
 
     def _calculate_perceived_factors(self) -> None:
         # TODO this
@@ -81,7 +114,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
 
     @property
     def multi_achieved_band_shares(self) -> np.ndarray:
-        """Analogus to _achieved_band_shares but for a multi-tld"""
+        """Analogous to _achieved_band_shares but for a multi-tld"""
         if self.achieved_cost_dist is None:
             raise ValueError("Gravity model has not been run. achieved_band_share is not set.")
         shares = []
@@ -93,6 +126,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
     def _calibrate(
             self,
             running_log_path: os.PathLike,
+            init_params: list[MultiCostDistribution],
             diff_step: float = 1e-8,
             ftol: float = 1e-6,
             xtol: float = 1e-4,
@@ -102,18 +136,17 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             verbose: int = 0,
             **kwargs,
     ) -> GravityModelCalibrateResults:
-        # TODO IS refactor core so that init_params isn't required
-        del kwargs['init_params']
-        params_len = len(self.target_cost_distributions[0].function_params)
+
+        params_len = len(init_params[0].function_params)
         ordered_init_params = []
-        for dist in self.target_cost_distributions:
+        for dist in init_params:
             params = self._order_cost_params(dist.function_params)
             for val in params:
                 ordered_init_params.append(val)
 
         gravity_kwargs: dict[str, Any] = {
             "running_log_path": running_log_path,
-            "distributions": self.target_cost_distributions,
+            "distributions": init_params,
             "diff_step": diff_step,
             "params_len": params_len
         }
@@ -121,7 +154,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             optimize.least_squares,
             fun=self._gravity_function,
             method=self._least_squares_method,
-            bounds=(self._order_bounds()[0] * len(self.target_cost_distributions), self._order_bounds()[1] * len(self.target_cost_distributions)),
+            bounds=(self._order_bounds()[0] * len(init_params), self._order_bounds()[1] * len(init_params)),
             jac=self._jacobian_function,
             verbose=verbose,
             ftol=ftol,
@@ -169,7 +202,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
 
         assert self.achieved_cost_dist is not None
         results = {}
-        for i, dist in enumerate(self.target_cost_distributions):
+        for i, dist in enumerate(init_params):
             gresult = GravityModelCalibrateResults(
                 cost_distribution=self.achieved_cost_dist[i],
                 cost_convergence=self.achieved_convergence[dist.name],
@@ -181,22 +214,127 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
 
             results[dist.name] = gresult
         return results
+
+    def calibrate(
+        self,
+        init_params: list[MultiCostDistribution],
+        running_log_path: os.PathLike,
+        *args,
+        **kwargs,
+    ) -> GravityModelCalibrateResults:
+        """Find the optimal parameters for self.cost_function.
+
+        Optimal parameters are found using `scipy.optimize.least_squares`
+        to fit the distributed row/col targets to `target_cost_distribution`.
+
+        Parameters
+        ----------
+        init_params:
+            A dictionary of {parameter_name: parameter_value} to pass
+            into the cost function as initial parameters.
+
+        running_log_path:
+            Path to output the running log to. This log will detail the
+            performance of the run and is written in .csv format.
+
+        target_cost_distribution:
+            The cost distribution to calibrate towards during the calibration
+            process.
+
+        diff_step:
+            Copied from scipy.optimize.least_squares documentation, where it
+            is passed to:
+            Determines the relative step size for the finite difference
+            approximation of the Jacobian. The actual step is computed as
+            `x * diff_step`. If None (default), then diff_step is taken to be a
+            conventional “optimal” power of machine epsilon for the finite
+            difference scheme used
+
+        ftol:
+            The tolerance to pass to `scipy.optimize.least_squares`. The search
+            will stop once this tolerance has been met. This is the
+            tolerance for termination by the change of the cost function
+
+        xtol:
+            The tolerance to pass to `scipy.optimize.least_squares`. The search
+            will stop once this tolerance has been met. This is the
+            tolerance for termination by the change of the independent
+            variables.
+
+        grav_max_iters:
+            The maximum number of calibration iterations to complete before
+            termination if the ftol has not been met.
+
+        failure_tol:
+            If, after initial calibration using `init_params`, the achieved
+            convergence is less than this value, calibration will be run again with
+            the default parameters from `self.cost_function`.
+
+        default_retry:
+            If, after running with `init_params`, the achieved convergence
+            is less than `failure_tol`, calibration will be run again with the
+            default parameters of `self.cost_function`.
+            This argument is ignored if the default parameters are given
+            as `init_params.
+
+        n_random_tries:
+            If, after running with default parameters of `self.cost_function`,
+            the achieved convergence is less than `failure_tol`, calibration will
+            be run again using random values for the cost parameters this
+            number of times.
+
+        verbose:
+            Copied from scipy.optimize.least_squares documentation, where it
+            is passed to:
+            Level of algorithm’s verbosity:
+            - 0 (default) : work silently.
+            - 1 : display a termination report.
+            - 2 : display progress during iterations (not supported by ‘lm’ method).
+
+        kwargs:
+            Additional arguments passed to self.gravity_furness.
+            Empty by default. The calling signature is:
+            `self.gravity_furness(seed_matrix, **kwargs)`
+
+        Returns
+        -------
+        results:
+            An instance of GravityModelCalibrateResults containing the
+            results of this run.
+
+        See Also
+        --------
+        `caf.distribute.furness.doubly_constrained_furness()`
+        `scipy.optimize.least_squares()`
+        """
+        for dist in init_params:
+            self.cost_function.validate_params(dist.function_params)
+        self._validate_running_log(running_log_path)
+        self._initialise_internal_params()
+        return self._calibrate(  # type: ignore
+            *args,
+            init_params=init_params,
+            running_log_path=running_log_path,
+            **kwargs,
+        )
+
+
     def _jacobian_function(self,
                            cost_args: list[float],
-                           distributions: list[MultiCostDistribution],
+                           cost_distributions: list[MultiCostDistribution],
                            diff_step: float,
                            running_log_path,
                            params_len):
 
         del running_log_path
 
-        jac_length = sum([len(dist.cost_distribution) for dist in distributions])
-        jac_width = len(distributions) * params_len
+        jac_length = sum([len(dist.cost_distribution) for dist in cost_distributions])
+        jac_width = len(cost_distributions) * params_len
         jacobian = np.zeros((jac_length, jac_width))
         base_mat = np.zeros(self.achieved_distribution.shape)
-        for i, dist in enumerate(distributions):
-            init_params = cost_args[i * params_len: i * params_len + params_len]
-            init_params_kwargs = self._cost_params_to_kwargs(init_params)
+        for i, dist in enumerate(cost_distributions):
+            init_params_kwargs = cost_args[i * params_len: i * params_len + params_len]
+            init_params_kwargs = self._cost_params_to_kwargs(init_params_kwargs)
             mat_slice = self.cost_function.calculate(self.cost_matrix[dist.zones],
                                                        **init_params_kwargs)
             base_mat[dist.zones] = mat_slice
@@ -206,10 +344,10 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
                 where=base_mat != 0,
                 out=np.zeros_like(base_mat),
             )
-        inner_dists = distributions.copy()
-        for j, dist in enumerate(distributions):
-            init_params = cost_args[j * params_len: j * params_len + params_len]
-            init_params_kwargs = self._cost_params_to_kwargs(init_params)
+        inner_dists = cost_distributions.copy()
+        for j, dist in enumerate(cost_distributions):
+            distributions = cost_args[j * params_len: j * params_len + params_len]
+            init_params_kwargs = self._cost_params_to_kwargs(distributions)
             for i, cost_param in enumerate(self.cost_function.kw_order):
                 cost_step = init_params_kwargs[cost_param] * diff_step
                 adj_cost_kwargs = init_params_kwargs.copy()
@@ -244,14 +382,14 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
 
     def _gravity_function(self,
                           cost_args,
-                          distributions,
+                          cost_distributions,
                           diff_step,
                           running_log_path,
                           params_len):
         del diff_step
 
         base_mat = np.zeros(self.achieved_distribution.shape)
-        for i, dist in enumerate(distributions):
+        for i, dist in enumerate(cost_distributions):
             init_params = cost_args[i * params_len: i * params_len + params_len]
             init_params_kwargs = self._cost_params_to_kwargs(init_params)
             mat_slice = self.cost_function.calculate(self.cost_matrix[dist.zones],
@@ -264,7 +402,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             tol=1e-6,
         )
         convergences, cost_distributions, residuals = {}, [], []
-        for dist in distributions:
+        for dist in cost_distributions:
             single_cost_distribution, single_achieved_residuals, single_convergence = core.cost_distribution_stats(
                 achieved_trip_distribution=matrix[dist.zones],
                 cost_matrix=self.cost_matrix[dist.zones],
@@ -276,10 +414,11 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
 
         log_costs = {}
 
-        for i, dist in enumerate(distributions):
+        for i, dist in enumerate(cost_distributions):
             for name, val in dist.function_params.items():
                 j = 0
                 log_costs[f"{name}_{i}"] = cost_args[params_len * i + j]
+                j+=1
 
         end_time = timing.current_milli_time()
         self._log_iteration(
