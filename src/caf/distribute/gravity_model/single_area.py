@@ -14,7 +14,11 @@ from scipy import optimize
 # Local Imports
 # pylint: disable=import-error,wrong-import-position
 from caf.distribute import cost_functions, furness
-from caf.distribute.gravity_model import core, GravityModelCalibrateResults, GravityModelRunResults
+from caf.distribute.gravity_model import (
+    core,
+    GravityModelCalibrateResults,
+    GravityModelRunResults,
+)
 
 # pylint: enable=import-error,wrong-import-position
 
