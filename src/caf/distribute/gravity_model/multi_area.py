@@ -47,6 +47,7 @@ class MultiCostDistribution:
         is a method included for choosing these which hasn't yet been
         implemented.
     """
+
     name: str
     cost_distribution: cost_utils.CostDistribution
     zones: np.ndarray
@@ -84,6 +85,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         class MultiCostDistribution. All zones in the cost_matrix/targets must
         be accounted for, and should only appear in one distribution each.
     """
+
     # actual cost matrix
     # adjusted cost matrix (optional) instead could be callable
 
@@ -106,8 +108,6 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         if len(col_targets) != cost_matrix.shape[1]:
             raise IndexError("col_targets doesn't match cost_matrix")
 
-
-
     def _calculate_perceived_factors(self) -> None:
         # TODO this
         raise NotImplementedError("WIP")
@@ -122,21 +122,19 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             shares.append(dist.band_share_vals)
         return np.concatenate(shares)
 
-
     def _calibrate(
-            self,
-            running_log_path: os.PathLike,
-            init_params: list[MultiCostDistribution],
-            diff_step: float = 1e-8,
-            ftol: float = 1e-6,
-            xtol: float = 1e-4,
-            grav_max_iters: int = 100,
-            failure_tol: float = 0,
-            default_retry: bool = True,
-            verbose: int = 0,
-            **kwargs,
+        self,
+        running_log_path: os.PathLike,
+        init_params: list[MultiCostDistribution],
+        diff_step: float = 1e-8,
+        ftol: float = 1e-6,
+        xtol: float = 1e-4,
+        grav_max_iters: int = 100,
+        failure_tol: float = 0,
+        default_retry: bool = True,
+        verbose: int = 0,
+        **kwargs,
     ) -> GravityModelCalibrateResults:
-
         params_len = len(init_params[0].function_params)
         ordered_init_params = []
         for dist in init_params:
@@ -148,13 +146,16 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             "running_log_path": running_log_path,
             "cost_distributions": init_params,
             "diff_step": diff_step,
-            "params_len": params_len
+            "params_len": params_len,
         }
         optimise_cost_params = functools.partial(
             optimize.least_squares,
             fun=self._gravity_function,
             method=self._least_squares_method,
-            bounds=(self._order_bounds()[0] * len(init_params), self._order_bounds()[1] * len(init_params)),
+            bounds=(
+                self._order_bounds()[0] * len(init_params),
+                self._order_bounds()[1] * len(init_params),
+            ),
             jac=self._jacobian_function,
             verbose=verbose,
             ftol=ftol,
@@ -193,7 +194,6 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             if np.mean(self.achieved_convergence) > np.mean(best_convergence):
                 best_params = result.x
 
-
         self._attempt_id = -2
         self._gravity_function(
             cost_args=best_params,
@@ -209,7 +209,9 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
                 value_distribution=self.achieved_distribution[dist.zones],
                 target_cost_distribution=dist.cost_distribution,
                 cost_function=self.cost_function,
-                cost_params=self._cost_params_to_kwargs(best_params[i * params_len: i * params_len + params_len])
+                cost_params=self._cost_params_to_kwargs(
+                    best_params[i * params_len : i * params_len + params_len]
+                ),
             )
 
             results[dist.name] = gresult
@@ -318,92 +320,113 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             **kwargs,
         )
 
-
-    def _jacobian_function(self,
-                           cost_args: list[float],
-                           cost_distributions: list[MultiCostDistribution],
-                           diff_step: float,
-                           running_log_path,
-                           params_len):
-
+    def _jacobian_function(
+        self,
+        cost_args: list[float],
+        cost_distributions: list[MultiCostDistribution],
+        diff_step: float,
+        running_log_path,
+        params_len,
+    ):
         del running_log_path
-
+        # Build empty jacobian matrix
         jac_length = sum([len(dist.cost_distribution) for dist in cost_distributions])
         jac_width = len(cost_distributions) * params_len
         jacobian = np.zeros((jac_length, jac_width))
+        # Build seed matrix
         base_mat = np.zeros(self.achieved_distribution.shape)
         for i, dist in enumerate(cost_distributions):
-            init_params_kwargs = cost_args[i * params_len: i * params_len + params_len]
+            init_params_kwargs = cost_args[i * params_len : i * params_len + params_len]
             init_params_kwargs = self._cost_params_to_kwargs(init_params_kwargs)
-            mat_slice = self.cost_function.calculate(self.cost_matrix[dist.zones],
-                                                       **init_params_kwargs)
-            base_mat[dist.zones] = mat_slice
-        furness_factor = np.divide(
-                self.achieved_distribution,
-                base_mat,
-                where=base_mat != 0,
-                out=np.zeros_like(base_mat),
+            mat_slice = self.cost_function.calculate(
+                self.cost_matrix[dist.zones], **init_params_kwargs
             )
+            base_mat[dist.zones] = mat_slice
+        # Calculate net effect of furnessing (saves a lot of time on furnessing here)
+        furness_factor = np.divide(
+            self.achieved_distribution,
+            base_mat,
+            where=base_mat != 0,
+            out=np.zeros_like(base_mat),
+        )
+        # Allows iteration of cost_distributions within a loop of cost_distributions
         inner_dists = cost_distributions.copy()
+        # Calculate an achieved matrix in a way which matches the jacobian calc
+        achieved_dist = base_mat * furness_factor
+        achieved_final, *_ = furness.doubly_constrained_furness(
+            seed_vals=achieved_dist,
+            row_targets=self.row_targets,
+            col_targets=self.col_targets,
+            tol=1e-7,
+            max_iters=20,
+            warning=False,
+        )
         for j, dist in enumerate(cost_distributions):
-            distributions = cost_args[j * params_len: j * params_len + params_len]
+            distributions = cost_args[j * params_len : j * params_len + params_len]
             init_params_kwargs = self._cost_params_to_kwargs(distributions)
             for i, cost_param in enumerate(self.cost_function.kw_order):
                 cost_step = init_params_kwargs[cost_param] * diff_step
                 adj_cost_kwargs = init_params_kwargs.copy()
                 adj_cost_kwargs[cost_param] += cost_step
-                adj_mat_slice = self.cost_function.calculate(self.cost_matrix[dist.zones],
-                                                             **adj_cost_kwargs)
+                adj_mat_slice = self.cost_function.calculate(
+                    self.cost_matrix[dist.zones], **adj_cost_kwargs
+                )
                 adj_mat = base_mat.copy()
                 adj_mat[dist.zones] = adj_mat_slice
                 adj_dist = adj_mat * furness_factor
-                adj_weights = adj_dist / adj_dist.sum()
-                adj_final = self.achieved_distribution.sum() * adj_weights
                 adj_final, *_ = furness.doubly_constrained_furness(
-                    seed_vals=adj_final,
+                    seed_vals=adj_dist,
                     row_targets=self.row_targets,
                     col_targets=self.col_targets,
                     tol=1e-7,
                     max_iters=20,
-                    warning=False
+                    warning=False,
                 )
-                cost_dists = []
+                test_res = []
                 for inner_dist in inner_dists:
                     adj_cost_dist = cost_utils.CostDistribution.from_data(
                         matrix=adj_final[inner_dist.zones],
                         cost_matrix=self.cost_matrix[inner_dist.zones],
                         bin_edges=inner_dist.cost_distribution.bin_edges,
                     )
-                    cost_dists.append(adj_cost_dist.band_share_vals)
-                outer_jac = np.concatenate(cost_dists)
-                jac_res = self.multi_achieved_band_shares - outer_jac
-                jacobian[:, 2 * j + i] = jac_res / cost_step
+                    act_cost_dist = cost_utils.CostDistribution.from_data(
+                        matrix=achieved_final[inner_dist.zones],
+                        cost_matrix=self.cost_matrix[inner_dist.zones],
+                        bin_edges=inner_dist.cost_distribution.bin_edges,
+                    )
+                    test_res.append(
+                        act_cost_dist.band_share_vals - adj_cost_dist.band_share_vals
+                    )
+                test_outer = np.concatenate(test_res)
+                jacobian[:, 2 * j + i] = test_outer / cost_step
         return jacobian
 
-    def _gravity_function(self,
-                          cost_args,
-                          cost_distributions,
-                          diff_step,
-                          running_log_path,
-                          params_len):
+    def _gravity_function(
+        self, cost_args, cost_distributions, diff_step, running_log_path, params_len
+    ):
         del diff_step
 
         base_mat = np.zeros(self.achieved_distribution.shape)
         for i, dist in enumerate(cost_distributions):
-            init_params = cost_args[i * params_len: i * params_len + params_len]
+            init_params = cost_args[i * params_len : i * params_len + params_len]
             init_params_kwargs = self._cost_params_to_kwargs(init_params)
-            mat_slice = self.cost_function.calculate(self.cost_matrix[dist.zones],
-                                                     **init_params_kwargs)
+            mat_slice = self.cost_function.calculate(
+                self.cost_matrix[dist.zones], **init_params_kwargs
+            )
             base_mat[dist.zones] = mat_slice
         matrix, iters, rmse = furness.doubly_constrained_furness(
             seed_vals=base_mat,
             row_targets=self.row_targets,
             col_targets=self.col_targets,
-            tol=1e-6,
+            tol=1e-1,
         )
         convergences, distributions, residuals = {}, [], []
         for dist in cost_distributions:
-            single_cost_distribution, single_achieved_residuals, single_convergence = core.cost_distribution_stats(
+            (
+                single_cost_distribution,
+                single_achieved_residuals,
+                single_convergence,
+            ) = core.cost_distribution_stats(
                 achieved_trip_distribution=matrix[dist.zones],
                 cost_matrix=self.cost_matrix[dist.zones],
                 target_cost_distribution=dist.cost_distribution,
@@ -415,10 +438,10 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         log_costs = {}
 
         for i, dist in enumerate(cost_distributions):
-            j=0
+            j = 0
             for name, val in dist.function_params.items():
                 log_costs[f"{name}_{i}"] = cost_args[params_len * i + j]
-                j+=1
+                j += 1
 
         end_time = timing.current_milli_time()
         self._log_iteration(
@@ -442,7 +465,6 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         achieved_residuals = np.concatenate(residuals)
 
         return achieved_residuals
-
 
 
 def gravity_model(
@@ -518,9 +540,7 @@ def gravity_model(
     seed_slices = []
     for distribution in cost_distributions:
         cost_slice = cost_mat.loc[distribution.zones]
-        seed_slice = cost_function.calculate(
-            cost_slice, **distribution.function_params
-        )
+        seed_slice = cost_function.calculate(cost_slice, **distribution.function_params)
         seed_slices.append(seed_slice)
     seed_matrix = pd.concat(seed_slices)
 
