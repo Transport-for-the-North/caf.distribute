@@ -351,16 +351,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         )
         # Allows iteration of cost_distributions within a loop of cost_distributions
         inner_dists = cost_distributions.copy()
-        # Calculate an achieved matrix in a way which matches the jacobian calc
-        achieved_dist = base_mat * furness_factor
-        achieved_final, *_ = furness.doubly_constrained_furness(
-            seed_vals=achieved_dist,
-            row_targets=self.row_targets,
-            col_targets=self.col_targets,
-            tol=1e-7,
-            max_iters=20,
-            warning=False,
-        )
+
         for j, dist in enumerate(cost_distributions):
             distributions = cost_args[j * params_len : j * params_len + params_len]
             init_params_kwargs = self._cost_params_to_kwargs(distributions)
@@ -376,8 +367,8 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
                 adj_dist = adj_mat * furness_factor
                 adj_final, *_ = furness.doubly_constrained_furness(
                     seed_vals=adj_dist,
-                    row_targets=self.row_targets,
-                    col_targets=self.col_targets,
+                    row_targets=self.achieved_distribution.sum(axis=1),
+                    col_targets=self.achieved_distribution.sum(axis=0),
                     tol=1e-7,
                     max_iters=20,
                     warning=False,
@@ -390,7 +381,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
                         bin_edges=inner_dist.cost_distribution.bin_edges,
                     )
                     act_cost_dist = cost_utils.CostDistribution.from_data(
-                        matrix=achieved_final[inner_dist.zones],
+                        matrix=self.achieved_distribution[inner_dist.zones],
                         cost_matrix=self.cost_matrix[inner_dist.zones],
                         bin_edges=inner_dist.cost_distribution.bin_edges,
                     )
