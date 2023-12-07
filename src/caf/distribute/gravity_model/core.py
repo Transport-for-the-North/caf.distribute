@@ -14,6 +14,7 @@ import numpy as np
 import pandas as pd
 from caf.toolkit import cost_utils, io, timing
 from scipy import optimize
+from matplotlib import pyplot as plt
 
 # Local Imports
 # pylint: disable=import-error,wrong-import-position
@@ -60,6 +61,7 @@ class GravityModelResults:
     value_distribution: np.ndarray
 
 
+
 @dataclasses.dataclass
 class GravityModelCalibrateResults(GravityModelResults):
     """A collection of results from a run of the Gravity Model.
@@ -93,6 +95,25 @@ class GravityModelCalibrateResults(GravityModelResults):
     target_cost_distribution: cost_utils.CostDistribution
     cost_function: cost_functions.CostFunction
     cost_params: dict[str, Any]
+
+    def plot_distributions(self):
+        fig, ax = plt.subplots(figsize=(10, 6))
+        df_1 = self.cost_distribution.df
+        df_1['normalised'] = df_1[self.target_cost_distribution.trips_col] / df_1[self.target_cost_distribution.trips_col].sum()
+        df_2 = self.target_cost_distribution.df
+        df_2['normalised'] = df_2[self.cost_distribution.trips_col] / df_2[
+            self.cost_distribution.trips_col].sum()
+        ax.bar(df_1[self.cost_distribution.avg_col], df_1['normalised'], width=df_1[self.cost_distribution.max_col] - df_1[self.cost_distribution.min_col], label='Achieved Distribution',
+                color='blue', alpha=0.7)
+        ax.bar(df_1[self.cost_distribution.avg_col], df_2['normalised'], width=df_2[self.target_cost_distribution.max_col] - df_2[self.target_cost_distribution.min_col], label='Target Distribution',
+                color='orange', alpha=0.7)
+
+        ax.set_xlabel('Cost')
+        ax.set_ylabel('Trips')
+        ax.set_title('Distribution Comparison')
+        ax.legend()
+
+        return fig
 
 
 @dataclasses.dataclass
