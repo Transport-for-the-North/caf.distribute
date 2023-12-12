@@ -28,6 +28,50 @@ LOG = logging.getLogger(__name__)
 # # # CLASSES # # #
 class MultiDistInput(BaseConfig):
 
+    """
+    TLDFile: Path
+        Path to a file containing distributions. This should contain 5 columns,
+        the names of which must be specified below.
+    TldLookupFile: Path
+        Path to a lookup from distribtion areas to zones. Should contain 2
+        columns which are explained below.
+    cat_col: str
+        The name of the column containing distribution area/categories in TLDFile.
+        E.g. 'City', 'Village', 'Town', if there are different distributions for
+        these different are types
+    min_col: str
+        The name of the column containing lower bounds of cost bands.
+    max_col: str
+        The name of the column containing upper bounds of cost bands.
+    ave_col: str
+        The name of the column containing average values of cost bands.
+    trips_col: str
+        The name of the column containing numbers of trips for a given cost band.
+    lookup_cat_col: str
+        The name of the column in the lookup containing the categories. The
+        names of the values (but not the column name) must match the names in
+        the cat_col of the TLD file. There must not be any distributions defined
+        in the TLDFile which do not appear in the lookup.
+    lookup_zone_col: str
+        The column in the lookup containing zone identifiers. The lookup must
+        contain all zones in the zone system.
+    init_params: dict[str, float]
+        A dict containing init_params for the cost function when calibrating.
+        If left blank the default value from the cost_function will be used.
+    log_path: Path
+        Path to where the log file should be saved. Saved as a csv but this can
+        also be a path to a txt file.
+    furness_tolerance: float
+        The tolerance for the furness in the gravity function. In general lower
+        tolerance will take longer but may yield better results.
+    furness_jac: bool
+        Whether to furness within the jacobian function. Not furnessing within
+        the jacobian does not represent knock on effects to other areas of
+        altering parameters for a given area. If you expect these effects to be
+        significant this should be set to True, but otherwise the process runs
+        quicker with it set to False.
+    """
+
     TLDFile: Path
     TldLookupFile: Path
     cat_col: str
@@ -118,7 +162,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         col_targets: np.ndarray,
         cost_matrix: np.ndarray,
         cost_function: cost_functions.CostFunction,
-        params: Optional[MultiDistInput]
+        params: Optional[MultiDistInput],
     ):
         super().__init__(cost_function=cost_function, cost_matrix=cost_matrix)
         self.row_targets = row_targets
@@ -129,31 +173,35 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             raise IndexError("col_targets doesn't match cost_matrix")
         if params is not None:
             self.tlds = pd.read_csv(params.TLDFile)
-            self.tlds.rename(columns={params.cat_col: 'cat',
-                                      params.min_col: 'min',
-                                      params.max_col: 'max',
-                                      params.ave_col: 'ave',
-                                      params.trips_col: 'trips'},
-                             inplace=True)
+            self.tlds.rename(
+                columns={
+                    params.cat_col: "cat",
+                    params.min_col: "min",
+                    params.max_col: "max",
+                    params.ave_col: "ave",
+                    params.trips_col: "trips",
+                },
+                inplace=True,
+            )
             self.lookup = pd.read_csv(params.TldLookupFile)
-            self.lookup.rename(columns={params.lookup_zone_col: 'zone',
-                                        params.lookup_cat_col: 'cat'},
-                               inplace=True)
-            self.tlds.set_index('cat', inplace=True)
-            self.lookup.sort_values('zone')
+            self.lookup.rename(
+                columns={params.lookup_zone_col: "zone", params.lookup_cat_col: "cat"},
+                inplace=True,
+            )
+            self.tlds.set_index("cat", inplace=True)
+            self.lookup.sort_values("zone")
             self.init_params = params.init_params
             self.dists = self.process_tlds()
             self.log_path = params.log_path
             self.furness_tol = params.furness_tolerance
             self.furness_jac = params.furness_jac
 
-
     def process_tlds(self):
         dists = []
         for cat in self.tlds.index.unique():
             tld = self.tlds.loc[cat]
             tld = cost_utils.CostDistribution(tld)
-            zones = self.lookup[self.lookup['cat'] == cat].index.values
+            zones = self.lookup[self.lookup["cat"] == cat].index.values
             if len(zones) == 0:
                 raise ValueError(
                     f"{cat} doesn't seem to appear in the given tld "
@@ -186,14 +234,13 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
     def _create_seed_matrix(self, cost_distributions, cost_args, params_len):
         base_mat = np.zeros(self.cost_matrix.shape)
         for i, dist in enumerate(cost_distributions):
-            init_params = cost_args[i * params_len: i * params_len + params_len]
+            init_params = cost_args[i * params_len : i * params_len + params_len]
             init_params_kwargs = self._cost_params_to_kwargs(init_params)
             mat_slice = self.cost_function.calculate(
                 self.cost_matrix[dist.zones], **init_params_kwargs
             )
             base_mat[dist.zones] = mat_slice
         return base_mat
-
 
     def _calibrate(
         self,
@@ -395,9 +442,8 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         cost_distributions: list[MultiCostDistribution],
         diff_step: float,
         running_log_path,
-        params_len
+        params_len,
     ):
-
         del running_log_path
         # Build empty jacobian matrix
         jac_length = sum([len(dist.cost_distribution) for dist in cost_distributions])
@@ -517,8 +563,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
 
         return achieved_residuals
 
-    def run(self, distributions: list[MultiCostDistribution],
-            furness_tol: float = None):
+    def run(self, distributions: list[MultiCostDistribution], furness_tol: float = None):
         """
         Run the gravity_model without calibrating.
 
@@ -533,7 +578,12 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         if furness_tol is None:
             furness_tol = self.furness_tol
 
-        self._gravity_function(init_params=cost_args, cost_distributions=distributions, running_log_path=self.log_path, params_len=params_len)
+        self._gravity_function(
+            init_params=cost_args,
+            cost_distributions=distributions,
+            running_log_path=self.log_path,
+            params_len=params_len,
+        )
 
         assert self.achieved_cost_dist is not None
         results = {}
@@ -545,7 +595,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
                 target_cost_distribution=dist.cost_distribution,
                 cost_function=self.cost_function,
                 cost_params=self._cost_params_to_kwargs(
-                    cost_args[i * params_len: i * params_len + params_len]
+                    cost_args[i * params_len : i * params_len + params_len]
                 ),
             )
 

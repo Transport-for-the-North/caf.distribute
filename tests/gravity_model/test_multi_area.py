@@ -14,6 +14,7 @@ def fixture_data_dir():
         r"C:\Users\IsaacScott\Documents\Github\caf.distribute\tests\gravity_model\data\multi_area_unit"
     )
 
+
 @pytest.fixture(name="mock_dir", scope="session")
 def fixture_mock_dir(tmp_path_factory) -> Path:
     path = tmp_path_factory.mktemp("main")
@@ -77,40 +78,44 @@ def fixture_dists(data_dir, distributions):
     )
     return sorted
 
+
 @pytest.fixture(name="no_furness_jac_conf", scope="session")
 def fixture_conf(data_dir, mock_dir):
-    conf = gm.MultiDistInput(TLDFile=data_dir / 'distributions.csv',
-                             TldLookupFile=data_dir / 'distributions_lookup.csv',
-                             cat_col='cat',
-                             min_col='lower',
-                             max_col='upper',
-                             ave_col='avg',
-                             trips_col='trips',
-                             lookup_cat_col='cat',
-                             lookup_zone_col='zone',
-                             init_params={'mu': 1, 'sigma': 2},
-                             log_path=mock_dir / 'log.csv',
-                             furness_tolerance=0.1,
-                             furness_jac=False
-                             )
+    conf = gm.MultiDistInput(
+        TLDFile=data_dir / "distributions.csv",
+        TldLookupFile=data_dir / "distributions_lookup.csv",
+        cat_col="cat",
+        min_col="lower",
+        max_col="upper",
+        ave_col="avg",
+        trips_col="trips",
+        lookup_cat_col="cat",
+        lookup_zone_col="zone",
+        init_params={"mu": 1, "sigma": 2},
+        log_path=mock_dir / "log.csv",
+        furness_tolerance=0.1,
+        furness_jac=False,
+    )
     return conf
+
 
 @pytest.fixture(name="furness_jac_conf", scope="session")
 def fixture_jac_furn(data_dir, mock_dir):
-    conf = gm.MultiDistInput(TLDFile=data_dir / 'distributions.csv',
-                             TldLookupFile=data_dir / 'distributions_lookup.csv',
-                             cat_col='cat',
-                             min_col='lower',
-                             max_col='upper',
-                             ave_col='avg',
-                             trips_col='trips',
-                             lookup_cat_col='cat',
-                             lookup_zone_col='zone',
-                             init_params={'mu': 1, 'sigma': 2},
-                             log_path=mock_dir / 'log.csv',
-                             furness_tolerance=0.1,
-                             furness_jac=True,
-                             )
+    conf = gm.MultiDistInput(
+        TLDFile=data_dir / "distributions.csv",
+        TldLookupFile=data_dir / "distributions_lookup.csv",
+        cat_col="cat",
+        min_col="lower",
+        max_col="upper",
+        ave_col="avg",
+        trips_col="trips",
+        lookup_cat_col="cat",
+        lookup_zone_col="zone",
+        init_params={"mu": 1, "sigma": 2},
+        log_path=mock_dir / "log.csv",
+        furness_tolerance=0.1,
+        furness_jac=True,
+    )
     return conf
 
 
@@ -123,12 +128,11 @@ def fixture_cal_no_furness(data_dir, infilled, no_furness_jac_conf, trip_ends, m
         col_targets=col_targets,
         cost_matrix=infilled,
         cost_function=cost_functions.BuiltInCostFunction.LOG_NORMAL.get_cost_function(),
-        params=no_furness_jac_conf
+        params=no_furness_jac_conf,
     )
-    results = model.calibrate(
-        running_log_path=mock_dir / "temp_log.csv"
-    )
+    results = model.calibrate(running_log_path=mock_dir / "temp_log.csv")
     return results
+
 
 @pytest.fixture(name="cal_furness", scope="session")
 def fixture_cal_furness(data_dir, infilled, furness_jac_conf, trip_ends, mock_dir):
@@ -139,11 +143,9 @@ def fixture_cal_furness(data_dir, infilled, furness_jac_conf, trip_ends, mock_di
         col_targets=col_targets,
         cost_matrix=infilled,
         cost_function=cost_functions.BuiltInCostFunction.LOG_NORMAL.get_cost_function(),
-        params=furness_jac_conf
+        params=furness_jac_conf,
     )
-    results = model.calibrate(
-        running_log_path=mock_dir / "temp_log.csv"
-    )
+    results = model.calibrate(running_log_path=mock_dir / "temp_log.csv")
     return results
 
 
@@ -159,21 +161,19 @@ class TestUtils:
 
 
 class TestDist:
-    @pytest.mark.parametrize("area", ['City', 'Town', 'External', 'Village'])
-    @pytest.mark.parametrize("cal_results", ['cal_furness', 'cal_no_furness'])
+    @pytest.mark.parametrize("area", ["City", "Town", "External", "Village"])
+    @pytest.mark.parametrize("cal_results", ["cal_furness", "cal_no_furness"])
     def test_convergence(self, cal_results, area, request):
         cal_results = request.getfixturevalue(cal_results)
         dist = cal_results[area]
         assert dist.cost_convergence > 0.85
 
-    @pytest.mark.parametrize("area", ['City', 'Town', 'External', 'Village'])
-    @pytest.mark.parametrize("cal_results", ['cal_furness', 'cal_no_furness'])
+    @pytest.mark.parametrize("area", ["City", "Town", "External", "Village"])
+    @pytest.mark.parametrize("cal_results", ["cal_furness", "cal_no_furness"])
     def test_params(self, cal_results, area, request):
-        cal_results=request.getfixturevalue(cal_results)
+        cal_results = request.getfixturevalue(cal_results)
         dist = cal_results[area]
-        mu = dist.cost_params['mu']
-        sigma = dist.cost_params['sigma']
+        mu = dist.cost_params["mu"]
+        sigma = dist.cost_params["sigma"]
         check = (sigma > 0) & (sigma < 3) & (mu > 0) & (mu < 3)
         assert check
-
-

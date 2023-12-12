@@ -159,6 +159,7 @@ def doubly_constrained_furness(
 
     return furnessed_mat, iter_num + 1, cur_rmse
 
+
 # def triply_constrained_furness(props: props_input, row_targets, col_targets, max_iters, mat_size: tuple[int, int], tol=1e-5):
 #     early_exit = False
 #     cur_rmse = np.inf

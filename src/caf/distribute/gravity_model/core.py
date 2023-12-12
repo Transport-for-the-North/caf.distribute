@@ -61,7 +61,6 @@ class GravityModelResults:
     value_distribution: np.ndarray
 
 
-
 @dataclasses.dataclass
 class GravityModelCalibrateResults(GravityModelResults):
     """A collection of results from a run of the Gravity Model.
@@ -99,18 +98,36 @@ class GravityModelCalibrateResults(GravityModelResults):
     def plot_distributions(self):
         fig, ax = plt.subplots(figsize=(10, 6))
         df_1 = self.cost_distribution.df
-        df_1['normalised'] = df_1[self.target_cost_distribution.trips_col] / df_1[self.target_cost_distribution.trips_col].sum()
+        df_1["normalised"] = (
+            df_1[self.target_cost_distribution.trips_col]
+            / df_1[self.target_cost_distribution.trips_col].sum()
+        )
         df_2 = self.target_cost_distribution.df
-        df_2['normalised'] = df_2[self.cost_distribution.trips_col] / df_2[
-            self.cost_distribution.trips_col].sum()
-        ax.bar(df_1[self.cost_distribution.avg_col], df_1['normalised'], width=df_1[self.cost_distribution.max_col] - df_1[self.cost_distribution.min_col], label='Achieved Distribution',
-                color='blue', alpha=0.7)
-        ax.bar(df_1[self.cost_distribution.avg_col], df_2['normalised'], width=df_2[self.target_cost_distribution.max_col] - df_2[self.target_cost_distribution.min_col], label='Target Distribution',
-                color='orange', alpha=0.7)
+        df_2["normalised"] = (
+            df_2[self.cost_distribution.trips_col]
+            / df_2[self.cost_distribution.trips_col].sum()
+        )
+        ax.bar(
+            df_1[self.cost_distribution.avg_col],
+            df_1["normalised"],
+            width=df_1[self.cost_distribution.max_col] - df_1[self.cost_distribution.min_col],
+            label="Achieved Distribution",
+            color="blue",
+            alpha=0.7,
+        )
+        ax.bar(
+            df_1[self.cost_distribution.avg_col],
+            df_2["normalised"],
+            width=df_2[self.target_cost_distribution.max_col]
+            - df_2[self.target_cost_distribution.min_col],
+            label="Target Distribution",
+            color="orange",
+            alpha=0.7,
+        )
 
-        ax.set_xlabel('Cost')
-        ax.set_ylabel('Trips')
-        ax.set_title('Distribution Comparison')
+        ax.set_xlabel("Cost")
+        ax.set_ylabel("Trips")
+        ax.set_title("Distribution Comparison")
         ax.legend()
 
         return fig
@@ -446,7 +463,6 @@ class GravityModelBase(abc.ABC):
 
     def _apply_perceived_factors(self, cost_matrix: np.ndarray) -> np.ndarray:
         return cost_matrix * self._perceived_factors
-
 
     def _calculate_initial_parameters(self) -> dict[str, Any]:
         ...

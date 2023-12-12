@@ -9,7 +9,7 @@ from caf.distribute.gravity_model.single_area import SingleAreaGravityModelCalib
 from caf.distribute.gravity_model.multi_area import (
     MultiCostDistribution,
     MultiAreaGravityModelCalibrator,
-    MultiDistInput
+    MultiDistInput,
 )
 
 # import MultiTLDGravityModel
