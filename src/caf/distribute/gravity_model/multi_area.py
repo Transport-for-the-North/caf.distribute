@@ -563,24 +563,22 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
 
         return achieved_residuals
 
-    def run(self, distributions: list[MultiCostDistribution], furness_tol: float = None):
+    def run(self):
         """
         Run the gravity_model without calibrating.
 
         This should be done when you have calibrating previously to find the
         correct parameters for the cost function.
         """
-        params_len = len(distributions[0].function_params)
+        params_len = len(self.dists[0].function_params)
         cost_args = []
-        for dist in distributions:
+        for dist in self.dists:
             for param in dist.function_params.values():
                 cost_args.append(param)
-        if furness_tol is None:
-            furness_tol = self.furness_tol
 
         self._gravity_function(
             init_params=cost_args,
-            cost_distributions=distributions,
+            cost_distributions=self.dists,
             running_log_path=self.log_path,
             params_len=params_len,
         )
@@ -595,7 +593,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
                 target_cost_distribution=dist.cost_distribution,
                 cost_function=self.cost_function,
                 cost_params=self._cost_params_to_kwargs(
-                    cost_args[i * params_len : i * params_len + params_len]
+                    cost_args[i * params_len: i * params_len + params_len]
                 ),
             )
 
