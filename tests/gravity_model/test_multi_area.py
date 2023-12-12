@@ -77,9 +77,26 @@ def fixture_dists(data_dir, distributions):
     )
     return sorted
 
+@pytest.fixture(name="multi_conf", scope="session")
+def fixture_conf(data_dir, mock_dir):
+    conf = gm.MultiDistInput(TLDFile=data_dir / 'distributions.csv',
+                             TldLookupFile=data_dir / 'distributions_lookup.csv',
+                             cat_col='cat',
+                             min_col='lower',
+                             max_col='upper',
+                             ave_col='avg',
+                             trips_col='trips',
+                             lookup_cat_col='cat',
+                             lookup_zone_col='zone',
+                             init_params={'mu': 1, 'sigma': 2},
+                             log_path=mock_dir / 'log.csv',
+                             furness_tolerance=0.1,
+                             )
+    return conf
+
 
 @pytest.fixture(name="cal_results", scope="session")
-def fixture_cal_res(data_dir, infilled, distributions_sorted, trip_ends, mock_dir):
+def fixture_cal_res(data_dir, infilled, multi_conf, trip_ends, mock_dir):
     row_targets = trip_ends["origin"].values
     col_targets = trip_ends["destination"].values
     model = gm.MultiAreaGravityModelCalibrator(
@@ -87,9 +104,10 @@ def fixture_cal_res(data_dir, infilled, distributions_sorted, trip_ends, mock_di
         col_targets=col_targets,
         cost_matrix=infilled,
         cost_function=cost_functions.BuiltInCostFunction.LOG_NORMAL.get_cost_function(),
+        params=multi_conf
     )
     results = model.calibrate(
-        running_log_path=mock_dir / "temp_log.csv", init_params=distributions_sorted
+        running_log_path=mock_dir / "temp_log.csv"
     )
     return results
 
