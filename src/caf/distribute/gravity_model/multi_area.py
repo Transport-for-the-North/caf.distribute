@@ -7,13 +7,13 @@ from typing import Any
 import os
 from typing import Optional
 from pathlib import Path
+import functools
 
 # Third Party
 import numpy as np
 import pandas as pd
 from scipy import optimize
 from caf.distribute.gravity_model.core import GravityModelCalibrateResults
-import functools
 
 # Local Imports
 from caf.toolkit import cost_utils, timing, BaseConfig
@@ -197,6 +197,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             self.furness_jac = params.furness_jac
 
     def process_tlds(self):
+        """Get distributions in the right format for a multi-area gravity model"""
         dists = []
         for cat in self.tlds.index.unique():
             tld = self.tlds.loc[cat]
@@ -217,8 +218,8 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
 
         return dists
 
-    def _calculate_perceived_factors(self) -> None:
-        # TODO this
+    def _calculate_perceived_factors(self, target_cost_distribution: cost_utils.CostDistribution,
+        achieved_band_shares: np.ndarray) -> None:
         raise NotImplementedError("WIP")
 
     @property
@@ -450,7 +451,6 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         jac_width = len(cost_distributions) * params_len
         jacobian = np.zeros((jac_length, jac_width))
         # Build seed matrix
-        # TODO pull this out into a function/method
         base_mat = self._create_seed_matrix(cost_distributions, init_params, params_len)
         # Calculate net effect of furnessing (saves a lot of time on furnessing here)
         furness_factor = np.divide(
@@ -509,7 +509,6 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         del diff_step
 
         base_mat = self._create_seed_matrix(cost_distributions, init_params, params_len)
-        # TODO add furness tolerance as parameter rather than hard coding
         matrix, iters, rmse = furness.doubly_constrained_furness(
             seed_vals=base_mat,
             row_targets=self.row_targets,
@@ -535,7 +534,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
 
         for i, dist in enumerate(cost_distributions):
             j = 0
-            for name, val in dist.function_params.items():
+            for name in dist.function_params.keys():
                 log_costs[f"{name}_{i}"] = init_params[params_len * i + j]
                 j += 1
             log_costs[f"convergence_{i}"] = convergences[dist.name]

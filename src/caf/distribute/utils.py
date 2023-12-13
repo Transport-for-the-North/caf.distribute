@@ -46,7 +46,6 @@ def infill_cost_matrix(
     -------
     np.ndarray: The input matrix with values infilled.
     """
-    # TODO add multiple factors by area-type
     min_row = np.min(np.ma.masked_where(cost_matrix <= 0, cost_matrix), axis=1) * diag_factor
     np.fill_diagonal(cost_matrix, min_row)
     cost_matrix[cost_matrix > 1e10] = zeros_infill

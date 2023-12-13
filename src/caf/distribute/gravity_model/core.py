@@ -3,22 +3,21 @@
 # Built-Ins
 import abc
 import dataclasses
-import functools
 import logging
 import os
 import warnings
-from typing import Any, Optional, Union
+from typing import Any, Optional
 
 # Third Party
 import numpy as np
 import pandas as pd
-from caf.toolkit import cost_utils, io, timing
 from scipy import optimize
 from matplotlib import pyplot as plt
-
+from caf.toolkit import cost_utils, io, timing
+from caf.distribute import cost_functions
 # Local Imports
 # pylint: disable=import-error,wrong-import-position
-from caf.distribute import cost_functions
+
 
 # pylint: enable=import-error,wrong-import-position
 
@@ -96,6 +95,9 @@ class GravityModelCalibrateResults(GravityModelResults):
     cost_params: dict[str, Any]
 
     def plot_distributions(self):
+        """
+        Plot a comparison of the achieved and target distributions.
+        """
         fig, ax = plt.subplots(figsize=(10, 6))
         df_1 = self.cost_distribution.df
         df_1["normalised"] = (
@@ -463,11 +465,6 @@ class GravityModelBase(abc.ABC):
 
     def _apply_perceived_factors(self, cost_matrix: np.ndarray) -> np.ndarray:
         return cost_matrix * self._perceived_factors
-
-    def _calculate_initial_parameters(self) -> dict[str, Any]:
-        ...
-        # TODO(MB) Make an abstract method for calculating initial parameters
-        # This already exists in SingleArea class
 
     def _guess_init_params(
         self,
