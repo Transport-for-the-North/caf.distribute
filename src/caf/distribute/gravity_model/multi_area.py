@@ -81,7 +81,7 @@ class MultiDistInput(BaseConfig):
     trips_col: str
     lookup_cat_col: str
     lookup_zone_col: str
-    init_params: dict[str, float] = None
+    init_params: dict[str, float]
     log_path: Path
     furness_tolerance: float = 1e-6
     furness_jac: float = False
@@ -253,7 +253,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         default_retry: bool = True,
         verbose: int = 0,
         **kwargs,
-    ) -> GravityModelCalibrateResults:
+    ) -> dict[str, GravityModelCalibrateResults]:
         params_len = len(self.dists[0].function_params)
         ordered_init_params = []
         for dist in self.dists:
@@ -310,7 +310,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             result = optimise_cost_params(x0=ordered_init_params)
 
             # Update the best params only if this was better
-            if np.mean(self.achieved_convergence) > np.mean(best_convergence):
+            if np.mean(list[self.achieved_convergence.values()]) > np.mean(best_convergence):
                 best_params = result.x
 
         self._attempt_id = -2
@@ -554,8 +554,8 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         self._loop_num += 1
         self._loop_start_time = timing.current_milli_time()
 
-        self.achieved_cost_dist = distributions
-        self.achieved_convergence = convergences
+        self.achieved_cost_dist: list[cost_utils.CostDistribution] = distributions
+        self.achieved_convergence: dict[str, float] = convergences
         self.achieved_distribution = matrix
 
         achieved_residuals = np.concatenate(residuals)

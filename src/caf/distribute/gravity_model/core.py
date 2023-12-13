@@ -201,12 +201,7 @@ class GravityModelBase(abc.ABC):
         self._attempt_id: int = -1
         self._loop_num: int = -1
         self._loop_start_time: float = -1.0
-        if isinstance(cost_matrix, pd.DataFrame):
-            self._perceived_factors: pd.DataFrame = pd.DataFrame(
-                np.ones_like(self.cost_matrix), index=self.cost_matrix.index
-            )
-        else:
-            self._perceived_factors: np.ndarray = np.ones_like(self.cost_matrix)
+        self._perceived_factors: np.ndarray = np.ones_like(self.cost_matrix)
 
         # Additional attributes
         self.initial_cost_params: dict[str, Any] = dict()
