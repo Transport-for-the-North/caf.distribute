@@ -15,6 +15,7 @@ from scipy import optimize
 from matplotlib import pyplot as plt
 from caf.toolkit import cost_utils, io, timing
 from caf.distribute import cost_functions
+
 # Local Imports
 # pylint: disable=import-error,wrong-import-position
 

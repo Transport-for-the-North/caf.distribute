@@ -218,8 +218,11 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
 
         return dists
 
-    def _calculate_perceived_factors(self, target_cost_distribution: cost_utils.CostDistribution,
-        achieved_band_shares: np.ndarray) -> None:
+    def _calculate_perceived_factors(
+        self,
+        target_cost_distribution: cost_utils.CostDistribution,
+        achieved_band_shares: np.ndarray,
+    ) -> None:
         raise NotImplementedError("WIP")
 
     @property
