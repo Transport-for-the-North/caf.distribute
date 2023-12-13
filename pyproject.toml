@@ -24,6 +24,7 @@ dependencies = [
     "pandas>=1.4.0",
     "tqdm>=4.50.2",
     "caf.toolkit>=0.2.1",
+    "matplotlib>=3.8.2"
 ]
 
 [project.optional-dependencies]
@@ -101,7 +102,7 @@ add-ignore = [
 # Tests
 [tool.pytest.ini_options]
 pythonpath = ["src"]
-addopts = '--cov=caf --cov-report=xml -n auto'
+addopts = '--cov=caf --cov-report=xml -n auto' # comment out this line to debug a test
 
 [tool.coverage.report]
 include_namespace_packages = true

@@ -593,7 +593,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
                 target_cost_distribution=dist.cost_distribution,
                 cost_function=self.cost_function,
                 cost_params=self._cost_params_to_kwargs(
-                    cost_args[i * params_len: i * params_len + params_len]
+                    cost_args[i * params_len : i * params_len + params_len]
                 ),
             )
 
