@@ -10,9 +10,7 @@ from caf.distribute import utils
 
 @pytest.fixture(name="data_dir", scope="session")
 def fixture_data_dir():
-    return Path(
-        r"C:\Users\IsaacScott\Documents\Github\caf.distribute\tests\gravity_model\data\multi_area_unit"
-    )
+    return Path(__file__).parent.resolve() / "data" / "multi_area_unit"
 
 
 @pytest.fixture(name="mock_dir", scope="session")
