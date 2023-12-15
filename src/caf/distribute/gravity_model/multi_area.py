@@ -565,7 +565,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
 
         return achieved_residuals
 
-    def run(self):
+    def run(self, triply_constrain: bool = False):
         """
         Run the gravity_model without calibrating.
 
@@ -585,7 +585,47 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             params_len=params_len,
         )
 
+        if triply_constrain:
+            props_list = []
+            for dist in self.dists:
+                prop_cost, band_vals = furness.cost_to_prop(self.cost_matrix[dist.zones],
+                                                             dist.cost_distribution.df.drop('ave', axis=1),
+                                                             val_col='trips'
+                                                             )
+                props = furness.props_input(prop_cost, dist.zones, band_vals)
+                props_list.append(props)
+            new_mat = furness.triply_constrained_furness(props_list,
+                                               self.row_targets,
+                                               self.col_targets,
+                                               5000,
+                                               self.cost_matrix.shape,
+                                               1
+                                               )
+
         assert self.achieved_cost_dist is not None
+        triple_results = {}
+        for i, dist in enumerate(self.dists):
+            (
+                single_cost_distribution,
+                single_achieved_residuals,
+                single_convergence,
+            ) = core.cost_distribution_stats(
+                achieved_trip_distribution=new_mat[dist.zones],
+                cost_matrix=self.cost_matrix[dist.zones],
+                target_cost_distribution=dist.cost_distribution)
+
+            gresult = GravityModelCalibrateResults(
+                cost_distribution=single_cost_distribution,
+                cost_convergence=single_convergence,
+                value_distribution=new_mat[dist.zones],
+                target_cost_distribution=dist.cost_distribution,
+                cost_function=self.cost_function,
+                cost_params=self._cost_params_to_kwargs(
+                    cost_args[i * params_len : i * params_len + params_len]
+                ),
+            )
+
+            triple_results[dist.name] = gresult
         results = {}
         for i, dist in enumerate(self.dists):
             gresult = GravityModelCalibrateResults(

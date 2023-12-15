@@ -3,9 +3,11 @@
 # Built-Ins
 import logging
 import warnings
+from dataclasses import dataclass
 
 # Third Party
 import numpy as np
+import pandas as pd
 
 # Local Imports
 # pylint: disable=import-error,wrong-import-position
@@ -159,83 +161,102 @@ def doubly_constrained_furness(
 
     return furnessed_mat, iter_num + 1, cur_rmse
 
+@dataclass
+class props_input:
 
-# def triply_constrained_furness(props: props_input, row_targets, col_targets, max_iters, mat_size: tuple[int, int], tol=1e-5):
-#     early_exit = False
-#     cur_rmse = np.inf
-#     iter_num = 0
-#     n_vals = len(row_targets)
-#
-#     # build seed
-#     furnessed_mat = np.zeros(mat_size)
-#     for distro in props:
-#         furnessed_mat[distro.zones] = distro.props
-#
-#     # one row, col furness loop outside iterations
-#     row_ach = np.sum(furnessed_mat, axis=1)
-#     diff_factor = np.divide(
-#         row_targets,
-#         row_ach,
-#         where=row_ach != 0,
-#         out=np.ones_like(row_targets, dtype=float)
-#     )
-#
-#     furnessed_mat = np.multiply(furnessed_mat.T, diff_factor).T
-#     # Adjust cols
-#     col_ach = np.sum(furnessed_mat, axis=0)
-#     diff_factor = np.divide(
-#         col_targets,
-#         col_ach,
-#         where=col_ach != 0,
-#         out=np.ones_like(col_targets, dtype=float),
-#     )
-#     furnessed_mat *= diff_factor
-#     # Can return early if all 0 - probably shouldn't happen!
-#     if row_targets.sum() == 0 or col_targets.sum() == 0:
-#         warnings.warn("Furness given targets of 0. Returning all 0's")
-#         return np.zeros_like(props), iter_num, np.inf
-#     for iter_num in range(1, max_iters):
-#         for distro in props:
-#             to_alter = furnessed_mat[distro.zones]
-#             checker = {}
-#             # internal =
-#             for i in distro.prop_vals:
-#                 tot_demand = to_alter[distro.props == i].sum()
-#                 checker[i] = tot_demand
-#             df = pd.DataFrame.from_dict(checker, orient='index').reset_index()
-#             df.columns = ['target_prop', 'demand']
-#             df['act_prop'] = df['demand'] / df['demand'].sum()
-#             df['adj'] = df['target_prop'] / df['act_prop']
-#             df.fillna(0, inplace=True)
-#             df.set_index('target_prop', inplace=True)
-#             for i in df.index:
-#                 to_alter[distro.props == i] *= df.loc[i, 'adj']
-#             furnessed_mat[distro.zones] = to_alter
-#         # Adjust rows
-#         row_ach = np.sum(furnessed_mat, axis=1)
-#         diff_factor = np.divide(
-#             row_targets,
-#             row_ach,
-#             where=row_ach != 0,
-#             out=np.ones_like(row_targets, dtype=float)
-#         )
-#
-#         furnessed_mat = np.multiply(furnessed_mat.T, diff_factor).T
-#         # Adjust cols
-#         col_ach = np.sum(furnessed_mat, axis=0)
-#         diff_factor = np.divide(
-#             col_targets,
-#             col_ach,
-#             where=col_ach != 0,
-#             out=np.ones_like(col_targets, dtype=float),
-#         )
-#         furnessed_mat *= diff_factor
-#
-#         row_diff = (row_targets - np.sum(furnessed_mat, axis=1)) ** 2
-#         col_diff = (col_targets - np.sum(furnessed_mat, axis=0)) ** 2
-#         cur_rmse = ((np.sum(row_diff) + np.sum(col_diff)) / n_vals) ** 0.5
-#         if cur_rmse < tol:
-#             print('debugging')
-#             early_exit = True
-#             break
-#     return furnessed_mat
+    props: np.ndarray
+    zones: np.ndarray
+    prop_vals: np.ndarray
+
+def cost_to_prop(costs, bands, val_col):
+    bands_sum = bands[val_col].sum()
+    bands[val_col] /= bands_sum
+    bands_array = bands.values
+    band_indices = np.zeros_like(costs, dtype=float)
+    for band_start, band_end, prop in bands_array:
+        band_mask = (costs >= band_start) & (costs <= band_end)
+        band_indices[band_mask] = prop
+
+    band_indices[band_indices==0] = bands[val_col].min() * 0.5
+    return band_indices, bands[val_col].values
+
+
+def triply_constrained_furness(props: list[props_input], row_targets, col_targets, max_iters, mat_size: tuple[int, int], tol=1e-5):
+    early_exit = False
+    cur_rmse = np.inf
+    iter_num = 0
+    n_vals = len(row_targets)
+
+    # build seed
+    furnessed_mat = np.zeros(mat_size)
+    for distro in props:
+        furnessed_mat[distro.zones] = distro.props
+
+    # one row, col furness loop outside iterations
+    row_ach = np.sum(furnessed_mat, axis=1)
+    diff_factor = np.divide(
+        row_targets,
+        row_ach,
+        where=row_ach != 0,
+        out=np.ones_like(row_targets, dtype=float)
+    )
+
+    furnessed_mat = np.multiply(furnessed_mat.T, diff_factor).T
+    # Adjust cols
+    col_ach = np.sum(furnessed_mat, axis=0)
+    diff_factor = np.divide(
+        col_targets,
+        col_ach,
+        where=col_ach != 0,
+        out=np.ones_like(col_targets, dtype=float),
+    )
+    furnessed_mat *= diff_factor
+    # Can return early if all 0 - probably shouldn't happen!
+    if row_targets.sum() == 0 or col_targets.sum() == 0:
+        warnings.warn("Furness given targets of 0. Returning all 0's")
+        return np.zeros_like(props), iter_num, np.inf
+    for iter_num in range(1, max_iters):
+        for distro in props:
+            to_alter = furnessed_mat[distro.zones]
+            checker = {}
+            # internal =
+            for i in distro.prop_vals:
+                tot_demand = to_alter[distro.props == i].sum()
+                checker[i] = tot_demand
+            df = pd.DataFrame.from_dict(checker, orient='index').reset_index()
+            df.columns = ['target_prop', 'demand']
+            df['act_prop'] = df['demand'] / df['demand'].sum()
+            df['adj'] = df['target_prop'] / df['act_prop']
+            df.fillna(0, inplace=True)
+            df.set_index('target_prop', inplace=True)
+            for i in df.index:
+                to_alter[distro.props == i] *= df.loc[i, 'adj']
+            furnessed_mat[distro.zones] = to_alter
+        # Adjust rows
+        row_ach = np.sum(furnessed_mat, axis=1)
+        diff_factor = np.divide(
+            row_targets,
+            row_ach,
+            where=row_ach != 0,
+            out=np.ones_like(row_targets, dtype=float)
+        )
+
+        furnessed_mat = np.multiply(furnessed_mat.T, diff_factor).T
+        # Adjust cols
+        col_ach = np.sum(furnessed_mat, axis=0)
+        diff_factor = np.divide(
+            col_targets,
+            col_ach,
+            where=col_ach != 0,
+            out=np.ones_like(col_targets, dtype=float),
+        )
+        furnessed_mat *= diff_factor
+
+        row_diff = (row_targets - np.sum(furnessed_mat, axis=1)) ** 2
+        col_diff = (col_targets - np.sum(furnessed_mat, axis=0)) ** 2
+        cur_rmse = ((np.sum(row_diff) + np.sum(col_diff)) / n_vals) ** 0.5
+        if cur_rmse < tol:
+            print('debugging')
+            early_exit = True
+            break
+    return furnessed_mat
