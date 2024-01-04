@@ -306,7 +306,9 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             result = optimise_cost_params(x0=ordered_init_params)
 
             # Update the best params only if this was better
-            if np.mean(list(self.achieved_convergence.values())) > np.mean(list(best_convergence.values())):
+            if np.mean(list(self.achieved_convergence.values())) > np.mean(
+                list(best_convergence.values())
+            ):
                 best_params = result.x
 
         self._attempt_id = -2
