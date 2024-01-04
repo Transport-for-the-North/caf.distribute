@@ -224,11 +224,18 @@ def triply_constrained_furness(
 
     Parameters
     ----------
-
     props: list[props_input]
         A list of info about cost bins. This is produced by cost_to_props
-
-
+    row_targets: np.ndarray
+        The targets for the rows (origins) in the matrix
+    col_targets: np.ndarray
+        The targets for the cols (destinations) in the matrix
+    max_iters: int
+        Max iterations for the furness to run before exiting
+    mat_size: tuplr[int, int]
+        The size of the matrix being furnessed
+    tol: float
+        The convergence criteria
     """
     early_exit = False
     cur_rmse = np.inf
