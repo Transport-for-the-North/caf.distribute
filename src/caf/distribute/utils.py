@@ -33,20 +33,22 @@ def infill_cost_matrix(
     intrazonal costs) with the minimum value from each respective row multiplied
     by a factor, the logic being that an intrazonal trip is probably 50% (or
     whatever factor chosen) of the distance to the nearest zone. It also infills
-    zeros in the matrix with a user defined factor to avoid errors in the seed matrix.
+    zeros in the matrix with a user defined value to avoid errors in the seed matrix.
 
     Parameters
     ----------
     cost_matrix: The cost matrix. This should be a square array
     diag_factor: The factor the rows' minimum values will be multiplied by to
     infill intrazonal costs.
-    zeros_infill: The infill value for other (none diagonal) zeros in the matrix
+    zeros_infill: The infill value for other (non-diagonal) zeros in the matrix
 
     Returns
     -------
     np.ndarray: The input matrix with values infilled.
     """
+    # TODO allow infilling diagonals only where zero
     min_row = np.min(np.ma.masked_where(cost_matrix <= 0, cost_matrix), axis=1) * diag_factor
+
     np.fill_diagonal(cost_matrix, min_row)
     cost_matrix[cost_matrix > 1e10] = zeros_infill
     cost_matrix[cost_matrix == 0] = zeros_infill

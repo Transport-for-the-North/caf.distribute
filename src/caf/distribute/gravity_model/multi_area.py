@@ -149,13 +149,6 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         be accounted for, and should only appear in one distribution each.
     """
 
-    # actual cost matrix
-    # adjusted cost matrix (optional) instead could be callable
-
-    # Need to update functions in base class to allow for giving multiple cost distributions
-    # Ideally calibrate and calibrate_with_perceived factors should be defined flexibly
-    # in base class
-
     def __init__(
         self,
         row_targets: np.ndarray,
@@ -236,7 +229,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         return np.concatenate(shares)
 
     def _create_seed_matrix(self, cost_distributions, cost_args, params_len):
-        base_mat = np.zeros(self.cost_matrix.shape)
+        base_mat = np.zeros_like(self.cost_matrix)
         for i, dist in enumerate(cost_distributions):
             init_params = cost_args[i * params_len : i * params_len + params_len]
             init_params_kwargs = self._cost_params_to_kwargs(init_params)
@@ -313,7 +306,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             result = optimise_cost_params(x0=ordered_init_params)
 
             # Update the best params only if this was better
-            if np.mean(list[self.achieved_convergence.values()]) > np.mean(best_convergence):
+            if np.mean(list(self.achieved_convergence.values())) > np.mean(list(best_convergence.values())):
                 best_params = result.x
 
         self._attempt_id = -2
@@ -325,7 +318,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         assert self.achieved_cost_dist is not None
         results = {}
         for i, dist in enumerate(self.dists):
-            gresult = GravityModelCalibrateResults(
+            result_i = GravityModelCalibrateResults(
                 cost_distribution=self.achieved_cost_dist[i],
                 cost_convergence=self.achieved_convergence[dist.name],
                 value_distribution=self.achieved_distribution[dist.zones],
@@ -336,7 +329,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
                 ),
             )
 
-            results[dist.name] = gresult
+            results[dist.name] = result_i
         return results
 
     def calibrate(

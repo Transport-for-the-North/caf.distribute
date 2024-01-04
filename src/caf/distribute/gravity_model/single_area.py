@@ -3,13 +3,17 @@
 # Built-Ins
 import logging
 import os
-from typing import Any, Optional
 import functools
+
+from typing import Any, Optional
 
 # Third Party
 import numpy as np
 from scipy import optimize
 from caf.toolkit import cost_utils, timing, toolbox
+
+# Local Imports
+# pylint: disable=import-error,wrong-import-position
 from caf.distribute import cost_functions, furness
 from caf.distribute.gravity_model import (
     core,
@@ -17,11 +21,8 @@ from caf.distribute.gravity_model import (
     GravityModelRunResults,
 )
 
-# Local Imports
-# pylint: disable=import-error,wrong-import-position
-
-
 # pylint: enable=import-error,wrong-import-position
+
 
 # # # CONSTANTS # # #
 LOG = logging.getLogger(__name__)

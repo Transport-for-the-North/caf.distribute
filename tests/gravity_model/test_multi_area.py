@@ -62,7 +62,7 @@ def fixture_infilled(data_dir):
 def fixture_dists(data_dir, distributions):
     tld_df = distributions
     lookup = pd.read_csv(data_dir / "distributions_lookup.csv")
-    sorted = utils.process_tlds(
+    sorted_ = utils.process_tlds(
         tld_df[tld_df["cat"] != "Minor"],
         "cat",
         "lower",
@@ -74,7 +74,7 @@ def fixture_dists(data_dir, distributions):
         "zone",
         {"mu": 1, "sigma": 2},
     )
-    return sorted
+    return sorted_
 
 
 @pytest.fixture(name="no_furness_jac_conf", scope="session")
@@ -173,5 +173,5 @@ class TestDist:
         dist = cal_results[area]
         mu = dist.cost_params["mu"]
         sigma = dist.cost_params["sigma"]
-        check = (sigma > 0) & (sigma < 3) & (mu > 0) & (mu < 3)
-        assert check
+        assert 0 < sigma < 3
+        assert 0 < mu < 3
