@@ -161,14 +161,37 @@ def doubly_constrained_furness(
 
     return furnessed_mat, iter_num + 1, cur_rmse
 
+
 @dataclass
 class props_input:
-
+    """
+    props: np.ndarray
+        This is essentially a cost matrix, but costs are replaced by the percentage
+        from the given cost band.
+    zones: np.ndarray
+        The zones in your zone system this prop matrix applies to
+    prop_vals: np.ndarray
+        The unique values in props
+    """
     props: np.ndarray
     zones: np.ndarray
     prop_vals: np.ndarray
 
-def cost_to_prop(costs, bands, val_col):
+
+def cost_to_prop(costs: np.ndarray, bands: pd.DataFrame, val_col: str):
+    """
+    Convert a cost matrix and cost bands into proportions expected.
+
+    Parameters
+    ----------
+    costs: np.ndarray
+        The costs matrix. If this is being run for a multi-area distribution,
+        only include costs for the bands applicable.
+    bands: pd.DataFrame
+        The cost bands for the given costs.
+    val_col: str
+        The column name of the values in the bands DataFrame.
+    """
     bands_sum = bands[val_col].sum()
     bands[val_col] /= bands_sum
     bands_array = bands.values
@@ -177,11 +200,36 @@ def cost_to_prop(costs, bands, val_col):
         band_mask = (costs >= band_start) & (costs <= band_end)
         band_indices[band_mask] = prop
 
-    band_indices[band_indices==0] = bands[val_col].min() * 0.5
+    band_indices[band_indices == 0] = bands[val_col].min() * 0.5
     return band_indices, bands[val_col].values
 
 
-def triply_constrained_furness(props: list[props_input], row_targets, col_targets, max_iters, mat_size: tuple[int, int], tol=1e-5):
+def triply_constrained_furness(
+    props: list[props_input],
+    row_targets,
+    col_targets,
+    max_iters,
+    mat_size: tuple[int, int],
+    tol=1e-5,
+):
+    """
+    Furness a seed matrix with triple constraints.
+
+    Furnesses with the matrix tightly constrained to origin and destination
+    targets (with rmse checked against tolerance), and loosely constrained
+    to cost band shares, i.e. constrained in each furness iteration, but no
+    exit criteria for this constraint. This theoretically gives good flexibilty,
+    where the furness should achieve good convergence on all three constraints
+    where possible, and achieve the first two where the third may not be possible.
+
+    Parameters
+    ----------
+
+    props: list[props_input]
+        A list of info about cost bins. This is produced by cost_to_props
+
+
+    """
     early_exit = False
     cur_rmse = np.inf
     iter_num = 0
@@ -195,10 +243,7 @@ def triply_constrained_furness(props: list[props_input], row_targets, col_target
     # one row, col furness loop outside iterations
     row_ach = np.sum(furnessed_mat, axis=1)
     diff_factor = np.divide(
-        row_targets,
-        row_ach,
-        where=row_ach != 0,
-        out=np.ones_like(row_targets, dtype=float)
+        row_targets, row_ach, where=row_ach != 0, out=np.ones_like(row_targets, dtype=float)
     )
 
     furnessed_mat = np.multiply(furnessed_mat.T, diff_factor).T
@@ -216,21 +261,22 @@ def triply_constrained_furness(props: list[props_input], row_targets, col_target
         warnings.warn("Furness given targets of 0. Returning all 0's")
         return np.zeros_like(props), iter_num, np.inf
     for iter_num in range(1, max_iters):
+        # first adjust to match cost bands; this is the 'third' constraint but
+        # is done first as the other two need to be matched more closely
         for distro in props:
             to_alter = furnessed_mat[distro.zones]
             checker = {}
-            # internal =
             for i in distro.prop_vals:
                 tot_demand = to_alter[distro.props == i].sum()
                 checker[i] = tot_demand
-            df = pd.DataFrame.from_dict(checker, orient='index').reset_index()
-            df.columns = ['target_prop', 'demand']
-            df['act_prop'] = df['demand'] / df['demand'].sum()
-            df['adj'] = df['target_prop'] / df['act_prop']
+            df = pd.DataFrame.from_dict(checker, orient="index").reset_index()
+            df.columns = ["target_prop", "demand"]
+            df["act_prop"] = df["demand"] / df["demand"].sum()
+            df["adj"] = df["target_prop"] / df["act_prop"]
             df.fillna(0, inplace=True)
-            df.set_index('target_prop', inplace=True)
+            df.set_index("target_prop", inplace=True)
             for i in df.index:
-                to_alter[distro.props == i] *= df.loc[i, 'adj']
+                to_alter[distro.props == i] *= df.loc[i, "adj"]
             furnessed_mat[distro.zones] = to_alter
         # Adjust rows
         row_ach = np.sum(furnessed_mat, axis=1)
@@ -238,7 +284,7 @@ def triply_constrained_furness(props: list[props_input], row_targets, col_target
             row_targets,
             row_ach,
             where=row_ach != 0,
-            out=np.ones_like(row_targets, dtype=float)
+            out=np.ones_like(row_targets, dtype=float),
         )
 
         furnessed_mat = np.multiply(furnessed_mat.T, diff_factor).T
@@ -256,7 +302,14 @@ def triply_constrained_furness(props: list[props_input], row_targets, col_target
         col_diff = (col_targets - np.sum(furnessed_mat, axis=0)) ** 2
         cur_rmse = ((np.sum(row_diff) + np.sum(col_diff)) / n_vals) ** 0.5
         if cur_rmse < tol:
-            print('debugging')
             early_exit = True
             break
+        if early_exit is not True:
+            warnings.warn(
+                f"The doubly constrained furness exhausted its max "
+                f"number of loops ({max_iters:d}), while achieving an RMSE "
+                f"difference of {cur_rmse:f}. The values returned may not be "
+                f"accurate."
+            )
+
     return furnessed_mat
