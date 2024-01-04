@@ -148,14 +148,6 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         class MultiCostDistribution. All zones in the cost_matrix/targets must
         be accounted for, and should only appear in one distribution each.
     """
-
-    # actual cost matrix
-    # adjusted cost matrix (optional) instead could be callable
-
-    # Need to update functions in base class to allow for giving multiple cost distributions
-    # Ideally calibrate and calibrate_with_perceived factors should be defined flexibly
-    # in base class
-
     def __init__(
         self,
         row_targets: np.ndarray,
