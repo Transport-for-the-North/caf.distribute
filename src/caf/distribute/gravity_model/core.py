@@ -111,18 +111,17 @@ class GravityModelCalibrateResults(GravityModelResults):
             / df_2[self.cost_distribution.trips_col].sum()
         )
         ax.bar(
-            df_1[self.cost_distribution.avg_col],
-            df_1["normalised"],
-            width=df_1[self.cost_distribution.max_col] - df_1[self.cost_distribution.min_col],
+            self.cost_distribution.avg_vals,
+            self.cost_distribution.band_share_vals,
+            width=self.cost_distribution.max_vals - self.cost_distribution.min_vals,
             label="Achieved Distribution",
             color="blue",
             alpha=0.7,
         )
         ax.bar(
-            df_1[self.cost_distribution.avg_col],
-            df_2["normalised"],
-            width=df_2[self.target_cost_distribution.max_col]
-            - df_2[self.target_cost_distribution.min_col],
+            self.cost_distribution.avg_vals,
+            self.target_cost_distribution.band_share_vals,
+            width=self.target_cost_distribution.max_vals - self.target_cost_distribution.min_vals,
             label="Target Distribution",
             color="orange",
             alpha=0.7,
@@ -551,7 +550,7 @@ def cost_distribution_stats(
 
     """
     # TODO(MB) Calculate extra stats / metrics
-    # r squared, ratio of coincidence, possible others?
+    #  r squared, ratio of coincidence, possible others?
     if target_cost_distribution is not None:
         cost_distribution = cost_utils.CostDistribution.from_data(
             matrix=achieved_trip_distribution,

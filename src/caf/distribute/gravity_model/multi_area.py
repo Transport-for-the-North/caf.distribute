@@ -228,7 +228,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         return np.concatenate(shares)
 
     def _create_seed_matrix(self, cost_distributions, cost_args, params_len):
-        base_mat = np.zeros(self.cost_matrix.shape)
+        base_mat = np.zeros_like(self.cost_matrix)
         for i, dist in enumerate(cost_distributions):
             init_params = cost_args[i * params_len : i * params_len + params_len]
             init_params_kwargs = self._cost_params_to_kwargs(init_params)
