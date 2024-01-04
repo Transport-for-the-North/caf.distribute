@@ -121,7 +121,8 @@ class GravityModelCalibrateResults(GravityModelResults):
         ax.bar(
             self.cost_distribution.avg_vals,
             self.target_cost_distribution.band_share_vals,
-            width=self.target_cost_distribution.max_vals - self.target_cost_distribution.min_vals,
+            width=self.target_cost_distribution.max_vals
+            - self.target_cost_distribution.min_vals,
             label="Target Distribution",
             color="orange",
             alpha=0.7,

@@ -158,4 +158,3 @@ def doubly_constrained_furness(
         )
 
     return furnessed_mat, iter_num + 1, cur_rmse
-

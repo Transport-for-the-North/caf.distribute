@@ -20,8 +20,8 @@ from caf.distribute.gravity_model import (
     GravityModelCalibrateResults,
     GravityModelRunResults,
 )
-# pylint: enable=import-error,wrong-import-position
 
+# pylint: enable=import-error,wrong-import-position
 
 
 # # # CONSTANTS # # #
