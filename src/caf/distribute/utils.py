@@ -33,7 +33,7 @@ def infill_cost_matrix(
     intrazonal costs) with the minimum value from each respective row multiplied
     by a factor, the logic being that an intrazonal trip is probably 50% (or
     whatever factor chosen) of the distance to the nearest zone. It also infills
-    zeros in the matrix with a user defined factor to avoid errors in the seed matrix.
+    zeros in the matrix with a user defined value to avoid errors in the seed matrix.
 
     Parameters
     ----------
