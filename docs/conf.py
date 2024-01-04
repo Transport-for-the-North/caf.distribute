@@ -9,22 +9,27 @@
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
-#
-# import os
-# import sys
-# sys.path.insert(0, os.path.abspath('.'))
+
+
 
 
 # -- Project information -----------------------------------------------------
 import sys
 import os
 from pathlib import Path
-import caf.distribute
 
 dir_path = Path(__file__).parents[1]
 source = dir_path / "src" / "caf" / "distribute"
+pckg_source = dir_path / "src"
 
 sys.path.insert(0, os.path.abspath(str(source)))
+sys.path.insert(0, os.path.abspath(str(pckg_source)))
+
+print(sys.path)
+
+import caf.distribute
+
+
 
 project = "caf.distribute"
 copyright = "2023, Transport for the North"
@@ -52,6 +57,8 @@ extensions = [
 ]
 
 automodapi_inheritance_diagram = False
+
+autodoc_mock_imports = [caf.distribute]
 
 numpydoc_show_class_members = False
 

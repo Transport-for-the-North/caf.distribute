@@ -219,7 +219,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         raise NotImplementedError("WIP")
 
     @property
-    def multi_achieved_band_shares(self) -> np.ndarray:
+    def achieved_band_share(self) -> np.ndarray:
         """Analogous to _achieved_band_shares but for a multi-tld"""
         if self.achieved_cost_dist is None:
             raise ValueError("Gravity model has not been run. achieved_band_share is not set.")
