@@ -23,9 +23,9 @@ source = dir_path / "src" / "caf" / "distribute"
 pckg_source = dir_path / "src"
 
 sys.path.insert(0, os.path.abspath(str(source)))
-sys.path.insert(0, os.path.abspath(str(pckg_source)))
+# sys.path.insert(0, os.path.abspath(str(pckg_source)))
 
-print(sys.path)
+# print(sys.path)
 
 import caf.distribute
 
