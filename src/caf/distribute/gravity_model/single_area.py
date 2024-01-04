@@ -11,18 +11,18 @@ from typing import Any, Optional
 import numpy as np
 from scipy import optimize
 from caf.toolkit import cost_utils, timing, toolbox
+
+# Local Imports
+# pylint: disable=import-error,wrong-import-position
 from caf.distribute import cost_functions, furness
 from caf.distribute.gravity_model import (
     core,
     GravityModelCalibrateResults,
     GravityModelRunResults,
 )
-
-# Local Imports
-# pylint: disable=import-error,wrong-import-position
-
-
 # pylint: enable=import-error,wrong-import-position
+
+
 
 # # # CONSTANTS # # #
 LOG = logging.getLogger(__name__)
