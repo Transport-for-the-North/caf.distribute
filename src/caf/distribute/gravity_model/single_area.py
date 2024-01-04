@@ -3,8 +3,9 @@
 # Built-Ins
 import logging
 import os
-from typing import Any, Optional
 import functools
+
+from typing import Any, Optional
 
 # Third Party
 import numpy as np
