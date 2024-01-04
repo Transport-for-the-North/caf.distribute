@@ -58,8 +58,6 @@ extensions = [
 
 automodapi_inheritance_diagram = False
 
-autodoc_mock_imports = [caf.distribute]
-
 numpydoc_show_class_members = False
 
 # Add any paths that contain templates here, relative to this directory.
@@ -85,5 +83,5 @@ master_doc = "index"
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ["_static"]
 
-autodoc_mock_imports = ["caf"]
+# autodoc_mock_imports = ["caf", "caf.distribute"]
 autodoc_typehints = "description"
