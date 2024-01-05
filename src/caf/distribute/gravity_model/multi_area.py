@@ -239,7 +239,8 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             )
             base_mat[dist.zones] = mat_slice
         return base_mat
-# pylint: disable=too-many-locals
+
+    # pylint: disable=too-many-locals
     def _calibrate(
         self,
         diff_step: float = 1e-8,
@@ -561,7 +562,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
 
         return achieved_residuals
 
-# pylint:enable=too-many-locals
+    # pylint:enable=too-many-locals
     def run(self):
         """
         Run the gravity_model without calibrating.
