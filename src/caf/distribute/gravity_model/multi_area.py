@@ -24,6 +24,7 @@ from caf.distribute import cost_functions, furness
 LOG = logging.getLogger(__name__)
 
 
+# pylint:disable=duplicate-code
 # # # CLASSES # # #
 class MultiDistInput(BaseConfig):
     """
@@ -689,5 +690,7 @@ def gravity_model(
 
     return matrix, iters, rmse
 
+
+# pylint:enable=duplicate-code
 
 # # # FUNCTIONS # # #
