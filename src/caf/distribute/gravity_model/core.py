@@ -96,9 +96,7 @@ class GravityModelCalibrateResults(GravityModelResults):
     cost_params: dict[str, Any]
 
     def plot_distributions(self):
-        """
-        Plot a comparison of the achieved and target distributions.
-        """
+        """Plot a comparison of the achieved and target distributions."""
         fig, ax = plt.subplots(figsize=(10, 6))
         df_1 = self.cost_distribution.df
         df_1["normalised"] = (

@@ -9,10 +9,6 @@
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
-#
-# import os
-# import sys
-# sys.path.insert(0, os.path.abspath('.'))
 
 
 # -- Project information -----------------------------------------------------
@@ -26,6 +22,7 @@ source = dir_path / "src" / "caf" / "distribute"
 
 sys.path.insert(0, os.path.abspath(str(source)))
 
+
 project = "caf.distribute"
 copyright = "2023, Transport for the North"
 author = "Transport for the North"
@@ -33,8 +30,13 @@ author = "Transport for the North"
 napoleon_google_docstring = False
 napoleon_numpy_docstring = True
 
-# The full version, including alpha/beta/rc tags
-release = str(caf.distribute.__version__)
+# The short X.Y version.
+import caf.distribute
+
+version = str(caf.distribute.__version__)
+
+# The full version, including alpha/beta/rc tags.
+release = version
 
 
 # -- General configuration ---------------------------------------------------
@@ -78,5 +80,5 @@ master_doc = "index"
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ["_static"]
 
-autodoc_mock_imports = ["caf"]
+# autodoc_mock_imports = ["caf", "caf.distribute"]
 autodoc_typehints = "description"
