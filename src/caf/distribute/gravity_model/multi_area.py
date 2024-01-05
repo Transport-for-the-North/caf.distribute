@@ -314,7 +314,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             ):
                 best_params = result.x
 
-        self._attempt_id = -2
+        self._attempt_id: int = -2
         self._gravity_function(
             init_params=best_params,
             **(gravity_kwargs | kwargs),

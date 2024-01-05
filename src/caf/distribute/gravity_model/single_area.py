@@ -388,7 +388,7 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
 
         # Run one final time with the optimal parameters
         self.optimal_cost_params = self._cost_params_to_kwargs(best_params)
-        self._attempt_id = -2
+        self._attempt_id: int = -2
         self._gravity_function(
             cost_args=best_params,
             **(gravity_kwargs | kwargs),
@@ -625,7 +625,7 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
         )
         if should_use_perceived:
             # Start with 1000 if perceived factor run
-            self._attempt_id = 1000
+            self._attempt_id: int = 1000
 
             self._calculate_perceived_factors(
                 target_cost_distribution, self.achieved_band_share
@@ -778,7 +778,7 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
         )
         if should_use_perceived:
             # Start with 1000 if perceived factor run
-            self._attempt_id = 1000
+            self._attempt_id: int = 1000
             self._calculate_perceived_factors(
                 target_cost_distribution, self.achieved_band_share
             )
