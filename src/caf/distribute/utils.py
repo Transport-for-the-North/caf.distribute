@@ -1,7 +1,5 @@
 # -*- coding: utf-8 -*-
-"""
-Module for miscellaneous utilities for the package
-"""
+"""Module for miscellaneous utilities for the package."""
 # Built-Ins
 from typing import Literal
 import functools
@@ -9,8 +7,6 @@ import functools
 # Third Party
 import numpy as np
 import pandas as pd
-from caf.toolkit import cost_utils
-from caf.distribute.gravity_model import multi_area
 
 # Local Imports
 # pylint: disable=import-error,wrong-import-position
@@ -53,46 +49,6 @@ def infill_cost_matrix(
     cost_matrix[cost_matrix > 1e10] = zeros_infill
     cost_matrix[cost_matrix == 0] = zeros_infill
     return cost_matrix
-
-
-def process_tlds(
-    tlds: pd.DataFrame,
-    cat_col: str,
-    min_col: str,
-    max_col: str,
-    ave_col: str,
-    trips_col: str,
-    tld_lookup: pd.DataFrame,
-    lookup_cat_col: str,
-    lookup_zone_col: str,
-    function_params: dict[str, float],
-) -> list[multi_area.MultiCostDistribution]:
-    """
-    Read in a dataframe of distributions by category and a lookup, and return
-    a list of distributions ready to be passed to a multi area gravity model.
-    """
-    tlds = tlds.set_index(cat_col)
-    tld_lookup = tld_lookup.sort_values(lookup_zone_col)
-    dists = []
-    for cat in tlds.index.unique():
-        tld = tlds.loc[cat]
-        tld = cost_utils.CostDistribution(
-            tld, min_col=min_col, max_col=max_col, avg_col=ave_col, trips_col=trips_col
-        )
-        zones = tld_lookup[tld_lookup[lookup_cat_col] == cat].index.values
-        if len(zones) == 0:
-            raise ValueError(
-                f"{cat} doesn't seem to appear in the given tld "
-                "lookup. Check for any typos (e.g. lower/upper case). "
-                f"If this is expected, remove {cat} from your "
-                "tlds dataframe before inputting."
-            )
-        distribution = multi_area.MultiCostDistribution(
-            name=cat, cost_distribution=tld, zones=zones, function_params=function_params
-        )
-        dists.append(distribution)
-
-    return dists
 
 
 def validate_zones(

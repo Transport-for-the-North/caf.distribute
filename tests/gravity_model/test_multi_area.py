@@ -151,12 +151,6 @@ class TestUtils:
     def test_infill_costs(self, costs, infilled, expected_infilled):
         assert np.array_equal(np.round(expected_infilled, 3), np.round(infilled, 3))
 
-    def test_tld_processing_length(self, distributions_sorted):
-        assert len(distributions_sorted) == 4
-
-    def test_tld_processing_type(self, distributions_sorted):
-        assert isinstance(distributions_sorted[0], gm.MultiCostDistribution)
-
 
 class TestDist:
     @pytest.mark.parametrize("area", ["City", "Town", "External", "Village"])

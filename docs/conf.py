@@ -11,8 +11,6 @@
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 
 
-
-
 # -- Project information -----------------------------------------------------
 import sys
 import os
@@ -23,9 +21,6 @@ dir_path = Path(__file__).parents[1]
 source = dir_path / "src" / "caf" / "distribute"
 
 sys.path.insert(0, os.path.abspath(str(source)))
-
-
-
 
 
 project = "caf.distribute"

@@ -3,9 +3,8 @@
 # Built-Ins
 import logging
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Optional
 import os
-from typing import Optional
 from pathlib import Path
 import functools
 
@@ -27,8 +26,11 @@ LOG = logging.getLogger(__name__)
 
 # # # CLASSES # # #
 class MultiDistInput(BaseConfig):
-
     """
+    Input to multi cost distribution calibrator.
+
+    Parameters
+    ----------
     TLDFile: Path
         Path to a file containing distributions. This should contain 5 columns,
         the names of which must be specified below.
@@ -94,7 +96,6 @@ class MultiCostDistribution:
 
     Parameters
     ----------
-
     name: str
         The name of the distribution (this will usually identify the area
         applicable e.g. City, Rural)
@@ -190,7 +191,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             self.furness_jac = params.furness_jac
 
     def process_tlds(self):
-        """Get distributions in the right format for a multi-area gravity model"""
+        """Get distributions in the right format for a multi-area gravity model."""
         dists = []
         for cat in self.tlds.index.unique():
             tld = self.tlds.loc[cat]
@@ -220,7 +221,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
 
     @property
     def achieved_band_share(self) -> np.ndarray:
-        """Analogous to _achieved_band_shares but for a multi-tld"""
+        """Overload achieved_band _share for multiple bands."""
         if self.achieved_cost_dist is None:
             raise ValueError("Gravity model has not been run. achieved_band_share is not set.")
         shares = []
@@ -238,7 +239,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             )
             base_mat[dist.zones] = mat_slice
         return base_mat
-
+# pylint: disable=too-many-locals
     def _calibrate(
         self,
         diff_step: float = 1e-8,
@@ -445,7 +446,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
     ):
         del running_log_path
         # Build empty jacobian matrix
-        jac_length = sum([len(dist.cost_distribution) for dist in cost_distributions])
+        jac_length = sum(len(dist.cost_distribution) for dist in cost_distributions)
         jac_width = len(cost_distributions) * params_len
         jacobian = np.zeros((jac_length, jac_width))
         # Build seed matrix
@@ -560,6 +561,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
 
         return achieved_residuals
 
+# pylint:enable=too-many-locals
     def run(self):
         """
         Run the gravity_model without calibrating.
