@@ -7,6 +7,21 @@ from caf.toolkit import cost_utils
 from caf.distribute import gravity_model as gm, cost_functions
 from caf.distribute import utils
 
+@pytest.fixture(name="cost_from_code", scope="session")
+def fixture_code_costs():
+    np.random.seed(42)
+    data = np.random.randint(1, 101, size=(10, 10)).astype(float)
+    np.fill_diagonal(data, 0)
+    df = pd.DataFrame(data, columns=[i+1 for i in range(10)], index=[i+1 for i in range(10)])
+    return df
+
+@pytest.fixture(name="infilled_expected", scope="session")
+def fix_infilled_exp(cost_from_code):
+    mat = cost_from_code.values
+    np.fill_diagonal(mat, 101)
+    min = np.min(mat, axis=1)
+    np.fill_diagonal(mat, min/2)
+    return mat
 
 @pytest.fixture(name="data_dir", scope="session")
 def fixture_data_dir():
@@ -46,9 +61,9 @@ def fixture_lookup(data_dir):
 
 
 @pytest.fixture(name="infilled", scope="session")
-def fixture_infill(costs):
-    wide_costs = costs.unstack().fillna(np.inf) / 1000
-    infilled = utils.infill_cost_matrix(wide_costs.values)
+def fixture_infill(cost_from_code):
+    # wide_costs = cost_from_code.unstack().fillna(np.inf) / 1000
+    infilled = utils.infill_cost_matrix(cost_from_code.values)
     return infilled
 
 
@@ -148,8 +163,8 @@ def fixture_cal_furness(data_dir, infilled, furness_jac_conf, trip_ends, mock_di
 
 
 class TestUtils:
-    def test_infill_costs(self, costs, infilled, expected_infilled):
-        assert np.array_equal(np.round(expected_infilled, 3), np.round(infilled, 3))
+    def test_infill_costs(self, infilled, infilled_expected):
+        assert np.array_equal(np.round(infilled_expected, 3), np.round(infilled, 3))
 
 
 class TestDist:
