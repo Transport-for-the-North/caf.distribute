@@ -7,21 +7,26 @@ from caf.toolkit import cost_utils
 from caf.distribute import gravity_model as gm, cost_functions
 from caf.distribute import utils
 
+
 @pytest.fixture(name="cost_from_code", scope="session")
 def fixture_code_costs():
     np.random.seed(42)
     data = np.random.randint(1, 101, size=(10, 10)).astype(float)
     np.fill_diagonal(data, 0)
-    df = pd.DataFrame(data, columns=[i+1 for i in range(10)], index=[i+1 for i in range(10)])
+    df = pd.DataFrame(
+        data, columns=[i + 1 for i in range(10)], index=[i + 1 for i in range(10)]
+    )
     return df
+
 
 @pytest.fixture(name="infilled_expected", scope="session")
 def fix_infilled_exp(cost_from_code):
     mat = cost_from_code.values
     np.fill_diagonal(mat, 101)
     min = np.min(mat, axis=1)
-    np.fill_diagonal(mat, min/2)
+    np.fill_diagonal(mat, min / 2)
     return mat
+
 
 @pytest.fixture(name="data_dir", scope="session")
 def fixture_data_dir():
