@@ -66,10 +66,14 @@ def fixture_lookup(data_dir):
 
 
 @pytest.fixture(name="infilled", scope="session")
-def fixture_infill(cost_from_code):
-    # wide_costs = cost_from_code.unstack().fillna(np.inf) / 1000
-    infilled = utils.infill_cost_matrix(cost_from_code.values)
+def fixture_infill(costs):
+    wide_costs = costs.unstack().fillna(np.inf) / 1000
+    infilled = utils.infill_cost_matrix(wide_costs.values)
     return infilled
+
+@pytest.fixture(name="infilled_from_code", scope="session")
+def fixture_infilled_from_code(cost_from_code):
+    return utils.infill_cost_matrix(cost_from_code.values)
 
 
 @pytest.fixture(name="expected_infilled", scope="session")
@@ -168,8 +172,8 @@ def fixture_cal_furness(data_dir, infilled, furness_jac_conf, trip_ends, mock_di
 
 
 class TestUtils:
-    def test_infill_costs(self, infilled, infilled_expected):
-        assert np.array_equal(np.round(infilled_expected, 3), np.round(infilled, 3))
+    def test_infill_costs(self, infilled_from_code, infilled_expected):
+        assert np.array_equal(np.round(infilled_expected, 3), np.round(infilled_from_code, 3))
 
 
 class TestDist:
