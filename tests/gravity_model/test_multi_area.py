@@ -71,6 +71,7 @@ def fixture_infill(costs):
     infilled = utils.infill_cost_matrix(wide_costs.values)
     return infilled
 
+
 @pytest.fixture(name="infilled_from_code", scope="session")
 def fixture_infilled_from_code(cost_from_code):
     return utils.infill_cost_matrix(cost_from_code.values)
