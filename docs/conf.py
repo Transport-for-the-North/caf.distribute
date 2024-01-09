@@ -76,5 +76,4 @@ master_doc = "index"
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ["_static"]
 
-# autodoc_mock_imports = ["caf", "caf.distribute"]
 autodoc_typehints = "description"
