@@ -310,12 +310,12 @@ def triply_constrained_furness(
         if cur_rmse < tol:
             early_exit = True
             break
-        if early_exit is not True:
-            warnings.warn(
-                f"The doubly constrained furness exhausted its max "
-                f"number of loops ({max_iters:d}), while achieving an RMSE "
-                f"difference of {cur_rmse:f}. The values returned may not be "
-                f"accurate."
-            )
+    if not early_exit:
+        warnings.warn(
+            f"The triply constrained furness exhausted its max "
+            f"number of loops ({max_iters:d}), while achieving an RMSE "
+            f"difference of {cur_rmse:f}. The values returned may not be "
+            f"accurate."
+        )
 
     return furnessed_mat
