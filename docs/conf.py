@@ -17,10 +17,6 @@ import os
 from pathlib import Path
 import caf.distribute
 
-dir_path = Path(__file__).parents[1]
-source = dir_path / "src" / "caf" / "distribute"
-
-sys.path.insert(0, os.path.abspath(str(source)))
 
 
 project = "caf.distribute"
