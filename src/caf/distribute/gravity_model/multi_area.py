@@ -36,7 +36,7 @@ class MultiDistInput(BaseConfig):
         Path to a file containing distributions. This should contain 5 columns,
         the names of which must be specified below.
     tld_lookup_file: Path
-        Path to a lookup from distribtion areas to zones. Should contain 2
+        Path to a lookup from distribution areas to zones. Should contain 2
         columns which are explained below.
     cat_col: str
         The name of the column containing distribution area/categories in TLDFile.
