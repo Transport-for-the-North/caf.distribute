@@ -104,6 +104,7 @@ max-statements = 100
 packages = ["caf.distribute"]
 ignore_missing_imports = true
 allow_redefinition = true
+allow_untyped_globals = true
 
 [tool.pydocstyle]
 convention = "numpy"
