@@ -1,10 +1,15 @@
-import pytest
-import numpy as np
-import pandas as pd
+# Built-Ins
 from pathlib import Path
 
+# Third Party
+import numpy as np
+import pandas as pd
+import pytest
 from caf.toolkit import cost_utils
-from caf.distribute import gravity_model as gm, cost_functions
+
+# Local Imports
+from caf.distribute import cost_functions
+from caf.distribute import gravity_model as gm
 from caf.distribute import utils
 
 

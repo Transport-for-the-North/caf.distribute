@@ -2,13 +2,11 @@
 """Tests for the {} module"""
 # Built-Ins
 import dataclasses
-
 from typing import Any
 
 # Third Party
-import pytest
 import numpy as np
-
+import pytest
 
 # Local Imports
 # pylint: disable=import-error,wrong-import-position

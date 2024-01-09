@@ -1,24 +1,23 @@
 # -*- coding: utf-8 -*-
 """Implementation of a self-calibrating single area gravity model."""
 # Built-Ins
+import functools
 import logging
 import os
-import functools
-
 from typing import Any, Optional
 
 # Third Party
 import numpy as np
-from scipy import optimize
 from caf.toolkit import cost_utils, timing, toolbox
+from scipy import optimize
 
 # Local Imports
 # pylint: disable=import-error,wrong-import-position
 from caf.distribute import cost_functions, furness
 from caf.distribute.gravity_model import (
-    core,
     GravityModelCalibrateResults,
     GravityModelRunResults,
+    core,
 )
 
 # pylint: enable=import-error,wrong-import-position

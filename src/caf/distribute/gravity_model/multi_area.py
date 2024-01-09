@@ -1,24 +1,23 @@
 # -*- coding: utf-8 -*-
 """Implementation of a self-calibrating single area gravity model."""
 # Built-Ins
-import logging
-from dataclasses import dataclass
-from typing import Any, Optional
-import os
-from pathlib import Path
 import functools
+import logging
+import os
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Optional
 
 # Third Party
 import numpy as np
 import pandas as pd
+from caf.toolkit import BaseConfig, cost_utils, timing
 from scipy import optimize
-from caf.distribute.gravity_model.core import GravityModelCalibrateResults
 
 # Local Imports
-from caf.toolkit import cost_utils, timing, BaseConfig
-from caf.distribute.gravity_model import core
 from caf.distribute import cost_functions, furness
-
+from caf.distribute.gravity_model import core
+from caf.distribute.gravity_model.core import GravityModelCalibrateResults
 
 # # # CONSTANTS # # #
 LOG = logging.getLogger(__name__)
@@ -32,10 +31,10 @@ class MultiDistInput(BaseConfig):
 
     Parameters
     ----------
-    TLDFile: Path
+    tld_file: Path
         Path to a file containing distributions. This should contain 5 columns,
         the names of which must be specified below.
-    TldLookupFile: Path
+    tld_lookup_file: Path
         Path to a lookup from distribtion areas to zones. Should contain 2
         columns which are explained below.
     cat_col: str
@@ -75,8 +74,8 @@ class MultiDistInput(BaseConfig):
         quicker with it set to False.
     """
 
-    TLDFile: Path
-    TldLookupFile: Path
+    tld_file: Path
+    tld_lookup_file: Path
     cat_col: str
     min_col: str
     max_col: str
@@ -167,7 +166,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         if len(col_targets) != cost_matrix.shape[1]:
             raise IndexError("col_targets doesn't match cost_matrix")
         if params is not None:
-            self.tlds = pd.read_csv(params.TLDFile)
+            self.tlds = pd.read_csv(params.tld_file)
             self.tlds.rename(
                 columns={
                     params.cat_col: "cat",
@@ -178,7 +177,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
                 },
                 inplace=True,
             )
-            self.lookup = pd.read_csv(params.TldLookupFile)
+            self.lookup = pd.read_csv(params.tld_lookup_file)
             self.lookup.rename(
                 columns={params.lookup_zone_col: "zone", params.lookup_cat_col: "cat"},
                 inplace=True,

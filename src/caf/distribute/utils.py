@@ -1,14 +1,13 @@
 # -*- coding: utf-8 -*-
 """Module for miscellaneous utilities for the package."""
 # Built-Ins
-from typing import Literal
 import functools
+from typing import Literal
 
 # Third Party
 import numpy as np
 import pandas as pd
 
-# Local Imports
 # pylint: disable=import-error,wrong-import-position
 # Local imports here
 # pylint: enable=import-error,wrong-import-position
