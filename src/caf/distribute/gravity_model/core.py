@@ -56,6 +56,11 @@ class GravityModelResults:
     cost_convergence: float
     value_distribution: np.ndarray
 
+    def save(self, out_dir):
+        self.cost_distribution.df.to_csv(out_dir / "distribution.csv")
+        pd.DataFrame(self.value_distribution).to_csv(out_dir / "matrix.csv")
+
+
 
 @dataclasses.dataclass
 class GravityModelCalibrateResults(GravityModelResults):
