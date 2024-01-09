@@ -124,30 +124,29 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
 
     Parameters
     ----------
-    row_targets:
+    row_targets: np.ndarray
         The targets for each row that the gravity model should be aiming to
         match. This can alternatively be thought of as the rows that wish to
         be distributed.
 
-    col_targets:
+    col_targets: np.ndarray
         The targets for each column that the gravity model should be
         aiming to match. This can alternatively be thought of as the
         columns that wish to be distributed.
 
-    cost_matrix:
+    cost_matrix: np.ndarray
         A matrix detailing the cost between each and every zone. This
         matrix must be the same size as
         `(len(row_targets), len(col_targets))`.
 
-    cost_function:
+    cost_function: cost_functions.CostFunction
         The cost function to use when calibrating the gravity model. This
         function is applied to `cost_matrix` before Furnessing during
         calibration.
 
-    target_cost_distributions:
-        A list of cost distributions for the model. See documentation for the
-        class MultiCostDistribution. All zones in the cost_matrix/targets must
-        be accounted for, and should only appear in one distribution each.
+    params: Optional[MultiDistInput]
+        Info needed for a multi-distribution gravity model. See documentation
+        for MultiDistInput.
     """
 
     def __init__(
