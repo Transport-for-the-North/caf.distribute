@@ -99,12 +99,12 @@ class GravityModelCalibrateResults(GravityModelResults):
         as the user decides.
         """
         fig, ax = plt.subplots(figsize=(10, 6))
-        df_1 = self.cost_distribution.df
+        df_1 = self.cost_distribution.df.copy()
         df_1["normalised"] = (
             df_1[self.target_cost_distribution.trips_col]
             / df_1[self.target_cost_distribution.trips_col].sum()
         )
-        df_2 = self.target_cost_distribution.df
+        df_2 = self.target_cost_distribution.df.copy()
         df_2["normalised"] = (
             df_2[self.cost_distribution.trips_col]
             / df_2[self.cost_distribution.trips_col].sum()
@@ -115,7 +115,7 @@ class GravityModelCalibrateResults(GravityModelResults):
             width=self.cost_distribution.max_vals - self.cost_distribution.min_vals,
             label="Achieved Distribution",
             color="blue",
-            alpha=0.7,
+            alpha=0.5,
         )
         ax.bar(
             self.cost_distribution.avg_vals,
@@ -124,7 +124,7 @@ class GravityModelCalibrateResults(GravityModelResults):
             - self.target_cost_distribution.min_vals,
             label="Target Distribution",
             color="orange",
-            alpha=0.7,
+            alpha=0.5,
         )
 
         ax.set_xlabel("Cost")
