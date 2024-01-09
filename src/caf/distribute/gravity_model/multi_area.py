@@ -11,8 +11,8 @@ from typing import Any, Optional
 # Third Party
 import numpy as np
 import pandas as pd
-from caf.toolkit import BaseConfig, cost_utils, timing
 from scipy import optimize
+from caf.toolkit import BaseConfig, cost_utils, timing
 
 # Local Imports
 from caf.distribute import cost_functions, furness

@@ -8,19 +8,16 @@ from typing import Any, Optional
 
 # Third Party
 import numpy as np
-from caf.toolkit import cost_utils, timing, toolbox
 from scipy import optimize
+from caf.toolkit import cost_utils, timing, toolbox
 
 # Local Imports
-# pylint: disable=import-error,wrong-import-position
 from caf.distribute import cost_functions, furness
 from caf.distribute.gravity_model import (
     GravityModelCalibrateResults,
     GravityModelRunResults,
     core,
 )
-
-# pylint: enable=import-error,wrong-import-position
 
 
 # # # CONSTANTS # # #

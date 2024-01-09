@@ -11,17 +11,12 @@ from typing import Any, Optional
 # Third Party
 import numpy as np
 import pandas as pd
-from caf.toolkit import cost_utils, io, timing
 from matplotlib import pyplot as plt
 from scipy import optimize
+from caf.toolkit import cost_utils, io, timing
 
 # Local Imports
 from caf.distribute import cost_functions
-
-# pylint: disable=import-error,wrong-import-position
-
-
-# pylint: enable=import-error,wrong-import-position
 
 # # # CONSTANTS # # #
 LOG = logging.getLogger(__name__)
