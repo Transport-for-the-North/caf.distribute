@@ -24,6 +24,7 @@ LOG = logging.getLogger(__name__)
 
 
 # pylint:disable=duplicate-code
+# Furness called with same parameters in single and multi-area
 # # # CLASSES # # #
 class MultiDistInput(BaseConfig):
     """

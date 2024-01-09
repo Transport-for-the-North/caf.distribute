@@ -110,8 +110,8 @@ def fixture_dists(data_dir, distributions):
 @pytest.fixture(name="no_furness_jac_conf", scope="session")
 def fixture_conf(data_dir, mock_dir):
     conf = gm.MultiDistInput(
-        TLDFile=data_dir / "distributions.csv",
-        TldLookupFile=data_dir / "distributions_lookup.csv",
+        tld_file=data_dir / "distributions.csv",
+        tld_lookup_file=data_dir / "distributions_lookup.csv",
         cat_col="cat",
         min_col="lower",
         max_col="upper",
@@ -130,8 +130,8 @@ def fixture_conf(data_dir, mock_dir):
 @pytest.fixture(name="furness_jac_conf", scope="session")
 def fixture_jac_furn(data_dir, mock_dir):
     conf = gm.MultiDistInput(
-        TLDFile=data_dir / "distributions.csv",
-        TldLookupFile=data_dir / "distributions_lookup.csv",
+        tld_file=data_dir / "distributions.csv",
+        tld_lookup_file=data_dir / "distributions_lookup.csv",
         cat_col="cat",
         min_col="lower",
         max_col="upper",
