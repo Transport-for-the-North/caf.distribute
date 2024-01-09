@@ -1,11 +1,36 @@
-import pytest
-import numpy as np
-import pandas as pd
+# Built-Ins
 from pathlib import Path
 
+# Third Party
+import numpy as np
+import pandas as pd
+import pytest
 from caf.toolkit import cost_utils
-from caf.distribute import gravity_model as gm, cost_functions
+
+# Local Imports
+from caf.distribute import cost_functions
+from caf.distribute import gravity_model as gm
 from caf.distribute import utils
+
+
+@pytest.fixture(name="cost_from_code", scope="session")
+def fixture_code_costs():
+    np.random.seed(42)
+    data = np.random.randint(1, 101, size=(10, 10)).astype(float)
+    np.fill_diagonal(data, 0)
+    df = pd.DataFrame(
+        data, columns=[i + 1 for i in range(10)], index=[i + 1 for i in range(10)]
+    )
+    return df
+
+
+@pytest.fixture(name="infilled_expected", scope="session")
+def fix_infilled_exp(cost_from_code):
+    mat = cost_from_code.values
+    np.fill_diagonal(mat, 101)
+    min = np.min(mat, axis=1)
+    np.fill_diagonal(mat, min / 2)
+    return mat
 
 
 @pytest.fixture(name="data_dir", scope="session")
@@ -52,6 +77,11 @@ def fixture_infill(costs):
     return infilled
 
 
+@pytest.fixture(name="infilled_from_code", scope="session")
+def fixture_infilled_from_code(cost_from_code):
+    return utils.infill_cost_matrix(cost_from_code.values)
+
+
 @pytest.fixture(name="expected_infilled", scope="session")
 def fixture_infilled(data_dir):
     costs_df = pd.read_csv(data_dir / "costs_infilled.csv", index_col=0)
@@ -80,8 +110,8 @@ def fixture_dists(data_dir, distributions):
 @pytest.fixture(name="no_furness_jac_conf", scope="session")
 def fixture_conf(data_dir, mock_dir):
     conf = gm.MultiDistInput(
-        TLDFile=data_dir / "distributions.csv",
-        TldLookupFile=data_dir / "distributions_lookup.csv",
+        tld_file=data_dir / "distributions.csv",
+        tld_lookup_file=data_dir / "distributions_lookup.csv",
         cat_col="cat",
         min_col="lower",
         max_col="upper",
@@ -100,8 +130,8 @@ def fixture_conf(data_dir, mock_dir):
 @pytest.fixture(name="furness_jac_conf", scope="session")
 def fixture_jac_furn(data_dir, mock_dir):
     conf = gm.MultiDistInput(
-        TLDFile=data_dir / "distributions.csv",
-        TldLookupFile=data_dir / "distributions_lookup.csv",
+        tld_file=data_dir / "distributions.csv",
+        tld_lookup_file=data_dir / "distributions_lookup.csv",
         cat_col="cat",
         min_col="lower",
         max_col="upper",
@@ -148,8 +178,10 @@ def fixture_cal_furness(data_dir, infilled, furness_jac_conf, trip_ends, mock_di
 
 
 class TestUtils:
-    def test_infill_costs(self, costs, infilled, expected_infilled):
-        assert np.array_equal(np.round(expected_infilled, 3), np.round(infilled, 3))
+    # only one test currently so leaving in this file
+    def test_infill_costs(self, infilled_from_code, infilled_expected):
+        """Test the method to infill a cost matrix (mainly intrazonal costs)"""
+        assert np.array_equal(np.round(infilled_expected, 3), np.round(infilled_from_code, 3))
 
 
 class TestDist:

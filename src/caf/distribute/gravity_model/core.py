@@ -11,16 +11,12 @@ from typing import Any, Optional
 # Third Party
 import numpy as np
 import pandas as pd
+from matplotlib import pyplot as plt, figure
 from scipy import optimize
-from matplotlib import pyplot as plt
 from caf.toolkit import cost_utils, io, timing
-from caf.distribute import cost_functions
 
 # Local Imports
-# pylint: disable=import-error,wrong-import-position
-
-
-# pylint: enable=import-error,wrong-import-position
+from caf.distribute import cost_functions
 
 # # # CONSTANTS # # #
 LOG = logging.getLogger(__name__)
@@ -95,8 +91,13 @@ class GravityModelCalibrateResults(GravityModelResults):
     cost_function: cost_functions.CostFunction
     cost_params: dict[str, Any]
 
-    def plot_distributions(self):
-        """Plot a comparison of the achieved and target distributions."""
+    def plot_distributions(self) -> figure.Figure:
+        """
+        Plot a comparison of the achieved and target distributions.
+
+        This method returns a matplotlib figure which can be saved or plotted
+        as the user decides.
+        """
         fig, ax = plt.subplots(figsize=(10, 6))
         df_1 = self.cost_distribution.df
         df_1["normalised"] = (
