@@ -178,7 +178,7 @@ def fixture_cal_furness(data_dir, infilled, furness_jac_conf, trip_ends, mock_di
 
 
 class TestUtils:
-    # only one test currently so leaving in this file
+    # TODO(IS) only one test currently so leaving in this file
     def test_infill_costs(self, infilled_from_code, infilled_expected):
         """Test the method to infill a cost matrix (mainly intrazonal costs)"""
         assert np.array_equal(np.round(infilled_expected, 3), np.round(infilled_from_code, 3))

@@ -45,6 +45,7 @@ def infill_cost_matrix(
     min_row = np.min(np.ma.masked_where(cost_matrix <= 0, cost_matrix), axis=1) * diag_factor
 
     np.fill_diagonal(cost_matrix, min_row)
+    # Needed due to a bug in np.fill_diagonal
     cost_matrix[cost_matrix > 1e10] = zeros_infill
     cost_matrix[cost_matrix == 0] = zeros_infill
     return cost_matrix
