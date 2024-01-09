@@ -102,9 +102,9 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
         end_time = timing.current_milli_time()
         self._log_iteration(
             log_path=running_log_path,
-            attempt_id=self._attempt_id,
+            attempt_id=self._attempt_id, # type: ignore
             loop_num=self._loop_num,
-            loop_time=(end_time - self._loop_start_time) / 1000,
+            loop_time=(end_time - self._loop_start_time) / 1000, # type: ignore
             cost_kwargs=cost_kwargs,
             furness_iters=iters,
             furness_rmse=rmse,
@@ -121,9 +121,9 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
         self.achieved_distribution = matrix
 
         # Store the initial values to log later
-        if self.initial_cost_params is None:
+        if self.initial_cost_params is None: # type: ignore
             self.initial_cost_params = cost_kwargs
-        if self.initial_convergence is None:
+        if self.initial_convergence is None: # type: ignore
             self.initial_convergence = convergence
 
         return achieved_residuals
@@ -350,7 +350,7 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
                 self.achieved_convergence,
                 failure_tol,
             )
-            self._attempt_id += 1
+            self._attempt_id += 1 # type: ignore
             ordered_init_params = self._order_cost_params(self.cost_function.default_params)
             result = optimise_cost_params(x0=ordered_init_params)
 
@@ -368,9 +368,9 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
                 self.achieved_convergence,
                 failure_tol,
             )
-            self._attempt_id += 100
+            self._attempt_id += 100 # type: ignore
             for i in range(n_random_tries):
-                self._attempt_id += i
+                self._attempt_id += i # type: ignore
                 random_params = self.cost_function.random_valid_params()
                 ordered_init_params = self._order_cost_params(random_params)
                 result = optimise_cost_params(x0=ordered_init_params)
