@@ -581,6 +581,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             running_log_path=self.log_path,
             params_len=params_len,
         )
+        results = {}
 
         if triply_constrain:
             # create seed matrix from parameters
@@ -596,11 +597,10 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             # triply contrained furness on seed matrix
             # tol is higher as it is more difficult to converge when triply contrained
             new_mat = furness.triply_constrained_furness(
-                props_list, self.row_targets, self.col_targets, 5000, self.cost_matrix.shape, 1
+                props_list, self.row_targets, self.col_targets, 5000, self.cost_matrix.shape, 0.01
             )
 
             assert self.achieved_cost_dist is not None
-            triple_results = {}
             for i, dist in enumerate(self.dists):
                 (
                     single_cost_distribution,
@@ -612,6 +612,8 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
                     target_cost_distribution=dist.cost_distribution,
                 )
 
+                self.achieved_distribution[dist.zones] = new_mat[dist.zones]
+
                 gresult = GravityModelCalibrateResults(
                     cost_distribution=single_cost_distribution,
                     cost_convergence=single_convergence,
@@ -619,13 +621,15 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
                     target_cost_distribution=dist.cost_distribution,
                     cost_function=self.cost_function,
                     cost_params=self._cost_params_to_kwargs(
-                        cost_args[i * params_len : i * params_len + params_len]
+                        cost_args[i * params_len: i * params_len + params_len]
                     ),
                 )
 
-                triple_results[dist.name] = gresult
-        results = {}
+                results[dist.name] = gresult
+            return results
+
         for i, dist in enumerate(self.dists):
+
             gresult = GravityModelCalibrateResults(
                 cost_distribution=self.achieved_cost_dist[i],
                 cost_convergence=self.achieved_convergence[dist.name],
@@ -633,7 +637,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
                 target_cost_distribution=dist.cost_distribution,
                 cost_function=self.cost_function,
                 cost_params=self._cost_params_to_kwargs(
-                    cost_args[i * params_len : i * params_len + params_len]
+                    cost_args[i * params_len: i * params_len + params_len]
                 ),
             )
 
