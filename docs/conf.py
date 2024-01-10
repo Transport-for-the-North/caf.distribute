@@ -18,7 +18,6 @@ from pathlib import Path
 import caf.distribute
 
 
-
 project = "caf.distribute"
 copyright = "2023, Transport for the North"
 author = "Transport for the North"
