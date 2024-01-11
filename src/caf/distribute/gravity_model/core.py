@@ -161,18 +161,18 @@ class GravityModelCalibrateResults(GravityModelResults):
         fig, ax = plt.subplots(figsize=(10, 6))
         df_1 = self.cost_distribution.df.copy()
         df_1["normalised"] = (
-            df_1[self.target_cost_distribution.trips_col]
-            / df_1[self.target_cost_distribution.trips_col].sum()
+            df_1[self.cost_distribution.trips_col]
+            / df_1[self.cost_distribution.trips_col].sum()
         )
-        df_1 = df_1.set_index(self.target_cost_distribution.avg_col)["normalised"].to_frame()
-        df_1["distribution"] = "target"
+        df_1 = df_1.set_index(self.cost_distribution.avg_col)["normalised"].to_frame()
+        df_1["distribution"] = "achieved"
         df_2 = self.target_cost_distribution.df.copy()
         df_2["normalised"] = (
-            df_2[self.cost_distribution.trips_col]
-            / df_2[self.cost_distribution.trips_col].sum()
+            df_2[self.target_cost_distribution.trips_col]
+            / df_2[self.target_cost_distribution.trips_col].sum()
         )
-        df_2 = df_2.set_index(self.cost_distribution.avg_col)["normalised"].to_frame()
-        df_2["distribution"] = "achieved"
+        df_2 = df_2.set_index(self.target_cost_distribution.avg_col)["normalised"].to_frame()
+        df_2["distribution"] = "target"
 
         kde_plotter = pd.concat([df_1, df_2]).reset_index()
         kde_plotter.columns = ["Cost", "Demand Share", "Distribution"]

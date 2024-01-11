@@ -241,7 +241,6 @@ def triply_constrained_furness(
     cur_rmse = np.inf
     iter_num = 0
     n_vals = len(row_targets)
-
     # build seed
     furnessed_mat = np.zeros(mat_size)
     for distro in props:

@@ -566,12 +566,17 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
 
         return achieved_residuals
 
-    def run(self, triply_constrain: bool = False):
+    def run(self, triply_constrain: bool = False, xamax: int = 3):
         """
         Run the gravity_model without calibrating.
 
         This should be done when you have calibrated previously to find the
         correct parameters for the cost function.
+
+        Parameters
+        ----------
+        triply_constrain: bool = False
+            Choose whether to run a triply constrained furness after
         """
         params_len = len(self.dists[0].function_params)
         cost_args = []
@@ -590,11 +595,19 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         if triply_constrain:
             # create seed matrix from parameters
             props_list = []
-            for dist in self.dists:
+            for i, dist in enumerate(self.dists):
+                achieved = self.achieved_cost_dist[i].df.copy()
+                target = dist.cost_distribution.df.copy().reset_index()
+                achieved['normalised'] = achieved[self.achieved_cost_dist[i].trips_col] / achieved[self.achieved_cost_dist[i].trips_col].sum()
+                target['normalised'] = target[dist.cost_distribution.trips_col] / target[
+                    dist.cost_distribution.trips_col].sum()
+                target.loc[target['normalised']>achieved['normalised']*xamax, 'normalised'] = achieved.loc[target['normalised']>achieved['normalised']*xamax, 'normalised'] * xamax
+                target.loc[target['normalised'] < achieved['normalised'] / xamax, 'normalised'] = \
+                achieved.loc[target['normalised'] < achieved['normalised'] / xamax, 'normalised'] / xamax
                 prop_cost, band_vals = furness.cost_to_prop(
                     self.cost_matrix[dist.zones],
-                    dist.cost_distribution.df.drop("ave", axis=1),
-                    val_col="trips",
+                    target[[dist.cost_distribution.min_col, dist.cost_distribution.max_col, 'normalised']],
+                    val_col="normalised",
                 )
                 props = furness.props_input(prop_cost, dist.zones, band_vals)
                 props_list.append(props)
