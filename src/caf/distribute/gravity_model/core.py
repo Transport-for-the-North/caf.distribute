@@ -7,13 +7,15 @@ import logging
 import os
 import warnings
 from typing import Any, Optional
+from pathlib import Path
 
 # Third Party
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt, figure
 from scipy import optimize
-from caf.toolkit import cost_utils, io, timing
+from caf.toolkit import cost_utils, io, timing, BaseConfig
+import seaborn as sns
 
 # Local Imports
 from caf.distribute import cost_functions
@@ -56,10 +58,17 @@ class GravityModelResults:
     cost_convergence: float
     value_distribution: np.ndarray
 
-    def save(self, out_dir):
-        self.cost_distribution.df.to_csv(out_dir / "distribution.csv")
-        pd.DataFrame(self.value_distribution).to_csv(out_dir / "matrix.csv")
+    @property
+    def achieved_rows(self):
+        return self.value_distribution.sum(axis=1)
 
+    @property
+    def achieved_cols(self):
+        return self.value_distribution.sum(axis=0)
+
+    @property
+    def matrix_total(self):
+        return self.value_distribution.sum()
 
 
 @dataclasses.dataclass
@@ -96,6 +105,52 @@ class GravityModelCalibrateResults(GravityModelResults):
     cost_function: cost_functions.CostFunction
     cost_params: dict[str, Any]
 
+    class output_yaml(BaseConfig):
+        cost_params: dict[str, Any]
+        cost_function: str
+        matrix_total: float
+        cost_convergence: float
+
+    def save(self, out_dir: Path):
+        out_dir.mkdir(parents=False, exist_ok=True)
+        achieved = self.cost_distribution.df.copy()
+        achieved["achieved_normalised_demand"] = (
+            achieved[self.cost_distribution.trips_col]
+            / achieved[self.cost_distribution.trips_col].sum()
+        )
+        target = self.target_cost_distribution.df.copy()
+        target["target_normalised_demand"] = (
+            target[self.target_cost_distribution.trips_col]
+            / target[self.target_cost_distribution.trips_col].sum()
+        )
+        target.index = achieved.index
+        dists_out = achieved.join(target["target_normalised_demand"])
+        dists_out.to_csv(out_dir / "dist_comparison.csv", index=False)
+        yaml_output = self.output_yaml(
+            cost_params=self.cost_params,
+            cost_function=self.cost_function.name,
+            matrix_total=self.matrix_total,
+            cost_convergence=self.cost_convergence,
+        )
+        yaml_output.save_yaml(out_dir / "misc_params.yml")
+
+    @property
+    def target_mean_trip_length(self):
+        temp = self.target_cost_distribution.df.copy()
+        temp["weighted"] = (
+            temp[self.target_cost_distribution.avg_col]
+            * temp[self.target_cost_distribution.trips_col]
+        )
+        return temp["weighted"].sum() / temp[self.target_cost_distribution.trips_col].sum()
+
+    @property
+    def achieved_mean_trip_length(self):
+        temp = self.cost_distribution.df.copy()
+        temp["weighted"] = (
+            temp[self.cost_distribution.avg_col] * temp[self.cost_distribution.trips_col]
+        )
+        return temp["weighted"].sum() / temp[self.cost_distribution.trips_col].sum()
+
     def plot_distributions(self) -> figure.Figure:
         """
         Plot a comparison of the achieved and target distributions.
@@ -109,33 +164,30 @@ class GravityModelCalibrateResults(GravityModelResults):
             df_1[self.target_cost_distribution.trips_col]
             / df_1[self.target_cost_distribution.trips_col].sum()
         )
+        df_1 = df_1.set_index(self.target_cost_distribution.avg_col)['normalised'].to_frame()
+        df_1['distribution'] = 'target'
         df_2 = self.target_cost_distribution.df.copy()
         df_2["normalised"] = (
             df_2[self.cost_distribution.trips_col]
             / df_2[self.cost_distribution.trips_col].sum()
         )
-        ax.bar(
-            self.cost_distribution.avg_vals,
-            self.cost_distribution.band_share_vals,
-            width=self.cost_distribution.max_vals - self.cost_distribution.min_vals,
-            label="Achieved Distribution",
-            color="blue",
-            alpha=0.5,
-        )
-        ax.bar(
-            self.cost_distribution.avg_vals,
-            self.target_cost_distribution.band_share_vals,
-            width=self.target_cost_distribution.max_vals
-            - self.target_cost_distribution.min_vals,
-            label="Target Distribution",
-            color="orange",
-            alpha=0.5,
-        )
+        df_2 = df_2.set_index(self.cost_distribution.avg_col)['normalised'].to_frame()
+        df_2['distribution'] = 'achieved'
 
-        ax.set_xlabel("Cost")
-        ax.set_ylabel("Trips")
+        kde_plotter = pd.concat([df_1, df_2]).reset_index()
+        kde_plotter.columns = ['Cost', 'Demand Share', 'Distribution']
+        sns.lineplot(data=kde_plotter, x="Cost", y="Demand Share", hue="Distribution", ax=ax)
+
         ax.set_title("Distribution Comparison")
-        ax.legend()
+        ax.text(
+            0.65,
+            0.7,
+            f"r squared = {np.round(self.cost_convergence, 4)}\n"
+            f"Achieved mean trip length = {np.round(self.achieved_mean_trip_length, 2)}\n"
+            f"Target mean trip length = {np.round(self.target_mean_trip_length, 2)}",
+            transform=ax.transAxes,
+            bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.5),
+        )
 
         return fig
 

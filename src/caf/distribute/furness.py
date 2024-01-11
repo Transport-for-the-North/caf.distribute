@@ -172,6 +172,7 @@ class props_input:
     prop_vals: np.ndarray
         The unique values in props
     """
+
     props: np.ndarray
     zones: np.ndarray
     prop_vals: np.ndarray
