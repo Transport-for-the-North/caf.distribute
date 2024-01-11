@@ -193,7 +193,7 @@ def cost_to_prop(costs: np.ndarray, bands: pd.DataFrame, val_col: str):
         The column name of the values in the bands DataFrame.
     """
     bands_sum = bands[val_col].sum()
-    bands[val_col] /= bands_sum
+    bands.loc[:, val_col] /= bands_sum
     bands_array = bands.values
     band_indices = np.zeros_like(costs, dtype=float)
     for band_start, band_end, prop in bands_array:

@@ -566,7 +566,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
 
         return achieved_residuals
 
-    def run(self, triply_constrain: bool = False, xamax: int = 3):
+    def run(self, triply_constrain: bool = False, xamax: int = 2):
         """
         Run the gravity_model without calibrating.
 
@@ -576,7 +576,8 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         Parameters
         ----------
         triply_constrain: bool = False
-            Choose whether to run a triply constrained furness after
+            Choose whether to run a triply constrained furness after running
+            gravity_function. This must be done on
         """
         params_len = len(self.dists[0].function_params)
         cost_args = []
