@@ -91,6 +91,7 @@ class MultiDistInput(BaseConfig):
 
     @property
     def log_path(self):
+        """Create path to a log file from out_path."""
         return self.out_path / "log.csv"
 
 
@@ -344,8 +345,8 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
 
     def calibrate(
         self,
-        update_params: bool = False,
         *args,
+        update_params: bool = False,
         **kwargs,
     ) -> GravityModelCalibrateResults:
         """Find the optimal parameters for self.cost_function.
@@ -637,7 +638,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
                     ],
                     val_col="normalised",
                 )
-                props = furness.props_input(prop_cost, dist.zones, band_vals)
+                props = furness.PropsInput(prop_cost, dist.zones, band_vals)
                 props_list.append(props)
             # triply contrained furness on seed matrix
             # tol is higher as it is more difficult to converge when triply contrained
@@ -654,7 +655,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             for i, dist in enumerate(self.dists):
                 (
                     single_cost_distribution,
-                    single_achieved_residuals,
+                    _,
                     single_convergence,
                 ) = core.cost_distribution_stats(
                     achieved_trip_distribution=new_mat[dist.zones],

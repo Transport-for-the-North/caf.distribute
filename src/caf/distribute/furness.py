@@ -162,7 +162,7 @@ def doubly_constrained_furness(
 
 
 @dataclass
-class props_input:
+class PropsInput:
     """
     props: np.ndarray
         This is essentially a cost matrix, but costs are replaced by the percentage
@@ -205,7 +205,7 @@ def cost_to_prop(costs: np.ndarray, bands: pd.DataFrame, val_col: str):
 
 
 def triply_constrained_furness(
-    props: list[props_input],
+    props: list[PropsInput],
     row_targets,
     col_targets,
     max_iters,
@@ -224,7 +224,7 @@ def triply_constrained_furness(
 
     Parameters
     ----------
-    props: list[props_input]
+    props: list[PropsInput]
         A list of info about cost bins. This is produced by cost_to_props
     row_targets: np.ndarray
         The targets for the rows (origins) in the matrix

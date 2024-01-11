@@ -14,8 +14,9 @@ import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt, figure
 from scipy import optimize
-from caf.toolkit import cost_utils, io, timing, BaseConfig
 import seaborn as sns
+from caf.toolkit import cost_utils, io, timing, BaseConfig
+
 
 # Local Imports
 from caf.distribute import cost_functions
@@ -60,14 +61,17 @@ class GravityModelResults:
 
     @property
     def achieved_rows(self):
+        """Return the achieved row totals."""
         return self.value_distribution.sum(axis=1)
 
     @property
     def achieved_cols(self):
+        """Return the achieved column totals."""
         return self.value_distribution.sum(axis=0)
 
     @property
     def matrix_total(self):
+        """Return the total trips in the matrix."""
         return self.value_distribution.sum()
 
 
@@ -105,13 +109,15 @@ class GravityModelCalibrateResults(GravityModelResults):
     cost_function: cost_functions.CostFunction
     cost_params: dict[str, Any]
 
-    class output_yaml(BaseConfig):
+    class OutputYaml(BaseConfig):
+        """Class for outputting some data from this class."""
         cost_params: dict[str, Any]
         cost_function: str
         matrix_total: float
         cost_convergence: float
 
     def save(self, out_dir: Path):
+        """Save method for class"""
         out_dir.mkdir(parents=False, exist_ok=True)
         achieved = self.cost_distribution.df.copy()
         achieved["achieved_normalised_demand"] = (
@@ -126,7 +132,7 @@ class GravityModelCalibrateResults(GravityModelResults):
         target.index = achieved.index
         dists_out = achieved.join(target["target_normalised_demand"])
         dists_out.to_csv(out_dir / "dist_comparison.csv", index=False)
-        yaml_output = self.output_yaml(
+        yaml_output = self.OutputYaml(
             cost_params=self.cost_params,
             cost_function=self.cost_function.name,
             matrix_total=self.matrix_total,
@@ -136,6 +142,7 @@ class GravityModelCalibrateResults(GravityModelResults):
 
     @property
     def target_mean_trip_length(self):
+        """Return the mean trip length of the target distribution."""
         temp = self.target_cost_distribution.df.copy()
         temp["weighted"] = (
             temp[self.target_cost_distribution.avg_col]
@@ -145,6 +152,7 @@ class GravityModelCalibrateResults(GravityModelResults):
 
     @property
     def achieved_mean_trip_length(self):
+        """Return the mean trip length of the achieved distribution."""
         temp = self.cost_distribution.df.copy()
         temp["weighted"] = (
             temp[self.cost_distribution.avg_col] * temp[self.cost_distribution.trips_col]

@@ -120,7 +120,7 @@ def fixture_conf(data_dir, mock_dir):
         lookup_cat_col="cat",
         lookup_zone_col="zone",
         init_params={"mu": 1, "sigma": 2},
-        log_path=mock_dir / "log.csv",
+        out_path=mock_dir,
         furness_tolerance=0.1,
         furness_jac=False,
     )
@@ -140,7 +140,7 @@ def fixture_jac_furn(data_dir, mock_dir):
         lookup_cat_col="cat",
         lookup_zone_col="zone",
         init_params={"mu": 1, "sigma": 2},
-        log_path=mock_dir / "log.csv",
+        out_path=mock_dir,
         furness_tolerance=0.1,
         furness_jac=True,
     )
@@ -158,7 +158,7 @@ def fixture_cal_no_furness(data_dir, infilled, no_furness_jac_conf, trip_ends, m
         cost_function=cost_functions.BuiltInCostFunction.LOG_NORMAL.get_cost_function(),
         params=no_furness_jac_conf,
     )
-    results = model.calibrate(running_log_path=mock_dir / "temp_log.csv")
+    results = model.calibrate()
     return results
 
 
@@ -173,7 +173,7 @@ def fixture_cal_furness(data_dir, infilled, furness_jac_conf, trip_ends, mock_di
         cost_function=cost_functions.BuiltInCostFunction.LOG_NORMAL.get_cost_function(),
         params=furness_jac_conf,
     )
-    results = model.calibrate(running_log_path=mock_dir / "temp_log.csv")
+    results = model.calibrate()
     return results
 
 
