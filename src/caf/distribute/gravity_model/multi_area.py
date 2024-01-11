@@ -596,17 +596,44 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             # create seed matrix from parameters
             props_list = []
             for i, dist in enumerate(self.dists):
+                # Limit how much the achieved distribution can be adjusted to xamax
                 achieved = self.achieved_cost_dist[i].df.copy()
                 target = dist.cost_distribution.df.copy().reset_index()
-                achieved['normalised'] = achieved[self.achieved_cost_dist[i].trips_col] / achieved[self.achieved_cost_dist[i].trips_col].sum()
-                target['normalised'] = target[dist.cost_distribution.trips_col] / target[
-                    dist.cost_distribution.trips_col].sum()
-                target.loc[target['normalised']>achieved['normalised']*xamax, 'normalised'] = achieved.loc[target['normalised']>achieved['normalised']*xamax, 'normalised'] * xamax
-                target.loc[target['normalised'] < achieved['normalised'] / xamax, 'normalised'] = \
-                achieved.loc[target['normalised'] < achieved['normalised'] / xamax, 'normalised'] / xamax
+                achieved["normalised"] = (
+                    achieved[self.achieved_cost_dist[i].trips_col]
+                    / achieved[self.achieved_cost_dist[i].trips_col].sum()
+                )
+                target["normalised"] = (
+                    target[dist.cost_distribution.trips_col]
+                    / target[dist.cost_distribution.trips_col].sum()
+                )
+                target.loc[
+                    target["normalised"] > achieved["normalised"] * xamax, "normalised"
+                ] = (
+                    achieved.loc[
+                        target["normalised"] > achieved["normalised"] * xamax, "normalised"
+                    ]
+                    * xamax
+                )
+                target.loc[
+                    target["normalised"] < achieved["normalised"] / xamax, "normalised"
+                ] = (
+                    achieved.loc[
+                        target["normalised"] < achieved["normalised"] / xamax, "normalised"
+                    ]
+                    / xamax
+                )
+                # Re-normalise after adjustment
+                target["normalised"] /= target["normalised"].sum()
                 prop_cost, band_vals = furness.cost_to_prop(
                     self.cost_matrix[dist.zones],
-                    target[[dist.cost_distribution.min_col, dist.cost_distribution.max_col, 'normalised']],
+                    target[
+                        [
+                            dist.cost_distribution.min_col,
+                            dist.cost_distribution.max_col,
+                            "normalised",
+                        ]
+                    ],
                     val_col="normalised",
                 )
                 props = furness.props_input(prop_cost, dist.zones, band_vals)
