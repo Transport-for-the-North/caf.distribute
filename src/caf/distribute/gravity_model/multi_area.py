@@ -344,7 +344,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
 
     def calibrate(
         self,
-        running_log_path: os.PathLike,
+        update_params: bool = False,
         *args,
         **kwargs,
     ) -> GravityModelCalibrateResults:
@@ -355,17 +355,8 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
 
         Parameters
         ----------
-        init_params:
-            A dictionary of {parameter_name: parameter_value} to pass
-            into the cost function as initial parameters.
-
-        running_log_path:
-            Path to output the running log to. This log will detail the
-            performance of the run and is written in .csv format.
-
-        target_cost_distribution:
-            The cost distribution to calibrate towards during the calibration
-            process.
+        update_params: bool = False
+            Choose whether the fundtion params will be updated once calibrated.
 
         diff_step:
             Copied from scipy.optimize.least_squares documentation, where it
@@ -435,13 +426,20 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         """
         for dist in self.dists:
             self.cost_function.validate_params(dist.function_params)
-        self._validate_running_log(running_log_path)
+        self._validate_running_log(self.log_path)
         self._initialise_internal_params()
-        return self._calibrate(  # type: ignore
+        results = self._calibrate(  # type: ignore
             *args,
-            running_log_path=running_log_path,
+            running_log_path=self.log_path,
             **kwargs,
         )
+        if update_params is True:
+            new_dists = []
+            for dist in self.dists:
+                dist.function_params = results[dist.name].cost_params
+                new_dists.append(dist)
+            self.dists = new_dists
+        return results
 
     def _jacobian_function(
         self,
