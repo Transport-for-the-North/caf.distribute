@@ -4,6 +4,7 @@
 import logging
 import warnings
 from dataclasses import dataclass
+from typing import Optional
 
 # Third Party
 import numpy as np
@@ -216,7 +217,7 @@ def triply_constrained_furness(
     col_targets,
     max_iters,
     mat_size: tuple[int, int],
-    init_mat: np.ndarray = None,
+    init_mat: Optional[np.ndarray] = None,
     tol=1e-5,
 ):
     """
