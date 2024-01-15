@@ -3,7 +3,6 @@
 # Built-Ins
 import functools
 import logging
-import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Optional
@@ -124,6 +123,8 @@ class MultiCostDistribution:
     function_params: dict[str, float]
 
 
+# pylint: disable=too-many-instance-attributes
+# 16 fine here
 class MultiAreaGravityModelCalibrator(core.GravityModelBase):
     """
     A self-calibrating multi-area gravity model.
@@ -164,6 +165,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         params: Optional[MultiDistInput],
     ):
         super().__init__(cost_function=cost_function, cost_matrix=cost_matrix)
+
         self.row_targets = row_targets
         self.col_targets = col_targets
         if len(row_targets) != cost_matrix.shape[0]:
@@ -195,6 +197,20 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             self.log_path = params.log_path
             self.furness_tol = params.furness_tolerance
             self.furness_jac = params.furness_jac
+
+    @property
+    def achieved_tripends(self) -> pd.DataFrame:
+        """
+        Return achieved trip-ends.
+
+        Simply sums achieved distribution over each axis.
+        """
+        return pd.DataFrame(
+            {
+                "origins": self.achieved_distribution.sum(axis=1),
+                "destinations": self.achieved_distribution.sum(axis=0),
+            }
+        )
 
     def process_tlds(self):
         """Get distributions in the right format for a multi-area gravity model."""
@@ -348,7 +364,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         *args,
         update_params: bool = False,
         **kwargs,
-    ) -> GravityModelCalibrateResults:
+    ) -> dict[str, GravityModelCalibrateResults]:
         """Find the optimal parameters for self.cost_function.
 
         Optimal parameters are found using `scipy.optimize.least_squares`
@@ -647,8 +663,9 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
                 self.row_targets,
                 self.col_targets,
                 5000,
-                self.cost_matrix.shape,
-                0.01,
+                init_mat=self.achieved_distribution,
+                mat_size=(self.cost_matrix.shape[0], self.cost_matrix.shape[1]),
+                tol=0.01,
             )
 
             assert self.achieved_cost_dist is not None
@@ -694,6 +711,9 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
 
             results[dist.name] = gresult
         return results
+
+
+# pylint: enable=too-many-instance-attributes
 
 
 def gravity_model(

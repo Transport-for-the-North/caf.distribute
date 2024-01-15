@@ -164,6 +164,11 @@ def doubly_constrained_furness(
 @dataclass
 class PropsInput:
     """
+    Input to triply constrained furness.
+
+    This is returned from cost_to_prop
+    Parameters
+    ----------
     props: np.ndarray
         This is essentially a cost matrix, but costs are replaced by the percentage
         from the given cost band.
@@ -204,12 +209,14 @@ def cost_to_prop(costs: np.ndarray, bands: pd.DataFrame, val_col: str):
     return band_indices, bands[val_col].values
 
 
+# pylint: disable=too-many-locals
 def triply_constrained_furness(
     props: list[PropsInput],
     row_targets,
     col_targets,
     max_iters,
     mat_size: tuple[int, int],
+    init_mat: np.ndarray = None,
     tol=1e-5,
 ):
     """
@@ -241,31 +248,17 @@ def triply_constrained_furness(
     cur_rmse = np.inf
     iter_num = 0
     n_vals = len(row_targets)
-    # build seed
-    furnessed_mat = np.zeros(mat_size)
-    for distro in props:
-        furnessed_mat[distro.zones] = distro.props
+    if init_mat is None:
+        # build seed
+        furnessed_mat = np.zeros(mat_size)
+        for distro in props:
+            furnessed_mat[distro.zones] = distro.props
 
-    # one row, col furness loop outside iterations
-    row_ach = np.sum(furnessed_mat, axis=1)
-    diff_factor = np.divide(
-        row_targets, row_ach, where=row_ach != 0, out=np.ones_like(row_targets, dtype=float)
-    )
-
-    furnessed_mat = np.multiply(furnessed_mat.T, diff_factor).T
-    # Adjust cols
-    col_ach = np.sum(furnessed_mat, axis=0)
-    diff_factor = np.divide(
-        col_targets,
-        col_ach,
-        where=col_ach != 0,
-        out=np.ones_like(col_targets, dtype=float),
-    )
-    furnessed_mat *= diff_factor
-    # Can return early if all 0 - probably shouldn't happen!
-    if row_targets.sum() == 0 or col_targets.sum() == 0:
-        warnings.warn("Furness given targets of 0. Returning all 0's")
-        return np.zeros_like(props), iter_num, np.inf
+        furnessed_mat, _, _ = doubly_constrained_furness(
+            furnessed_mat, row_targets, col_targets, max_iters=10, warning=False
+        )
+    else:
+        furnessed_mat = init_mat
     for iter_num in range(1, max_iters):
         # first adjust to match cost bands; this is the 'third' constraint but
         # is done first as the other two need to be matched more closely
@@ -275,15 +268,19 @@ def triply_constrained_furness(
             for i in distro.prop_vals:
                 tot_demand = to_alter[distro.props == i].sum()
                 checker[i] = tot_demand
-            df = pd.DataFrame.from_dict(checker, orient="index").reset_index()
-            df.columns = ["target_prop", "demand"]
-            df["act_prop"] = df["demand"] / df["demand"].sum()
-            df["adj"] = df["target_prop"] / df["act_prop"]
-            df.fillna(0, inplace=True)
-            df.set_index("target_prop", inplace=True)
-            for i in df.index:
-                to_alter[distro.props == i] *= df.loc[i, "adj"]
+            # pylint: disable=unsupported-assignment-operation, unsubscriptable-object
+            # pylint error
+            checker_df = pd.DataFrame.from_dict(checker, orient="index").reset_index()
+            checker_df.columns = ["target_prop", "demand"]
+            checker_df["act_prop"] = checker_df["demand"] / checker_df["demand"].sum()
+            checker_df["adj"] = checker_df["target_prop"] / checker_df["act_prop"]
+            checker_df.fillna(0, inplace=True)
+            checker_df.set_index("target_prop", inplace=True)
+
+            for i in checker_df.index:
+                to_alter[distro.props == i] *= checker_df.loc[i, "adj"]
             furnessed_mat[distro.zones] = to_alter
+            # pylint:enable=unsupported-assignment-operation, unsubscriptable-object
         # Adjust rows
         row_ach = np.sum(furnessed_mat, axis=1)
         diff_factor = np.divide(
@@ -310,7 +307,7 @@ def triply_constrained_furness(
         if cur_rmse < tol:
             early_exit = True
             break
-    if not early_exit:
+    if not early_exit & iter_num >= max_iters:
         warnings.warn(
             f"The triply constrained furness exhausted its max "
             f"number of loops ({max_iters:d}), while achieving an RMSE "
@@ -319,3 +316,6 @@ def triply_constrained_furness(
         )
 
     return furnessed_mat
+
+
+# pylint: enable=too-many-locals

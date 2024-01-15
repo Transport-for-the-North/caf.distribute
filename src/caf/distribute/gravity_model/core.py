@@ -111,13 +111,14 @@ class GravityModelCalibrateResults(GravityModelResults):
 
     class OutputYaml(BaseConfig):
         """Class for outputting some data from this class."""
+
         cost_params: dict[str, Any]
         cost_function: str
         matrix_total: float
         cost_convergence: float
 
     def save(self, out_dir: Path):
-        """Save method for class"""
+        """Save method for class."""
         out_dir.mkdir(parents=False, exist_ok=True)
         achieved = self.cost_distribution.df.copy()
         achieved["achieved_normalised_demand"] = (
