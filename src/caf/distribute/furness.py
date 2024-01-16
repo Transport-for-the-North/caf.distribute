@@ -308,7 +308,7 @@ def triply_constrained_furness(
         if cur_rmse < tol:
             early_exit = True
             break
-    if not early_exit & iter_num >= max_iters:
+    if (not early_exit) & (iter_num >= max_iters):
         warnings.warn(
             f"The triply constrained furness exhausted its max "
             f"number of loops ({max_iters:d}), while achieving an RMSE "
