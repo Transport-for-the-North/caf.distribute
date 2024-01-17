@@ -586,7 +586,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         assert self.achieved_cost_dist is not None
         results = {}
         for i, dist in enumerate(self.dists):
-            gresult = GravityModelCalibrateResults(
+            result_i = GravityModelCalibrateResults(
                 cost_distribution=self.achieved_cost_dist[i],
                 cost_convergence=self.achieved_convergence[dist.name],
                 value_distribution=self.achieved_distribution[dist.zones],
@@ -597,7 +597,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
                 ),
             )
 
-            results[dist.name] = gresult
+            results[dist.name] = result_i
         return results
 
 

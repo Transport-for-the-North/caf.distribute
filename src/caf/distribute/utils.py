@@ -65,6 +65,7 @@ def validate_zones(
     format. There is no return from this function if the zones do match, only
     an error raised if they don't.
     """
+    # TODO(IS) add tests for this
     if costs_format == "long":
         orig_zones = costs.index.get_level_values[0].values
         dest_zones = costs.index.get_level_values[1].values
