@@ -9,20 +9,15 @@
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
-#
-# import os
-# import sys
-# sys.path.insert(0, os.path.abspath('.'))
+
+
+# -- Project information -----------------------------------------------------
 import sys
 import os
 from pathlib import Path
+import caf.distribute
 
-dir_path = Path(__file__).parents[1]
-source = dir_path / "src" / "caf" / "distribute"
 
-sys.path.insert(0, os.path.abspath(str(source)))
-
-# -- Project information -----------------------------------------------------
 project = "caf.distribute"
 copyright = "2023, Transport for the North"
 author = "Transport for the North"
@@ -80,5 +75,4 @@ master_doc = "index"
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ["_static"]
 
-autodoc_mock_imports = ["caf"]
 autodoc_typehints = "description"

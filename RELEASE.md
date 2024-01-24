@@ -20,4 +20,4 @@ there.
 Below, a brief summary of patches made since the previous version can be found.
 
 ### Next Release Notes
-- Updated the license
+- Multi-TLD gravity model added

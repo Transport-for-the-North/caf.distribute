@@ -3,26 +3,27 @@
 from __future__ import annotations
 
 # Built-Ins
-import os
-import json
-import pathlib
 import dataclasses
-
+import json
+import os
+import pathlib
 from typing import Any
 
 # Third Party
-import pytest
 import numpy as np
+import pytest
 
-
-# Local Imports
 # pylint: disable=import-error,wrong-import-position
 from caf.toolkit import cost_utils
+
+# Local Imports
 from caf.distribute import cost_functions
-from caf.distribute.gravity_model import GravityModelResults
-from caf.distribute.gravity_model import GravityModelRunResults
-from caf.distribute.gravity_model import GravityModelCalibrateResults
-from caf.distribute.gravity_model import SingleAreaGravityModelCalibrator
+from caf.distribute.gravity_model import (
+    GravityModelCalibrateResults,
+    GravityModelResults,
+    GravityModelRunResults,
+    SingleAreaGravityModelCalibrator,
+)
 
 # pylint: enable=import-error,wrong-import-position
 

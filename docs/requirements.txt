@@ -1,5 +1,5 @@
 # Required libraries for a doc build
 sphinx-automodapi>=0.16.0
 pydata-sphinx-theme>=0.14.1
-caf.distribute>=0.1.0
 graphviz>=0.20.1
+versioningit>=2.2.0, < 3.0.0

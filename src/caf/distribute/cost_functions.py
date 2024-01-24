@@ -4,19 +4,14 @@ from __future__ import annotations
 
 # Built-Ins
 import enum
-import random
 import inspect
 import logging
-
-from typing import Any
-from typing import Mapping
-from typing import Optional
-from typing import Callable
+import random
+from typing import Any, Callable, Mapping, Optional
 
 # Third Party
 import numpy as np
 
-# Local Imports
 # pylint: disable=import-error,wrong-import-position
 from caf.toolkit import math_utils
 

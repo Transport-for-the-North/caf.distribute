@@ -7,7 +7,6 @@ import warnings
 # Third Party
 import numpy as np
 
-# Local Imports
 # pylint: disable=import-error,wrong-import-position
 
 # pylint: enable=import-error,wrong-import-position
@@ -74,6 +73,7 @@ def doubly_constrained_furness(
         The Root Mean Squared Error difference achieved before exiting
     """
     # pylint: disable=too-many-locals
+    # TODO(MB) Incorporate Nhan's furnessing optimisations
     # Error check
     if seed_vals.shape != (len(row_targets), len(col_targets)):
         raise ValueError(
@@ -134,7 +134,7 @@ def doubly_constrained_furness(
             # Calculate the diff - leave early if met
             row_diff = (row_targets - np.sum(furnessed_mat, axis=1)) ** 2
             col_diff = (col_targets - np.sum(furnessed_mat, axis=0)) ** 2
-            cur_rmse = (np.sum(row_diff + col_diff) / n_vals) ** 0.5
+            cur_rmse = ((np.sum(row_diff) + np.sum(col_diff)) / n_vals) ** 0.5
             if cur_rmse < tol:
                 early_exit = True
                 break

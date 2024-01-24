@@ -44,12 +44,20 @@ Indices and tables
 * :ref:`modindex`
 * :ref:`search`
 
-Contents
---------
+Modules
+-------
 
 .. toctree::
+   :maxdepth: 1
 
    cost_functions
    furness
-   gravity_model
+   utils
 
+Sub-Packages
+------------
+
+.. toctree::
+   :maxdepth: 1
+
+   gravity_model
