@@ -35,7 +35,8 @@ def infill_cost_matrix(
     cost_matrix: The cost matrix. This should be a square array
     diag_factor: The factor the rows' minimum values will be multiplied by to
     infill intrazonal costs.
-    zeros_infill: The infill value for other (non-diagonal) zeros in the matrix
+    zeros_infill: The infill value for other (non-diagonal) zeros in the matrix.
+    Due to a bug this will also replace any values over 1e10.
 
     Returns
     -------
