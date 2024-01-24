@@ -75,7 +75,8 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
         diff_step: float = 0.0,
         **kwargs,
     ) -> np.ndarray:
-        # inherited docstring
+        """Use in the least_squares_optimiser to distribute demand."""
+        # inherited docstring from _gravity_function in core
         # Not used, but need for compatibility with self._jacobian_function
         del diff_step
 
@@ -136,7 +137,13 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
         target_cost_distribution: cost_utils.CostDistribution,
         **kwargs,
     ) -> np.ndarray:
-        # inherited docstring
+        """
+        Use in the least squared optmimiser to produce a jacobian.
+
+        The jacobian informs the optimiser which direction/how much to move
+        parameters between iterations.
+        """
+        # inherited docstring from _jacobian_function in core
         # pylint: disable=too-many-locals
         # Not used, but need for compatibility with self._gravity_function
         del running_log_path

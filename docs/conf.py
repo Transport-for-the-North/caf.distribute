@@ -17,11 +17,6 @@ import os
 from pathlib import Path
 import caf.distribute
 
-dir_path = Path(__file__).parents[1]
-source = dir_path / "src" / "caf" / "distribute"
-
-sys.path.insert(0, os.path.abspath(str(source)))
-
 
 project = "caf.distribute"
 copyright = "2023, Transport for the North"
@@ -80,5 +75,4 @@ master_doc = "index"
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ["_static"]
 
-# autodoc_mock_imports = ["caf", "caf.distribute"]
 autodoc_typehints = "description"
