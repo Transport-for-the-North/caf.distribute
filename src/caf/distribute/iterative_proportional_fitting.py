@@ -806,8 +806,7 @@ def ipf(
     use_sparse: bool = ...,
     show_pbar: bool = ...,
     pbar_kwargs: Optional[dict[str, Any]] = ...,
-) -> tuple[np.ndarray, int, float]:
-    ...  # pragma: no cover
+) -> tuple[np.ndarray, int, float]: ...  # pragma: no cover
 
 
 @overload
@@ -822,8 +821,7 @@ def ipf(
     use_sparse: bool = ...,
     show_pbar: bool = ...,
     pbar_kwargs: Optional[dict[str, Any]] = ...,
-) -> tuple[sparse.COO, int, float]:
-    ...  # pragma: no cover
+) -> tuple[sparse.COO, int, float]: ...  # pragma: no cover
 
 
 def ipf(
