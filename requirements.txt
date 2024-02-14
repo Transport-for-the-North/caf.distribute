@@ -1,9 +1,7 @@
 # Required libraries
-
-# Example
 scipy>=1.9.3
 numpy>=1.19.0
 pandas>=1.4.0
 tqdm>=4.50.2
-caf.toolkit>=0.2.1
+caf.toolkit>=0.5.0
 matplotlib>=3.8.2
