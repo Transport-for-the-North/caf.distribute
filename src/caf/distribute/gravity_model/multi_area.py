@@ -3,7 +3,6 @@
 # Built-Ins
 import functools
 import logging
-import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Optional
@@ -85,9 +84,14 @@ class MultiDistInput(BaseConfig):
     lookup_cat_col: str
     lookup_zone_col: str
     init_params: dict[str, float]
-    log_path: Path
+    out_path: Path
     furness_tolerance: float = 1e-6
     furness_jac: float = False
+
+    @property
+    def log_path(self):
+        """Create path to a log file from out_path."""
+        return self.out_path / "log.csv"
 
 
 @dataclass
@@ -119,6 +123,8 @@ class MultiCostDistribution:
     function_params: dict[str, float]
 
 
+# pylint: disable=too-many-instance-attributes
+# 16 fine here
 class MultiAreaGravityModelCalibrator(core.GravityModelBase):
     """
     A self-calibrating multi-area gravity model.
@@ -159,6 +165,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         params: Optional[MultiDistInput],
     ):
         super().__init__(cost_function=cost_function, cost_matrix=cost_matrix)
+
         self.row_targets = row_targets
         self.col_targets = col_targets
         if len(row_targets) != cost_matrix.shape[0]:
@@ -186,9 +193,24 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             self.lookup.sort_values("zone")
             self.init_params = params.init_params
             self.dists = self.process_tlds()
+            self.out_path = params.out_path
             self.log_path = params.log_path
             self.furness_tol = params.furness_tolerance
             self.furness_jac = params.furness_jac
+
+    @property
+    def achieved_tripends(self) -> pd.DataFrame:
+        """
+        Return achieved trip-ends.
+
+        Simply sums achieved distribution over each axis.
+        """
+        return pd.DataFrame(
+            {
+                "origins": self.achieved_distribution.sum(axis=1),
+                "destinations": self.achieved_distribution.sum(axis=0),
+            }
+        )
 
     def process_tlds(self):
         """Get distributions in the right format for a multi-area gravity model."""
@@ -332,16 +354,17 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
                     best_params[i * params_len : i * params_len + params_len]
                 ),
             )
+            result_i.save(out_dir=self.out_path / dist.name)
 
             results[dist.name] = result_i
         return results
 
     def calibrate(
         self,
-        running_log_path: os.PathLike,
         *args,
+        update_params: bool = False,
         **kwargs,
-    ) -> GravityModelCalibrateResults:
+    ) -> dict[str, GravityModelCalibrateResults]:
         """Find the optimal parameters for self.cost_function.
 
         Optimal parameters are found using `scipy.optimize.least_squares`
@@ -349,17 +372,8 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
 
         Parameters
         ----------
-        init_params:
-            A dictionary of {parameter_name: parameter_value} to pass
-            into the cost function as initial parameters.
-
-        running_log_path:
-            Path to output the running log to. This log will detail the
-            performance of the run and is written in .csv format.
-
-        target_cost_distribution:
-            The cost distribution to calibrate towards during the calibration
-            process.
+        update_params: bool = False
+            Choose whether the fundtion params will be updated once calibrated.
 
         diff_step:
             Copied from scipy.optimize.least_squares documentation, where it
@@ -429,13 +443,20 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         """
         for dist in self.dists:
             self.cost_function.validate_params(dist.function_params)
-        self._validate_running_log(running_log_path)
+        self._validate_running_log(self.log_path)
         self._initialise_internal_params()
-        return self._calibrate(  # type: ignore
+        results = self._calibrate(  # type: ignore
             *args,
-            running_log_path=running_log_path,
+            running_log_path=self.log_path,
             **kwargs,
         )
+        if update_params is True:
+            new_dists = []
+            for dist in self.dists:
+                dist.function_params = results[dist.name].cost_params
+                new_dists.append(dist)
+            self.dists = new_dists
+        return results
 
     def _jacobian_function(
         self,
@@ -562,13 +583,18 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
 
         return achieved_residuals
 
-    # pylint:enable=too-many-locals
-    def run(self):
+    def run(self, triply_constrain: bool = False, xamax: int = 2):
         """
         Run the gravity_model without calibrating.
 
-        This should be done when you have calibrating previously to find the
+        This should be done when you have calibrated previously to find the
         correct parameters for the cost function.
+
+        Parameters
+        ----------
+        triply_constrain: bool = False
+            Choose whether to run a triply constrained furness after running
+            gravity_function. This must be done on
         """
         params_len = len(self.dists[0].function_params)
         cost_args = []
@@ -582,9 +608,95 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             running_log_path=self.log_path,
             params_len=params_len,
         )
-
-        assert self.achieved_cost_dist is not None
         results = {}
+
+        if triply_constrain:
+            # create seed matrix from parameters
+            props_list = []
+            for i, dist in enumerate(self.dists):
+                # Limit how much the achieved distribution can be adjusted to xamax
+                achieved = self.achieved_cost_dist[i].df.copy()
+                target = dist.cost_distribution.df.copy().reset_index()
+                achieved["normalised"] = (
+                    achieved[self.achieved_cost_dist[i].trips_col]
+                    / achieved[self.achieved_cost_dist[i].trips_col].sum()
+                )
+                target["normalised"] = (
+                    target[dist.cost_distribution.trips_col]
+                    / target[dist.cost_distribution.trips_col].sum()
+                )
+                target.loc[
+                    target["normalised"] > achieved["normalised"] * xamax, "normalised"
+                ] = (
+                    achieved.loc[
+                        target["normalised"] > achieved["normalised"] * xamax, "normalised"
+                    ]
+                    * xamax
+                )
+                target.loc[
+                    target["normalised"] < achieved["normalised"] / xamax, "normalised"
+                ] = (
+                    achieved.loc[
+                        target["normalised"] < achieved["normalised"] / xamax, "normalised"
+                    ]
+                    / xamax
+                )
+                # Re-normalise after adjustment
+                target["normalised"] /= target["normalised"].sum()
+                prop_cost, band_vals = furness.cost_to_prop(
+                    self.cost_matrix[dist.zones],
+                    target[
+                        [
+                            dist.cost_distribution.min_col,
+                            dist.cost_distribution.max_col,
+                            "normalised",
+                        ]
+                    ],
+                    val_col="normalised",
+                )
+                props = furness.PropsInput(prop_cost, dist.zones, band_vals)
+                props_list.append(props)
+            # triply contrained furness on seed matrix
+            # tol is higher as it is more difficult to converge when triply contrained
+            new_mat = furness.triply_constrained_furness(
+                props_list,
+                self.row_targets,
+                self.col_targets,
+                5000,
+                init_mat=self.achieved_distribution,
+                mat_size=(self.cost_matrix.shape[0], self.cost_matrix.shape[1]),
+                tol=0.01,
+            )
+
+            assert self.achieved_cost_dist is not None
+            for i, dist in enumerate(self.dists):
+                (
+                    single_cost_distribution,
+                    _,
+                    single_convergence,
+                ) = core.cost_distribution_stats(
+                    achieved_trip_distribution=new_mat[dist.zones],
+                    cost_matrix=self.cost_matrix[dist.zones],
+                    target_cost_distribution=dist.cost_distribution,
+                )
+
+                self.achieved_distribution[dist.zones] = new_mat[dist.zones]
+
+                gresult = GravityModelCalibrateResults(
+                    cost_distribution=single_cost_distribution,
+                    cost_convergence=single_convergence,
+                    value_distribution=new_mat[dist.zones],
+                    target_cost_distribution=dist.cost_distribution,
+                    cost_function=self.cost_function,
+                    cost_params=self._cost_params_to_kwargs(
+                        cost_args[i * params_len : i * params_len + params_len]
+                    ),
+                )
+                gresult.save(self.out_path / dist.name)
+
+                results[dist.name] = gresult
+            return results
+
         for i, dist in enumerate(self.dists):
             result_i = GravityModelCalibrateResults(
                 cost_distribution=self.achieved_cost_dist[i],
@@ -599,6 +711,9 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
 
             results[dist.name] = result_i
         return results
+
+
+# pylint: enable=too-many-instance-attributes
 
 
 def gravity_model(
