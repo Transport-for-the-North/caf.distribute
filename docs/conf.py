@@ -21,10 +21,7 @@ author = "Transport for the North"
 napoleon_google_docstring = False
 napoleon_numpy_docstring = True
 
-# Local Imports
 # The short X.Y version.
-import caf.distribute
-
 version = str(caf.distribute.__version__)
 
 # The full version, including alpha/beta/rc tags.
