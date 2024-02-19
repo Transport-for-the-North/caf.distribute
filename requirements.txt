@@ -3,7 +3,7 @@ numpy>=1.22.0, <1.27.0   # Capped for numba
 scipy>=1.10.1
 pandas>=1.4.0
 tqdm>=4.50.2
-caf.toolkit>=0.5.0
+caf.toolkit>=0.6.0
 matplotlib>=3.8.2
 
 # Ipf requirements

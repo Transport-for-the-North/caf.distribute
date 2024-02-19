@@ -23,7 +23,7 @@ dependencies = [
     "pandas>=1.4.0",
     "scipy>=1.10.1",
     "tqdm>=4.50.2",
-    "caf.toolkit>=0.5.1",
+    "caf.toolkit>=0.6.0",
     "matplotlib>=3.8.2"
 ]
 
