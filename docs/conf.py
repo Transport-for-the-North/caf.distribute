@@ -12,8 +12,9 @@
 
 # -- Project information -----------------------------------------------------
 
-import sys
+# Built-Ins
 import os
+import sys
 
 sys.path.insert(0, os.path.abspath(os.path.join("..", "src")))
 
@@ -27,7 +28,10 @@ napoleon_numpy_docstring = True
 
 # Calculate version numbers
 def _get_version() -> str:
+    # Built-Ins
     from pathlib import Path
+
+    # Third Party
     from versioningit import get_version
 
     return get_version(
