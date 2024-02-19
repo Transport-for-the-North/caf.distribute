@@ -8,8 +8,8 @@ from typing import Any, Optional
 
 # Third Party
 import numpy as np
-from scipy import optimize
 from caf.toolkit import cost_utils, timing, toolbox
+from scipy import optimize
 
 # Local Imports
 from caf.distribute import cost_functions, furness
@@ -18,7 +18,6 @@ from caf.distribute.gravity_model import (
     GravityModelRunResults,
     core,
 )
-
 
 # # # CONSTANTS # # #
 LOG = logging.getLogger(__name__)

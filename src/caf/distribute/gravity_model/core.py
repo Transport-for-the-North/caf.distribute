@@ -11,9 +11,10 @@ from typing import Any, Optional
 # Third Party
 import numpy as np
 import pandas as pd
-from matplotlib import pyplot as plt, figure
-from scipy import optimize
 from caf.toolkit import cost_utils, io, timing
+from matplotlib import figure
+from matplotlib import pyplot as plt
+from scipy import optimize
 
 # Local Imports
 from caf.distribute import cost_functions

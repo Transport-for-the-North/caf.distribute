@@ -10,13 +10,9 @@
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 
-
 # -- Project information -----------------------------------------------------
-import sys
-import os
-from pathlib import Path
+# Local Imports
 import caf.distribute
-
 
 project = "caf.distribute"
 copyright = "2023, Transport for the North"
@@ -25,6 +21,7 @@ author = "Transport for the North"
 napoleon_google_docstring = False
 napoleon_numpy_docstring = True
 
+# Local Imports
 # The short X.Y version.
 import caf.distribute
 

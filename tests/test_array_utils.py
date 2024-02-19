@@ -11,7 +11,6 @@ import sparse
 # Local Imports
 from caf.distribute import array_utils
 
-
 # # # CONSTANTS # # #
 
 

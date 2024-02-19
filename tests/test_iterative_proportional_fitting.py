@@ -12,9 +12,8 @@ import numpy as np
 import pandas as pd
 import pytest
 import sparse
-from numpy import testing as np_testing
-
 from caf.toolkit import math_utils
+from numpy import testing as np_testing
 
 # Local Imports
 from caf.distribute import iterative_proportional_fitting

@@ -14,7 +14,6 @@ import numpy as np
 import pandas as pd
 import sparse
 import tqdm
-
 from caf.toolkit import math_utils
 from caf.toolkit import pandas_utils as pd_utils
 
