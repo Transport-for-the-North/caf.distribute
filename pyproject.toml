@@ -75,7 +75,9 @@ extend-exclude = '''
 
 [tool.pylint.messages_control]
 disable = [
-    "line-too-long",    # Compatibility with black
+    "line-too-long",        # Compatibility with black
+    "wrong-import-order",   # Compatibility with Isort
+    "ungrouped-imports",    # Compatibility with Isort
     "too-many-lines",
     "use-dict-literal",
     "use-list-literal",
