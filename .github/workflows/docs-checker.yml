@@ -10,9 +10,19 @@ jobs:
   format:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      -   uses: actions/checkout@v3
+      -   name: Set up Python ${{ matrix.python-version }}
+          uses: actions/setup-python@v4
+          with:
+            python-version: "3.11"
+
+      -   name: Install dependencies
+          run: |
+            python -m pip install --upgrade pip
+            pip install -r docs/requirements.txt
+
       - uses: sphinx-doc/github-problem-matcher@master
       - name: "Build docs"
         run: |
           cd docs
-          make html
+          sphinx-build -b html . build
