@@ -1,10 +1,16 @@
 name: Docs Build Check
 
+# Execute this action only on PRs that touch
+# documentation files.
 on:
   push:
     branches: main
+    paths:
+      - "docs/**"
   pull_request:
     branches: main
+    paths:
+      - "docs/**"
 
 jobs:
   format:
