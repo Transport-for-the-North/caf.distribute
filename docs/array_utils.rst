@@ -1,5 +1,5 @@
 array_utils
 ===========
 
-.. automodapi:: array_utils
+.. automodapi:: caf.distribute.array_utils
     :no-heading:

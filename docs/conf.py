@@ -11,8 +11,11 @@
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 
 # -- Project information -----------------------------------------------------
-# Local Imports
-import caf.distribute
+
+import sys
+import os
+
+sys.path.insert(0, os.path.abspath(os.path.join("..", "src")))
 
 project = "caf.distribute"
 copyright = "2023, Transport for the North"
@@ -21,8 +24,19 @@ author = "Transport for the North"
 napoleon_google_docstring = False
 napoleon_numpy_docstring = True
 
+
+# Calculate version numbers
+def _get_version() -> str:
+    from pathlib import Path
+    from versioningit import get_version
+
+    return get_version(
+        project_dir=Path(__file__).parents[1],
+    )
+
+
 # The short X.Y version.
-version = str(caf.distribute.__version__)
+version = str(_get_version())
 
 # The full version, including alpha/beta/rc tags.
 release = version
