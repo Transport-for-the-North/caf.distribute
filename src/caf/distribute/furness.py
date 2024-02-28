@@ -3,9 +3,12 @@
 # Built-Ins
 import logging
 import warnings
+from typing import Optional
 
 # Third Party
 import numpy as np
+import pandas as pd
+from caf.toolkit import translation
 
 # pylint: disable=import-error,wrong-import-position
 
@@ -157,3 +160,54 @@ def doubly_constrained_furness(
         )
 
     return furnessed_mat, iter_num + 1, cur_rmse
+
+
+def four_d_constraint(
+    seed_vals,
+    lower_row_targets: np.ndarray,
+    lower_col_targets: np.ndarray,
+    higher_row_targets: np.ndarray,
+    higher_col_targets: np.ndarray,
+    row_trans_vector: pd.DataFrame,
+    lower_name: str,
+    higher_name: str,
+    col_trans_vector: Optional[pd.DataFrame] = None,
+    lower_zones: Optional[np.ndarray] = None,
+    higher_zones: Optional[np.ndarray] = None,
+    tol: float = 1e-9,
+    max_iters: int = 5000,
+    warning: bool = True,
+):
+    iters = 0
+    if lower_zones is None:
+        lower_zones = range(1, len(lower_row_targets + 1))
+    if higher_zones is None:
+        higher_zones = range(1, len(higher_row_targets + 1))
+    while True:
+        mat_lower, iters_lower, rmse_lower = doubly_constrained_furness(
+            seed_vals, lower_row_targets, higher_row_targets, tol, max_iters, warning
+        )
+        trans_mat = pd.DataFrame(mat_lower, index=lower_zones, columns=lower_zones)
+        seed_higher = translation.pandas_matrix_zone_translation(
+            trans_mat,
+            row_trans_vector,
+            f"{lower_name}_id",
+            f"{higher_name}_id",
+            f"{lower_name}_to_{higher_name}",
+            col_trans_vector,
+        )
+        mat_higher, iters_higher, rmse_higher = doubly_constrained_furness(
+            seed_higher.values, higher_row_targets, lower_row_targets, tol, max_iters, warning
+        )
+        iters += 1
+        if (iters_lower <= 1) & (iters_higher <= 1):
+            return mat_lower, iters, rmse_lower, rmse_higher
+        trans_mat = pd.DataFrame(mat_higher, index=higher_zones, columns=higher_zones)
+        seed_vals = translation.pandas_matrix_zone_translation(
+            trans_mat,
+            row_trans_vector,
+            f"{higher_name}_id",
+            f"{lower_name}_id",
+            f"{higher_name}_to_{lower_name}",
+            col_trans_vector,
+        ).values
