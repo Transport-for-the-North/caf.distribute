@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """Furness functions for distributing vectors to matrices."""
 import collections
+
 # Built-Ins
 import logging
 import warnings
@@ -179,6 +180,7 @@ class FourDInputs:
     outer_max_iters: int = 10
     zonal_zones: Optional[np.ndarray] = None
 
+
 def sectoral_constraint(
     seed_vals: np.ndarray,
     row_targets: np.ndarray,
@@ -195,86 +197,86 @@ def sectoral_constraint(
     warning: bool = True,
 ):
     """
-        Furness process with origin and destination constraints at two levels.
+    Furness process with origin and destination constraints at two levels.
 
-        This process is designed as a way of translating matrices to a more
-        disaggregate zone system while keeping cost distributions. It will return
-        when
+    This process is designed as a way of translating matrices to a more
+    disaggregate zone system while keeping cost distributions. It will return
+    when
 
-        Parameters
-        ----------
-        seed_vals: np.ndarray
-            Initial values for the furness. This must be at the lower (less
-            aggregate) zone system.
-        row_targets: np.ndarray
-            See doubly constrained furness.
-        col_targets: np.ndarray
-            See doubly constrained furness.
-        translation_vector: pd.DataFrame
-            A translation vector between the two zone systems. This must be a two
-            way translation. It is expected to be in the format output by caf.space.
-        from_col: str
-            The name of the column in the translation vector containing zone
-            ids for the original (i.e. less aggregate) zone system.
-        to_col: str
-            The name of the column in the translation vector containing zone
-            ids for the sectoral (i.e. more aggregate) zone system.
-        factor_col: str
-            The name of the column in the translation vector containing factors
-            for translation. This column should contain all ones, but is left
-            to the user to provide as an extra check on inputs.
-        sectoral_target_mat: pd.DataFrame
-            The matrix at sectoral level which should be adjusted to. Zone names
-            here should match those in the translation vector.
-        zonal_zones: Optional[collections.Collection] = None
-            Zone names of the lower zone system. These must be in the correct order,
-            and must match translation vector(s). If None is provided, this will
-            to numbers from 1 to the length of the matrix
-        tol:
-            See doubly constrained furness
-        furness_max_iters:
-            Passed as max_iters when doubly_constrained_furness is called.
-        max_iters:
-            The max number of iterations for the outer process (i.e. furness at
-            both levels and check convergence)
-        warning:
-            See doubly constrained furness
+    Parameters
+    ----------
+    seed_vals: np.ndarray
+        Initial values for the furness. This must be at the lower (less
+        aggregate) zone system.
+    row_targets: np.ndarray
+        See doubly constrained furness.
+    col_targets: np.ndarray
+        See doubly constrained furness.
+    translation_vector: pd.DataFrame
+        A translation vector between the two zone systems. This must be a two
+        way translation. It is expected to be in the format output by caf.space.
+    from_col: str
+        The name of the column in the translation vector containing zone
+        ids for the original (i.e. less aggregate) zone system.
+    to_col: str
+        The name of the column in the translation vector containing zone
+        ids for the sectoral (i.e. more aggregate) zone system.
+    factor_col: str
+        The name of the column in the translation vector containing factors
+        for translation. This column should contain all ones, but is left
+        to the user to provide as an extra check on inputs.
+    sectoral_target_mat: pd.DataFrame
+        The matrix at sectoral level which should be adjusted to. Zone names
+        here should match those in the translation vector.
+    zonal_zones: Optional[collections.Collection] = None
+        Zone names of the lower zone system. These must be in the correct order,
+        and must match translation vector(s). If None is provided, this will
+        to numbers from 1 to the length of the matrix
+    tol:
+        See doubly constrained furness
+    furness_max_iters:
+        Passed as max_iters when doubly_constrained_furness is called.
+    max_iters:
+        The max number of iterations for the outer process (i.e. furness at
+        both levels and check convergence)
+    warning:
+        See doubly constrained furness
 
-        Returns
-        -------
-        furnessed_matrix:
-            The final furnessed matrix. This matrix will match 'sectoral_targets'
-            precisely.
+    Returns
+    -------
+    furnessed_matrix:
+        The final furnessed matrix. This matrix will match 'sectoral_targets'
+        precisely.
 
-        completed_iters:
-            The number of completed outer iterations - each iteration is a 2-d
-             furness then an adjustment to the sectoral targetsbefore exiting.
+    completed_iters:
+        The number of completed outer iterations - each iteration is a 2-d
+         furness then an adjustment to the sectoral targets before exiting.
 
-        achieved_rmse:
-            The Root Mean Squared Error difference achieved before exiting to
-            row and column targets.
+    achieved_rmse:
+        The Root Mean Squared Error difference achieved before exiting to
+        row and column targets.
 
-        """
+    """
     iter = 1
     seed_vals_inner = seed_vals.copy()
     if zonal_zones is None:
-        zonal_zones = range(1, len(seed_vals)+1)
+        zonal_zones = range(1, len(seed_vals) + 1)
     while True:
         furnessed, _, _ = doubly_constrained_furness(
             seed_vals_inner, row_targets, col_targets, tol, furness_max_iters, warning
         )
         trans_mat = pd.DataFrame(furnessed, index=zonal_zones, columns=zonal_zones)
-        aggregated = translation.pandas_matrix_zone_translation(trans_mat,
-                                                                translation_vector,
-                                                                from_col,
-                                                                to_col,
-                                                                factor_col)
-        adjustment_mat = translation.pandas_matrix_zone_translation(sectoral_target_mat / aggregated,
-                                                                    translation_vector,
-                                                                    to_col,
-                                                                    from_col,
-                                                                    factor_col,
-                                                                    check_totals=False)
+        aggregated = translation.pandas_matrix_zone_translation(
+            trans_mat, translation_vector, from_col, to_col, factor_col
+        )
+        adjustment_mat = translation.pandas_matrix_zone_translation(
+            sectoral_target_mat / aggregated,
+            translation_vector,
+            to_col,
+            from_col,
+            factor_col,
+            check_totals=False,
+        )
         adjusted = furnessed * adjustment_mat.to_numpy()
         rmse = calc_rmse(col_targets, adjusted, row_targets)
         if rmse < tol:
@@ -282,9 +284,9 @@ def sectoral_constraint(
         seed_vals_inner = adjusted
         iter += 1
         if iter > max_iters:
-            warnings.warn("Process has reached the max number of iterations "
-                          f"without converging. The RMSE is {rmse}. Returning "
-                          f"the matrix as it currently is")
+            warnings.warn(
+                "Process has reached the max number of iterations "
+                f"without converging. The RMSE is {rmse}. Returning "
+                f"the matrix as it currently is"
+            )
             return adjusted, iter, rmse
-
-
