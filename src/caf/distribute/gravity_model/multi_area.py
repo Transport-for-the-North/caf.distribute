@@ -517,21 +517,19 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
 
         base_mat = self._create_seed_matrix(cost_distributions, init_params, params_len)
         if four_d is True:
-            out = furness.four_d_constraint(
+            matrix, iters, rmse = furness.sectoral_constraint(
                 seed_vals=base_mat,
-                row_trans_vector=four_d_inputs.row_trans_vector,
-                lower_name=four_d_inputs.lower_name,
-                higher_name=four_d_inputs.higher_name,
-                lower_row_targets=self.row_targets,
-                lower_col_targets=self.col_targets,
-                higher_row_targets=four_d_inputs.row_targets,
-                higher_col_targets=four_d_inputs.col_targets,
-                col_trans_vector=four_d_inputs.col_trans_vector,
-                lower_zones=four_d_inputs.lower_zones,
-                higher_zones=four_d_inputs.higher_zones,
-                furness_tol=self.furness_tol,
-                off_tol=four_d_inputs.off_tol,
-                outer_max_iters=four_d_inputs.outer_max_iters,
+                row_targets=self.row_targets,
+                col_targets=self.col_targets,
+                translation_vector=four_d_inputs.trans_vector,
+                from_col=four_d_inputs.from_col,
+                to_col=four_d_inputs.to_col,
+                factor_col=four_d_inputs.factor_col,
+                zonal_zones=four_d_inputs.zonal_zones,
+                sectoral_target_mat=four_d_inputs.target_mat,
+                tol=self.furness_tol,
+                furness_max_iters=5000,
+                max_iters=four_d_inputs.outer_max_iters,
             )
         else:
             matrix, iters, rmse = furness.doubly_constrained_furness(

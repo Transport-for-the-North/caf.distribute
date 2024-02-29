@@ -170,17 +170,13 @@ def doubly_constrained_furness(
 
 @dataclass
 class FourDInputs:
-    row_targets: np.ndarray
-    col_targets: np.ndarray
-    lower_name: str
-    higher_name: str
-    row_trans_vector: pd.DataFrame
-    col_trans_vector: Optional[pd.DataFrame] = None
-    lower_zones: Optional[np.ndarray] = None
-    higher_zones: Optional[np.ndarray] = None
-    off_tol: float = 1e-9
+    trans_vector: pd.DataFrame
+    from_col: str
+    to_col: str
+    factor_col: str
+    target_mat: pd.DataFrame
     outer_max_iters: int = 10
-
+    zonal_zones: Optional[np.ndarray] = None
 
 def four_d_constraint(
     seed_vals: np.ndarray,
@@ -329,9 +325,10 @@ def sectoral_constraint(
     warning: bool = True,
 ):
     iter = 1
+    seed_vals_inner = seed_vals.copy()
     while True:
-        furnessed = doubly_constrained_furness(
-            seed_vals, row_targets, col_targets, tol, furness_max_iters, warning
+        furnessed, _, _ = doubly_constrained_furness(
+            seed_vals_inner, row_targets, col_targets, tol, furness_max_iters, warning
         )
         trans_mat = pd.DataFrame(furnessed, index=zonal_zones, columns=zonal_zones)
         aggregated = translation.pandas_matrix_zone_translation(trans_mat,
@@ -343,17 +340,18 @@ def sectoral_constraint(
                                                                     translation_vector,
                                                                     to_col,
                                                                     from_col,
-                                                                    factor_col)
+                                                                    factor_col,
+                                                                    check_totals=False)
         adjusted = furnessed * adjustment_mat.to_numpy()
         rmse = calc_rmse(col_targets, adjusted, row_targets)
         if rmse < tol:
-            return adjusted, rmse, iter
-        seed_vals = adjusted
+            return adjusted, iter, rmse
+        seed_vals_inner = adjusted
         iter += 1
         if iter > max_iters:
             warnings.warn("Process has reached the max number of iterations "
                           f"without converging. The RMSE is {rmse}. Returning "
                           f"the matrix as it currently is")
-            return adjusted, rmse, iter
+            return adjusted, iter, rmse
 
 
