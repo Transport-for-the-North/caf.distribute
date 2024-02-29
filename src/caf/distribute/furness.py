@@ -24,11 +24,14 @@ LOG = logging.getLogger(__name__)
 
 # # # FUNCTIONS # # #
 # TODO(BT): Add a pandas wrapper to doubly_constrained_furness()
-def calc_rmse(col_targets, furnessed_mat, row_targets, n_vals):
+def calc_rmse(col_targets, furnessed_mat, row_targets, n_vals: Optional[int] = None):
+    if n_vals is None:
+        n_vals = len(row_targets)
     row_diff = (row_targets - np.sum(furnessed_mat, axis=1)) ** 2
     col_diff = (col_targets - np.sum(furnessed_mat, axis=0)) ** 2
     rmse = ((np.sum(row_diff) + np.sum(col_diff)) / n_vals) ** 0.5
     return rmse
+
 
 def doubly_constrained_furness(
     seed_vals: np.ndarray,
@@ -164,6 +167,7 @@ def doubly_constrained_furness(
 
     return furnessed_mat, iter_num + 1, cur_rmse
 
+
 @dataclass
 class FourDInputs:
     row_targets: np.ndarray
@@ -176,6 +180,7 @@ class FourDInputs:
     higher_zones: Optional[np.ndarray] = None
     off_tol: float = 1e-9
     outer_max_iters: int = 10
+
 
 def four_d_constraint(
     seed_vals: np.ndarray,
@@ -254,7 +259,12 @@ def four_d_constraint(
         higher_zones = range(1, len(higher_row_targets + 1))
     while True:
         mat_lower, iters_lower, rmse_lower = doubly_constrained_furness(
-            seed_vals, lower_row_targets, lower_col_targets, furness_tol, inner_max_iters, warning
+            seed_vals,
+            lower_row_targets,
+            lower_col_targets,
+            furness_tol,
+            inner_max_iters,
+            warning,
         )
         trans_mat = pd.DataFrame(mat_lower, index=lower_zones, columns=lower_zones)
         seed_higher = translation.pandas_matrix_zone_translation(
@@ -265,11 +275,18 @@ def four_d_constraint(
             f"{lower_name}_to_{higher_name}",
             col_trans_vector,
         )
-        rmse_higher = calc_rmse(higher_col_targets, seed_higher, higher_row_targets, len(higher_row_targets))
+        rmse_higher = calc_rmse(
+            higher_col_targets, seed_higher, higher_row_targets, len(higher_row_targets)
+        )
         if rmse_higher < off_tol:
             return mat_lower, iters, rmse_lower, rmse_higher
         mat_higher, iters_higher, rmse_higher = doubly_constrained_furness(
-            seed_higher, higher_row_targets, higher_col_targets, furness_tol, inner_max_iters, warning
+            seed_higher,
+            higher_row_targets,
+            higher_col_targets,
+            furness_tol,
+            inner_max_iters,
+            warning,
         )
         trans_mat = pd.DataFrame(mat_higher, index=higher_zones, columns=higher_zones)
         seed_vals = translation.pandas_matrix_zone_translation(
@@ -280,14 +297,63 @@ def four_d_constraint(
             f"{higher_name}_to_{lower_name}",
             col_trans_vector,
         ).values
-        rmse_lower = calc_rmse(lower_col_targets, seed_vals, lower_row_targets, len(lower_row_targets))
+        rmse_lower = calc_rmse(
+            lower_col_targets, seed_vals, lower_row_targets, len(lower_row_targets)
+        )
         if rmse_lower < off_tol:
             return seed_vals, iters, rmse_lower, rmse_higher
         iters += 1
         if iters > outer_max_iters:
-            warnings.warn("Max iterations has been reached for the outer process. "
-                          "The RMSE for the lower zone system, after furnessing to "
-                          f"higher is {rmse_lower}. The rmse for the higher zone "
-                          f"system after furnessing to the lower zone system also "
-                          f"doesn't match the criteria.")
+            warnings.warn(
+                "Max iterations has been reached for the outer process. "
+                "The RMSE for the lower zone system, after furnessing to "
+                f"higher is {rmse_lower}. The rmse for the higher zone "
+                f"system after furnessing to the lower zone system also "
+                f"doesn't match the criteria."
+            )
             return mat_lower, iters, rmse_lower, rmse_higher
+
+def sectoral_constraint(
+    seed_vals: np.ndarray,
+    row_targets: np.ndarray,
+    col_targets: np.ndarray,
+    translation_vector: pd.DataFrame,
+    from_col,
+    to_col,
+    factor_col,
+    zonal_zones,
+    sectoral_target_mat,
+    tol: float = 1e-9,
+    furness_max_iters: int = 5000,
+    max_iters: int = 10,
+    warning: bool = True,
+):
+    iter = 1
+    while True:
+        furnessed = doubly_constrained_furness(
+            seed_vals, row_targets, col_targets, tol, furness_max_iters, warning
+        )
+        trans_mat = pd.DataFrame(furnessed, index=zonal_zones, columns=zonal_zones)
+        aggregated = translation.pandas_matrix_zone_translation(trans_mat,
+                                                                translation_vector,
+                                                                from_col,
+                                                                to_col,
+                                                                factor_col)
+        adjustment_mat = translation.pandas_matrix_zone_translation(sectoral_target_mat / aggregated,
+                                                                    translation_vector,
+                                                                    to_col,
+                                                                    from_col,
+                                                                    factor_col)
+        adjusted = furnessed * adjustment_mat.to_numpy()
+        rmse = calc_rmse(col_targets, adjusted, row_targets)
+        if rmse < tol:
+            return adjusted, rmse, iter
+        seed_vals = adjusted
+        iter += 1
+        if iter > max_iters:
+            warnings.warn("Process has reached the max number of iterations "
+                          f"without converging. The RMSE is {rmse}. Returning "
+                          f"the matrix as it currently is")
+            return adjusted, rmse, iter
+
+
