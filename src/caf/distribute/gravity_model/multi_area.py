@@ -504,17 +504,33 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         return jacobian
 
     def _gravity_function(
-        self, init_params, cost_distributions, running_log_path, params_len, diff_step=0
+        self, init_params, cost_distributions, running_log_path, params_len, diff_step=0, four_d: bool = False, four_d_inputs: Optional[furness.FourDInputs] = None
     ):
         del diff_step
 
         base_mat = self._create_seed_matrix(cost_distributions, init_params, params_len)
-        matrix, iters, rmse = furness.doubly_constrained_furness(
-            seed_vals=base_mat,
-            row_targets=self.row_targets,
-            col_targets=self.col_targets,
-            tol=self.furness_tol,
-        )
+        if four_d is True:
+            out = furness.four_d_constraint(seed_vals=base_mat,
+                                            row_trans_vector=four_d_inputs.row_trans_vector,
+                                            lower_name=four_d_inputs.lower_name,
+                                            higher_name=four_d_inputs.higher_name,
+                                            lower_row_targets=self.row_targets,
+                                            lower_col_targets=self.col_targets,
+                                            higher_row_targets=four_d_inputs.row_targets,
+                                            higher_col_targets=four_d_inputs.col_targets,
+                                            col_trans_vector=four_d_inputs.col_trans_vector,
+                                            lower_zones=four_d_inputs.lower_zones,
+                                            higher_zones=four_d_inputs.higher_zones,
+                                            furness_tol=self.furness_tol,
+                                            off_tol=four_d_inputs.off_tol,
+                                            outer_max_iters=four_d_inputs.outer_max_iters)
+        else:
+            matrix, iters, rmse = furness.doubly_constrained_furness(
+                seed_vals=base_mat,
+                row_targets=self.row_targets,
+                col_targets=self.col_targets,
+                tol=self.furness_tol,
+            )
         convergences, distributions, residuals = {}, [], []
         for dist in cost_distributions:
             (
@@ -563,7 +579,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         return achieved_residuals
 
     # pylint:enable=too-many-locals
-    def run(self):
+    def run(self, four_d: bool = False, four_d_inputs: Optional[furness.FourDInputs] = None):
         """
         Run the gravity_model without calibrating.
 
@@ -581,6 +597,8 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             cost_distributions=self.dists,
             running_log_path=self.log_path,
             params_len=params_len,
+            four_d=four_d,
+            four_d_inputs=four_d_inputs
         )
 
         assert self.achieved_cost_dist is not None
