@@ -190,7 +190,7 @@ def sectoral_constraint(
     to_col: str,
     factor_col: str,
     sectoral_target_mat: pd.DataFrame,
-    zonal_zones: Optional[collections.Collection] = None,
+    zonal_zones: Optional[np.ndarray] = None,
     tol: float = 1e-9,
     furness_max_iters: int = 5000,
     max_iters: int = 10,
@@ -259,6 +259,14 @@ def sectoral_constraint(
     """
     iter = 1
     seed_vals_inner = seed_vals.copy()
+    n_vals = len(row_targets)
+    if (translation_vector[factor_col] != 1).all():
+        raise ValueError(
+            "This process is designed to work with zones the nest "
+            "perfectly within sectors. The translation vector provided "
+            "implies this isn't the case. Either fix the translation  "
+            "or reconsider using this function. "
+        )
     if zonal_zones is None:
         zonal_zones = range(1, len(seed_vals) + 1)
     while True:
@@ -278,7 +286,7 @@ def sectoral_constraint(
             check_totals=False,
         )
         adjusted = furnessed * adjustment_mat.to_numpy()
-        rmse = calc_rmse(col_targets, adjusted, row_targets)
+        rmse = calc_rmse(col_targets, adjusted, row_targets, n_vals)
         if rmse < tol:
             return adjusted, iter, rmse
         seed_vals_inner = adjusted
