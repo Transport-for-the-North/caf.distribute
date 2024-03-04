@@ -511,26 +511,20 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         params_len,
         diff_step=0,
         four_d: bool = False,
-        four_d_inputs: Optional[furness.FourDInputs] = None,
+        four_d_inputs: Optional[furness.SectoralConstraintInputs] = None,
     ):
         del diff_step
 
         base_mat = self._create_seed_matrix(cost_distributions, init_params, params_len)
         if four_d is True:
-            matrix, iters, rmse = furness.sectoral_constraint(
+            furness_inputs = furness.FurnessInputs(
                 seed_vals=base_mat,
                 row_targets=self.row_targets,
                 col_targets=self.col_targets,
-                translation_vector=four_d_inputs.trans_vector,
-                from_col=four_d_inputs.from_col,
-                to_col=four_d_inputs.to_col,
-                factor_col=four_d_inputs.factor_col,
-                zonal_zones=four_d_inputs.zonal_zones,
-                sectoral_target_mat=four_d_inputs.target_mat,
-                tol=self.furness_tol,
-                furness_max_iters=5000,
-                max_iters=four_d_inputs.outer_max_iters,
+                tol=self.furness_tol
             )
+            four_d_inputs.furness_inputs = furness_inputs
+            matrix, iters, rmse = furness.sectoral_constraint(four_d_inputs)
         else:
             matrix, iters, rmse = furness.doubly_constrained_furness(
                 seed_vals=base_mat,
@@ -586,7 +580,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         return achieved_residuals
 
     # pylint:enable=too-many-locals
-    def run(self, four_d: bool = False, four_d_inputs: Optional[furness.FourDInputs] = None):
+    def run(self, four_d: bool = False, four_d_inputs: Optional[furness.SectoralConstraintInputs] = None):
         """
         Run the gravity_model without calibrating.
 

@@ -1,7 +1,5 @@
 # -*- coding: utf-8 -*-
 """Furness functions for distributing vectors to matrices."""
-import collections
-
 # Built-Ins
 import logging
 import warnings
@@ -20,13 +18,89 @@ from caf.toolkit import translation
 # # # CONSTANTS # # #
 LOG = logging.getLogger(__name__)
 
+
 # # # CLASSES # # #
 # TODO(BT): Add 3D Furness from NorMITs Demand
+@dataclass
+class FurnessInputs:
+    """
+    Parameters
+    ----------
+    seed_vals: np.ndarray
+        Initial values for the furness. This must be at the lower (less
+        aggregate) zone system.
+    row_targets: np.ndarray
+        See doubly constrained furness.
+    col_targets: np.ndarray
+        See doubly constrained furness.
+    tol:
+        See doubly constrained furness
+    max_iters:
+        The max number of iterations for the outer process (i.e. furness at
+        both levels and check convergence)
+    warning:
+        See doubly constrained furness
+    """
+
+    seed_vals: np.ndarray
+    row_targets: np.ndarray
+    col_targets: np.ndarray
+    tol: float = 1e-9
+    max_iters: int = 5000
+    warning: bool = True
+
+
+@dataclass
+class SectoralConstraintInputs:
+    """
+    Input additional arguments for sectorial constraint.
+
+    These are inputs not needed for a doubly constrained furness, as those will
+    always be needed.
+
+    Parameters
+    ----------
+    trans_vector: pd.DataFrame
+        Vector used for translating between zones and sectors. This should be
+        one way, from zone up to sector, and should be one to one (all factors
+        equal to 1).
+    from_col: str
+        The name of the column in the translation vector containing zone
+        ids for the original (i.e. less aggregate) zone system.
+    to_col: str
+        The name of the column in the translation vector containing zone
+        ids for the sectoral (i.e. more aggregate) zone system.
+    factor_col: str
+        The name of the column in the translation vector containing factors
+        for translation. This column should contain all ones, but is left
+        to the user to provide as an extra check on inputs.
+    target_mat: pd.DataFrame
+        The matrix at sectoral level which should be adjusted to. Zone names
+        here should match those in the translation vector.
+    zonal_zones: Optional[collections.Collection] = None
+        Zone names of the lower zone system. These must be in the correct order,
+        and must match translation vector(s). If None is provided, this will
+        to numbers from 1 to the length of the matrix
+    outer_max_iters:
+        Passed as max_iters when doubly_constrained_furness is called.
+    furness_input: FurnessInputs
+        Inputs for a doubly constrained furness.
+    """
+
+    trans_vector: pd.DataFrame
+    from_col: str
+    to_col: str
+    factor_col: str
+    target_mat: pd.DataFrame
+    outer_max_iters: int = 10
+    zonal_zones: Optional[np.ndarray] = None
+    furness_inputs: Optional[FurnessInputs] = None
 
 
 # # # FUNCTIONS # # #
 # TODO(BT): Add a pandas wrapper to doubly_constrained_furness()
 def calc_rmse(col_targets, furnessed_mat, row_targets, n_vals: Optional[int] = None):
+    """Calculate the RMSE for a matrix, xompared to row and column targets."""
     if n_vals is None:
         n_vals = len(row_targets)
     row_diff = (row_targets - np.sum(furnessed_mat, axis=1)) ** 2
@@ -170,78 +244,14 @@ def doubly_constrained_furness(
     return furnessed_mat, iter_num + 1, cur_rmse
 
 
-@dataclass
-class FourDInputs:
-    trans_vector: pd.DataFrame
-    from_col: str
-    to_col: str
-    factor_col: str
-    target_mat: pd.DataFrame
-    outer_max_iters: int = 10
-    zonal_zones: Optional[np.ndarray] = None
-
-
-def sectoral_constraint(
-    seed_vals: np.ndarray,
-    row_targets: np.ndarray,
-    col_targets: np.ndarray,
-    translation_vector: pd.DataFrame,
-    from_col: str,
-    to_col: str,
-    factor_col: str,
-    sectoral_target_mat: pd.DataFrame,
-    zonal_zones: Optional[np.ndarray] = None,
-    tol: float = 1e-9,
-    furness_max_iters: int = 5000,
-    max_iters: int = 10,
-    warning: bool = True,
-):
+def sectoral_constraint(inputs: SectoralConstraintInputs):
     """
-    Furness process with origin and destination constraints at two levels.
-
-    This process is designed as a way of translating matrices to a more
-    disaggregate zone system while keeping cost distributions. It will return
-    when
+    Furness with an extra constraint to match a matrix at a more aggregate zoning.
 
     Parameters
     ----------
-    seed_vals: np.ndarray
-        Initial values for the furness. This must be at the lower (less
-        aggregate) zone system.
-    row_targets: np.ndarray
-        See doubly constrained furness.
-    col_targets: np.ndarray
-        See doubly constrained furness.
-    translation_vector: pd.DataFrame
-        A translation vector between the two zone systems. This must be a two
-        way translation. It is expected to be in the format output by caf.space.
-    from_col: str
-        The name of the column in the translation vector containing zone
-        ids for the original (i.e. less aggregate) zone system.
-    to_col: str
-        The name of the column in the translation vector containing zone
-        ids for the sectoral (i.e. more aggregate) zone system.
-    factor_col: str
-        The name of the column in the translation vector containing factors
-        for translation. This column should contain all ones, but is left
-        to the user to provide as an extra check on inputs.
-    sectoral_target_mat: pd.DataFrame
-        The matrix at sectoral level which should be adjusted to. Zone names
-        here should match those in the translation vector.
-    zonal_zones: Optional[collections.Collection] = None
-        Zone names of the lower zone system. These must be in the correct order,
-        and must match translation vector(s). If None is provided, this will
-        to numbers from 1 to the length of the matrix
-    tol:
-        See doubly constrained furness
-    furness_max_iters:
-        Passed as max_iters when doubly_constrained_furness is called.
-    max_iters:
-        The max number of iterations for the outer process (i.e. furness at
-        both levels and check convergence)
-    warning:
-        See doubly constrained furness
-
+    inputs: SectoralConstraintInputs
+        See docstring of input class.
     Returns
     -------
     furnessed_matrix:
@@ -255,43 +265,52 @@ def sectoral_constraint(
     achieved_rmse:
         The Root Mean Squared Error difference achieved before exiting to
         row and column targets.
-
     """
+    finputs = inputs.furness_inputs
+    if finputs is None:
+        raise ValueError("Furness inputs must be provided." "")
     iter = 1
-    seed_vals_inner = seed_vals.copy()
-    n_vals = len(row_targets)
-    if (translation_vector[factor_col] != 1).all():
+    seed_vals_inner = finputs.seed_vals.copy()
+    n_vals = len(finputs.row_targets)
+    if (inputs.trans_vector[inputs.factor_col] != 1).all():
         raise ValueError(
             "This process is designed to work with zones the nest "
             "perfectly within sectors. The translation vector provided "
             "implies this isn't the case. Either fix the translation  "
             "or reconsider using this function. "
         )
-    if zonal_zones is None:
-        zonal_zones = range(1, len(seed_vals) + 1)
+    if inputs.zonal_zones is None:
+        inputs.zonal_zones = range(1, len(finputs.seed_vals) + 1)
     while True:
         furnessed, _, _ = doubly_constrained_furness(
-            seed_vals_inner, row_targets, col_targets, tol, furness_max_iters, warning
+            seed_vals_inner,
+            finputs.row_targets,
+            finputs.col_targets,
+            finputs.tol,
+            finputs.max_iters,
+            finputs.warning,
         )
-        trans_mat = pd.DataFrame(furnessed, index=zonal_zones, columns=zonal_zones)
+        trans_mat = pd.DataFrame(
+            furnessed, index=inputs.zonal_zones, columns=inputs.zonal_zones
+        )
         aggregated = translation.pandas_matrix_zone_translation(
-            trans_mat, translation_vector, from_col, to_col, factor_col
+            trans_mat, inputs.trans_vector, inputs.from_col, inputs.to_col, inputs.factor_col
         )
         adjustment_mat = translation.pandas_matrix_zone_translation(
-            sectoral_target_mat / aggregated,
-            translation_vector,
-            to_col,
-            from_col,
-            factor_col,
+            inputs.target_mat / aggregated,
+            inputs.trans_vector,
+            inputs.to_col,
+            inputs.from_col,
+            inputs.factor_col,
             check_totals=False,
         )
         adjusted = furnessed * adjustment_mat.to_numpy()
-        rmse = calc_rmse(col_targets, adjusted, row_targets, n_vals)
-        if rmse < tol:
+        rmse = calc_rmse(finputs.col_targets, adjusted, finputs.row_targets, n_vals)
+        if rmse < finputs.tol:
             return adjusted, iter, rmse
         seed_vals_inner = adjusted
         iter += 1
-        if iter > max_iters:
+        if iter > finputs.max_iters:
             warnings.warn(
                 "Process has reached the max number of iterations "
                 f"without converging. The RMSE is {rmse}. Returning "
