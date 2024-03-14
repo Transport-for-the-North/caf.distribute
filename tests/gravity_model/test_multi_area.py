@@ -162,21 +162,6 @@ def fixture_cal_no_furness(data_dir, infilled, no_furness_jac_conf, trip_ends, m
     return results
 
 
-@pytest.fixture(name="cal_furness", scope="session")
-def fixture_cal_furness(data_dir, infilled, furness_jac_conf, trip_ends, mock_dir):
-    row_targets = trip_ends["origin"].values
-    col_targets = trip_ends["destination"].values
-    model = gm.MultiAreaGravityModelCalibrator(
-        row_targets=row_targets,
-        col_targets=col_targets,
-        cost_matrix=infilled,
-        cost_function=cost_functions.BuiltInCostFunction.LOG_NORMAL.get_cost_function(),
-        params=furness_jac_conf,
-    )
-    results = model.calibrate(running_log_path=mock_dir / "temp_log.csv")
-    return results
-
-
 class TestUtils:
     # TODO(IS) only one test currently so leaving in this file
     def test_infill_costs(self, infilled_from_code, infilled_expected):
@@ -185,8 +170,23 @@ class TestUtils:
 
 
 class TestDist:
+    @pytest.fixture(name="cal_furness", scope="session")
+    def fixture_cal_furness(self, data_dir, infilled, furness_jac_conf, trip_ends, mock_dir):
+        row_targets = trip_ends["origin"].values
+        col_targets = trip_ends["destination"].values
+        model = gm.MultiAreaGravityModelCalibrator(
+            row_targets=row_targets,
+            col_targets=col_targets,
+            cost_matrix=infilled,
+            cost_function=cost_functions.BuiltInCostFunction.LOG_NORMAL.get_cost_function(),
+            params=furness_jac_conf,
+        )
+        results = model.calibrate(running_log_path=mock_dir / "temp_log.csv")
+        return results
+
     @pytest.mark.parametrize("area", ["City", "Town", "External", "Village"])
     @pytest.mark.parametrize("cal_results", ["cal_furness", "cal_no_furness"])
+    @pytest.mark.filterwarnings("ignore:Given a log path:UserWarning")
     def test_convergence(self, cal_results, area, request):
         cal_results = request.getfixturevalue(cal_results)
         dist = cal_results[area]
@@ -194,6 +194,7 @@ class TestDist:
 
     @pytest.mark.parametrize("area", ["City", "Town", "External", "Village"])
     @pytest.mark.parametrize("cal_results", ["cal_furness", "cal_no_furness"])
+    @pytest.mark.filterwarnings("ignore:Given a log path:UserWarning")
     def test_params(self, cal_results, area, request):
         cal_results = request.getfixturevalue(cal_results)
         dist = cal_results[area]

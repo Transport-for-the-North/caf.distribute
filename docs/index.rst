@@ -50,8 +50,10 @@ Modules
 .. toctree::
    :maxdepth: 1
 
+   array_utils
    cost_functions
    furness
+   iterative_proportional_fitting
    utils
 
 Sub-Packages
