@@ -371,8 +371,7 @@ def default_convergence(
     max_conv = 0
     for target, ach in zip(targets, achieved):
         conv = np.max(abs((ach / target) - 1))
-        if conv > max_conv:
-            max_conv = conv
+        max_conv = max(max_conv, conv)
 
     return max_conv
 
