@@ -98,9 +98,8 @@ class SectoralConstraintInputs:
 
 
 # # # FUNCTIONS # # #
-# TODO(BT): Add a pandas wrapper to doubly_constrained_furness()
 def calc_rmse(col_targets, furnessed_mat, row_targets, n_vals: Optional[int] = None):
-    """Calculate the RMSE for a matrix, xompared to row and column targets."""
+    """Calculate the RMSE for a matrix, compared to row and column targets."""
     if n_vals is None:
         n_vals = len(row_targets)
     row_diff = (row_targets - np.sum(furnessed_mat, axis=1)) ** 2
