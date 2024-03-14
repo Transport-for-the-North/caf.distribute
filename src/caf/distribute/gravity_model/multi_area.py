@@ -75,8 +75,8 @@ class MultiDistInput(BaseConfig):
         quicker with it set to False.
     """
 
-    tld_file: Path
-    tld_lookup_file: Path
+    tld_file: Path | pd.DataFrame
+    tld_lookup_file: Path | pd.DataFrame
     cat_col: str
     min_col: str
     max_col: str
@@ -88,6 +88,20 @@ class MultiDistInput(BaseConfig):
     log_path: Path
     furness_tolerance: float = 1e-6
     furness_jac: float = False
+
+    @property
+    def tld(self):
+        if isinstance(self.tld_file, pd.DataFrame):
+            return self.tld_file
+        else:
+            return pd.read_csv(self.tld_file)
+
+    @property
+    def tld_lookup(self):
+        if isinstance(self.tld_lookup_file, pd.DataFrame):
+            return self.tld_lookup_file
+        else:
+            return pd.read_csv(self.tld_lookup_file)
 
 
 @dataclass
@@ -166,7 +180,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         if len(col_targets) != cost_matrix.shape[1]:
             raise IndexError("col_targets doesn't match cost_matrix")
         if params is not None:
-            self.tlds = pd.read_csv(params.tld_file)
+            self.tlds = params.tld
             self.tlds.rename(
                 columns={
                     params.cat_col: "cat",
@@ -177,7 +191,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
                 },
                 inplace=True,
             )
-            self.lookup = pd.read_csv(params.tld_lookup_file)
+            self.lookup = params.tld_lookup
             self.lookup.rename(
                 columns={params.lookup_zone_col: "zone", params.lookup_cat_col: "cat"},
                 inplace=True,
@@ -512,13 +526,12 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         running_log_path,
         params_len,
         diff_step=0,
-        four_d: bool = False,
         four_d_inputs: Optional[furness.SectoralConstraintInputs] = None,
     ):
         del diff_step
 
         base_mat = self._create_seed_matrix(cost_distributions, init_params, params_len)
-        if four_d is True:
+        if four_d_inputs is not None:
             furness_inputs = furness.FurnessInputs(
                 seed_vals=base_mat,
                 row_targets=self.row_targets,
@@ -582,16 +595,16 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         return achieved_residuals
 
     # pylint:enable=too-many-locals
-    def run(self, four_d: bool = False, four_d_inputs: Optional[furness.SectoralConstraintInputs] = None):
+    def run(self, four_d_inputs: Optional[furness.SectoralConstraintInputs] = None):
         """
         Run the gravity_model without calibrating.
 
         This should be done when you have calibrating previously to find the
         correct parameters for the cost function.
         """
-        params_len = len(self.dists[0].function_params)
+        params_len = len(list(self.dists.values())[0].function_params)
         cost_args = []
-        for dist in self.dists:
+        for dist in self.dists.values():
             for param in dist.function_params.values():
                 cost_args.append(param)
 
@@ -600,7 +613,6 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             cost_distributions=self.dists,
             running_log_path=self.log_path,
             params_len=params_len,
-            four_d=four_d,
             four_d_inputs=four_d_inputs,
         )
 
