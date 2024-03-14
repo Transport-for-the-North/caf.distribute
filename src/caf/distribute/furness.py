@@ -83,7 +83,7 @@ class SectoralConstraintInputs:
         to numbers from 1 to the length of the matrix
     outer_max_iters:
         Passed as max_iters when doubly_constrained_furness is called.
-    furness_input: FurnessInputs
+    furness_inputs: FurnessInputs
         Inputs for a doubly constrained furness.
     """
 
@@ -267,16 +267,16 @@ def sectoral_constraint(inputs: SectoralConstraintInputs):
     """
     finputs = inputs.furness_inputs
     if finputs is None:
-        raise ValueError("Furness inputs must be provided." "")
+        raise ValueError("Furness inputs must be provided.")
     iter = 1
     seed_vals_inner = finputs.seed_vals.copy()
     n_vals = len(finputs.row_targets)
     if (inputs.trans_vector[inputs.factor_col] != 1).all():
         raise ValueError(
-            "This process is designed to work with zones the nest "
+            "This process is designed to work with zones that nest "
             "perfectly within sectors. The translation vector provided "
-            "implies this isn't the case. Either fix the translation  "
-            "or reconsider using this function. "
+            "implies this isn't the case. Either fix the translation "
+            "or reconsider using this function."
         )
     if inputs.zonal_zones is None:
         inputs.zonal_zones = range(1, len(finputs.seed_vals) + 1)
@@ -295,6 +295,8 @@ def sectoral_constraint(inputs: SectoralConstraintInputs):
         aggregated = translation.pandas_matrix_zone_translation(
             trans_mat, inputs.trans_vector, inputs.from_col, inputs.to_col, inputs.factor_col
         )
+        # This is for factors, so everything is multiplied by one to match
+        # sectoral factors to zones
         adjustment_mat = translation.pandas_matrix_zone_translation(
             inputs.target_mat / aggregated,
             inputs.trans_vector,
@@ -304,6 +306,7 @@ def sectoral_constraint(inputs: SectoralConstraintInputs):
             check_totals=False,
         )
         adjusted = furnessed * adjustment_mat.to_numpy()
+        # Check rmse compared to zonal targets after sectoral adjustment
         rmse = calc_rmse(finputs.col_targets, adjusted, finputs.row_targets, n_vals)
         if rmse < finputs.tol:
             return adjusted, iter, rmse
