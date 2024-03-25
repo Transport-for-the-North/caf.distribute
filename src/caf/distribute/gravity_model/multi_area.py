@@ -238,7 +238,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         if self.achieved_cost_dist is None:
             raise ValueError("Gravity model has not been run. achieved_band_share is not set.")
         shares = []
-        for dist in self.achieved_cost_dist:
+        for dist in self.achieved_cost_dist.values():
             shares.append(dist.band_share_vals)
         return np.concatenate(shares)
 
@@ -365,10 +365,6 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
 
         Parameters
         ----------
-        init_params:
-            A dictionary of {parameter_name: parameter_value} to pass
-            into the cost function as initial parameters.
-
         running_log_path:
             Path to output the running log to. This log will detail the
             performance of the run and is written in .csv format.
@@ -376,15 +372,6 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         target_cost_distribution:
             The cost distribution to calibrate towards during the calibration
             process.
-
-        diff_step:
-            Copied from scipy.optimize.least_squares documentation, where it
-            is passed to:
-            Determines the relative step size for the finite difference
-            approximation of the Jacobian. The actual step is computed as
-            `x * diff_step`. If None (default), then diff_step is taken to be a
-            conventional “optimal” power of machine epsilon for the finite
-            difference scheme used
 
         ftol:
             The tolerance to pass to `scipy.optimize.least_squares`. The search
@@ -601,6 +588,18 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
 
         This should be done when you have calibrating previously to find the
         correct parameters for the cost function.
+
+        Parameters
+        ----------
+        four_d_inputs: Optional[furness.SectoralConstraintInputs]
+            Provide these inputs if you want the model to run with a sectoral
+            constraint. See the documentation of the input class for more
+            info.
+
+        Returns
+        -------
+        results: dict[str, GravityModelCalibrationResults]
+            Results from the run. See return class for more info.
         """
         params_len = len(list(self.dists.values())[0].function_params)
         cost_args = []
