@@ -77,17 +77,21 @@ class MultiDistInput(BaseConfig):
 
     tld_file: Path | pd.DataFrame
     tld_lookup_file: Path | pd.DataFrame
-    cat_col: str
-    min_col: str
-    max_col: str
-    ave_col: str
-    trips_col: str
-    lookup_cat_col: str
-    lookup_zone_col: str
+    cat_col: str='cat'
+    min_col: str='min'
+    max_col: str='max'
+    ave_col: str='ave'
+    trips_col: str = 'trips'
+    lookup_cat_col: str = 'cat'
+    lookup_zone_col: str = 'zone'
     init_params: dict[str, float]
     log_path: Path
     furness_tolerance: float = 1e-6
     furness_jac: float = False
+
+    class Config:
+        arbitrary_types_allowed = True
+
 
     @property
     def tld(self):
@@ -244,12 +248,14 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
 
     def _create_seed_matrix(self, cost_distributions, cost_args, params_len):
         base_mat = np.zeros_like(self.cost_matrix)
+        zones=[]
         for i, dist in enumerate(cost_distributions.values()):
             init_params = cost_args[i * params_len: i * params_len + params_len]
             init_params_kwargs = self._cost_params_to_kwargs(init_params)
             mat_slice = self.cost_function.calculate(
                 self.cost_matrix[dist.zones], **init_params_kwargs
             )
+            zones += list(dist.zones)
             base_mat[dist.zones] = mat_slice
         return base_mat
 
@@ -617,19 +623,17 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
 
         assert self.achieved_cost_dist is not None
         results = {}
-        for i, dist in enumerate(self.dists):
-            result_i = GravityModelCalibrateResults(
-                cost_distribution=self.achieved_cost_dist[i],
+        for name, dist in self.dists.items():
+
+            results[name] = GravityModelCalibrateResults(
+                cost_distribution=self.achieved_cost_dist[name],
                 cost_convergence=self.achieved_convergence[dist.name],
                 value_distribution=self.achieved_distribution[dist.zones],
                 target_cost_distribution=dist.cost_distribution,
                 cost_function=self.cost_function,
-                cost_params=self._cost_params_to_kwargs(
-                    cost_args[i * params_len : i * params_len + params_len]
-                ),
+                cost_params=cost_args
             )
 
-            results[dist.name] = result_i
         return results
 
 
