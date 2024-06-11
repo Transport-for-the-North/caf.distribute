@@ -256,6 +256,9 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             )
             zones += list(dist.zones)
             base_mat[dist.zones] = mat_slice
+        # seed vals must be zero where targets are zero for furnessing to work.
+        base_mat[np.where(self.row_targets == 0), :] = 0
+        base_mat[:, np.where(self.col_targets == 0)] = 0
         return base_mat
 
     # pylint: disable=too-many-locals
