@@ -245,7 +245,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
     def _create_seed_matrix(self, cost_distributions, cost_args, params_len):
         base_mat = np.zeros_like(self.cost_matrix)
         for i, dist in enumerate(cost_distributions.values()):
-            init_params = cost_args[i * params_len: i * params_len + params_len]
+            init_params = cost_args[i * params_len : i * params_len + params_len]
             init_params_kwargs = self._cost_params_to_kwargs(init_params)
             mat_slice = self.cost_function.calculate(
                 self.cost_matrix[dist.zones], **init_params_kwargs
@@ -337,15 +337,15 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         i = 0
         for name, dist in self.dists.items():
             iter_params = self._cost_params_to_kwargs(
-                    best_params[i * params_len : i * params_len + params_len]
-                )
+                best_params[i * params_len : i * params_len + params_len]
+            )
             results[name] = GravityModelCalibrateResults(
                 cost_distribution=self.achieved_cost_dist[name],
                 cost_convergence=self.achieved_convergence[dist.name],
                 value_distribution=self.achieved_distribution[dist.zones],
                 target_cost_distribution=dist.cost_distribution,
                 cost_function=self.cost_function,
-                cost_params=iter_params
+                cost_params=iter_params,
             )
             dist.function_params = iter_params
 
@@ -466,7 +466,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         inner_dists = cost_distributions.copy()
 
         for j, dist in enumerate(cost_distributions.values()):
-            distributions = init_params[j * params_len: j * params_len + params_len]
+            distributions = init_params[j * params_len : j * params_len + params_len]
             init_params_kwargs = self._cost_params_to_kwargs(distributions)
             for i, cost_param in enumerate(self.cost_function.kw_order):
                 cost_step = init_params_kwargs[cost_param] * diff_step
@@ -523,7 +523,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
                 seed_vals=base_mat,
                 row_targets=self.row_targets,
                 col_targets=self.col_targets,
-                tol=self.furness_tol
+                tol=self.furness_tol,
             )
             four_d_inputs.furness_inputs = furness_inputs
             matrix, iters, rmse = furness.sectoral_constraint(four_d_inputs)
