@@ -270,6 +270,9 @@ def sectoral_constraint(inputs: SectoralConstraintInputs):
         raise ValueError("Furness inputs must be provided.")
     iter = 1
     seed_vals_inner = finputs.seed_vals.copy()
+    # seed_vals_inner[np.where(inputs.target_mat == 0)] = 0
+    zonal_excl = [i for i in inputs.zonal_zones if i not in inputs.trans_vector[inputs.to_col]]
+    sectoral_excl = [i for i in inputs.trans_vector[inputs.to_col] if i not in inputs.zonal_zones]
     n_vals = len(finputs.row_targets)
     if (inputs.trans_vector[inputs.factor_col] != 1).all():
         raise ValueError(
@@ -278,6 +281,7 @@ def sectoral_constraint(inputs: SectoralConstraintInputs):
             "implies this isn't the case. Either fix the translation "
             "or reconsider using this function."
         )
+    
     if inputs.zonal_zones is None:
         inputs.zonal_zones = range(1, len(finputs.seed_vals) + 1)
     while True:
@@ -295,22 +299,29 @@ def sectoral_constraint(inputs: SectoralConstraintInputs):
         aggregated = translation.pandas_matrix_zone_translation(
             trans_mat, inputs.trans_vector, inputs.from_col, inputs.to_col, inputs.factor_col
         )
+        # row_diff = aggregated.sum(axis=1) / inputs.target_mat.sum(axis=1) - 1
+        # col_diff = aggregated.sum(axis=0) / inputs.target_mat.sum(axis=0) - 1
+        # if (np.absolute(row_diff).max() > 0.01) | (np.absolute(col_diff).max() > 0.01):
+        #     raise ValueError("The furnessed matrix aggregated up to sectoral level "
+        #                      "does not match the target matrix. Check your translation, "
+        #                      "zonal trip ends and target matrix.")
+
         # This is for factors, so everything is multiplied by one to match
         # sectoral factors to zones
         adjustment_mat = translation.pandas_matrix_zone_translation(
-            inputs.target_mat / aggregated,
+            pd.DataFrame(inputs.target_mat, index=aggregated.index, columns=aggregated.columns).div(aggregated).fillna(1).replace(to_replace={np.inf :1}),
             inputs.trans_vector,
             inputs.to_col,
             inputs.from_col,
             inputs.factor_col,
             check_totals=False,
         )
-        adjusted = furnessed * adjustment_mat.to_numpy()
+        adjusted = furnessed * adjustment_mat
         # Check rmse compared to zonal targets after sectoral adjustment
-        rmse = calc_rmse(finputs.col_targets, adjusted, finputs.row_targets, n_vals)
+        rmse = calc_rmse(finputs.col_targets, adjusted.values, finputs.row_targets, n_vals)
         if rmse < finputs.tol:
-            return adjusted, iter, rmse
-        seed_vals_inner = adjusted
+            return adjusted.to_numpy(), iter, rmse
+        seed_vals_inner = adjusted.to_numpy()
         iter += 1
         if iter > finputs.max_iters:
             warnings.warn(
@@ -318,4 +329,4 @@ def sectoral_constraint(inputs: SectoralConstraintInputs):
                 f"without converging. The RMSE is {rmse}. Returning "
                 f"the matrix as it currently is"
             )
-            return adjusted, iter, rmse
+            return adjusted.to_numpy(), iter, rmse
