@@ -100,16 +100,6 @@ class GravityModelCalibrateResults(GravityModelResults):
         as the user decides.
         """
         fig, ax = plt.subplots(figsize=(10, 6))
-        df_1 = self.cost_distribution.df
-        df_1["normalised"] = (
-            df_1[self.target_cost_distribution.trips_col]
-            / df_1[self.target_cost_distribution.trips_col].sum()
-        )
-        df_2 = self.target_cost_distribution.df
-        df_2["normalised"] = (
-            df_2[self.cost_distribution.trips_col]
-            / df_2[self.cost_distribution.trips_col].sum()
-        )
         ax.bar(
             self.cost_distribution.avg_vals,
             self.cost_distribution.band_share_vals,

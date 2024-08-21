@@ -172,7 +172,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
                     params.cat_col: "cat",
                     params.min_col: "min",
                     params.max_col: "max",
-                    params.ave_col: "ave",
+                    params.ave_col: "avg",
                     params.trips_col: "trips",
                 },
                 inplace=True,
