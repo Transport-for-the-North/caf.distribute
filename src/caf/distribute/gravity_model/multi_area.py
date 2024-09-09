@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 """Implementation of a self-calibrating single area gravity model."""
 # Built-Ins
+from __future__ import annotations
+
 import functools
 import logging
 import os
@@ -89,6 +91,14 @@ class MultiDistInput(BaseConfig):
     furness_tolerance: float = 1e-6
     furness_jac: float = False
 
+@dataclass
+class MultiDistData:
+    distributions: list[MultiCostDistribution]
+    init_params: dict[str, float]
+    log_path: Path
+    furness_tolerance: float = 1e-6
+    furness_jac: float = False
+
 
 @dataclass
 class MultiCostDistribution:
@@ -117,6 +127,10 @@ class MultiCostDistribution:
     cost_distribution: cost_utils.CostDistribution
     zones: np.ndarray
     function_params: dict[str, float]
+
+#TODO fix inputs 
+
+#TODO wrapper
 
 
 class MultiAreaGravityModelCalibrator(core.GravityModelBase):
@@ -156,7 +170,12 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         col_targets: np.ndarray,
         cost_matrix: np.ndarray,
         cost_function: cost_functions.CostFunction,
-        params: Optional[MultiDistInput],
+        #TODO move these parameters as inputs of calibrate and run
+        distributions: list[MultiCostDistribution],
+        log_path: Path,
+        furness_tolerance: float = 1e-6,
+        furness_jac: float = False,
+
     ):
         super().__init__(cost_function=cost_function, cost_matrix=cost_matrix)
         self.row_targets = row_targets
@@ -165,30 +184,11 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             raise IndexError("row_targets doesn't match cost_matrix")
         if len(col_targets) != cost_matrix.shape[1]:
             raise IndexError("col_targets doesn't match cost_matrix")
-        if params is not None:
-            self.tlds = pd.read_csv(params.tld_file)
-            self.tlds.rename(
-                columns={
-                    params.cat_col: "cat",
-                    params.min_col: "min",
-                    params.max_col: "max",
-                    params.ave_col: "avg",
-                    params.trips_col: "trips",
-                },
-                inplace=True,
-            )
-            self.lookup = pd.read_csv(params.tld_lookup_file)
-            self.lookup.rename(
-                columns={params.lookup_zone_col: "zone", params.lookup_cat_col: "cat"},
-                inplace=True,
-            )
-            self.tlds.set_index("cat", inplace=True)
-            self.lookup.sort_values("zone")
-            self.init_params = params.init_params
-            self.dists = self.process_tlds()
-            self.log_path = params.log_path
-            self.furness_tol = params.furness_tolerance
-            self.furness_jac = params.furness_jac
+
+        self.dists = distributions
+        self.log_path = log_path
+        self.furness_tol = furness_tolerance
+        self.furness_jac = furness_jac
 
     def process_tlds(self):
         """Get distributions in the right format for a multi-area gravity model."""
@@ -563,7 +563,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         return achieved_residuals
 
     # pylint:enable=too-many-locals
-    def run(self):
+    def  run(self):
         """
         Run the gravity_model without calibrating.
 

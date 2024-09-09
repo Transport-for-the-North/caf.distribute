@@ -57,10 +57,6 @@ class GravityModelResults:
     cost_convergence: float
     value_distribution: np.ndarray
     
-    @property
-    @abc.abstractmethod
-    def summary(self):
-        return
 
 
 @dataclasses.dataclass
