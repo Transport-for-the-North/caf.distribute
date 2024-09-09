@@ -124,6 +124,25 @@ class GravityModelCalibrateResults(GravityModelResults):
         ax.legend()
 
         return fig
+    
+    def summary(self, key:Optional[str|int]=None)->pd.Series:
+        """summarise the run parameters into a series with name set to key.
+
+
+        Outputs the gravity model achieved parameters and the convergence.
+        Parameters
+        ----------
+        key : str | int
+            key to indentify the data - used as name of the series
+
+        Returns
+        -------
+        pd.DataFrame
+            a summary of the calibration
+        """        
+        output_params = self.cost_params.copy()
+        output_params["convergence"]=self.cost_convergence
+        return pd.Series(output_params, name=key)
 
 
 @dataclasses.dataclass
@@ -161,6 +180,24 @@ class GravityModelRunResults(GravityModelResults):
     target_cost_distribution: Optional[cost_utils.CostDistribution] = None
     cost_function: Optional[cost_functions.CostFunction] = None
     cost_params: Optional[dict[str, Any]] = None
+
+
+    def summary(self, key:Optional[str|int]=None)->pd.Series:
+        """summarise the run parameters into a series with name set to key
+
+        
+        Outputs the gravity model parameters used to generate the distribution.
+        Parameters
+        ----------
+        key : str | int
+            key to indentify the data - used as name of the series
+
+        Returns
+        -------
+        pd.DataFrame
+            a summary of the calibration
+        """        
+        return pd.Series(self.cost_params, name=key)
 
 
 class GravityModelBase(abc.ABC):

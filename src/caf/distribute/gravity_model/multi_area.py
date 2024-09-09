@@ -251,7 +251,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         default_retry: bool = True,
         verbose: int = 0,
         **kwargs,
-    ) -> dict[str, GravityModelCalibrateResults]:
+    ) -> dict[str|int, GravityModelCalibrateResults]:
         params_len = len(self.dists[0].function_params)
         ordered_init_params = []
         for dist in self.dists:
@@ -341,7 +341,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         running_log_path: os.PathLike,
         *args,
         **kwargs,
-    ) -> GravityModelCalibrateResults:
+    ) -> dict[str|int, GravityModelCalibrateResults]:
         """Find the optimal parameters for self.cost_function.
 
         Optimal parameters are found using `scipy.optimize.least_squares`
