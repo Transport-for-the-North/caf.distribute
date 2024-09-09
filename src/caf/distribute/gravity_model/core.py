@@ -56,6 +56,11 @@ class GravityModelResults:
     cost_distribution: cost_utils.CostDistribution
     cost_convergence: float
     value_distribution: np.ndarray
+    
+    @property
+    @abc.abstractmethod
+    def summary(self):
+        return
 
 
 @dataclasses.dataclass
@@ -125,15 +130,12 @@ class GravityModelCalibrateResults(GravityModelResults):
 
         return fig
     
-    def summary(self, key:Optional[str|int]=None)->pd.Series:
-        """summarise the run parameters into a series with name set to key.
+    @property
+    def summary(self)->pd.Series:
+        """summary of the GM calibration parameters as a series.
 
 
         Outputs the gravity model achieved parameters and the convergence.
-        Parameters
-        ----------
-        key : str | int
-            key to indentify the data - used as name of the series
 
         Returns
         -------
@@ -142,7 +144,7 @@ class GravityModelCalibrateResults(GravityModelResults):
         """        
         output_params = self.cost_params.copy()
         output_params["convergence"]=self.cost_convergence
-        return pd.Series(output_params, name=key)
+        return pd.Series(output_params)
 
 
 @dataclasses.dataclass
@@ -181,23 +183,20 @@ class GravityModelRunResults(GravityModelResults):
     cost_function: Optional[cost_functions.CostFunction] = None
     cost_params: Optional[dict[str, Any]] = None
 
-
-    def summary(self, key:Optional[str|int]=None)->pd.Series:
-        """summarise the run parameters into a series with name set to key
+    @property
+    def summary(self)->pd.Series:
+        """summary of the GM run parameters as a series.
 
         
         Outputs the gravity model parameters used to generate the distribution.
         Parameters
-        ----------
-        key : str | int
-            key to indentify the data - used as name of the series
 
         Returns
         -------
         pd.DataFrame
-            a summary of the calibration
+            a summary of the run
         """        
-        return pd.Series(self.cost_params, name=key)
+        return pd.Series(self.cost_params)
 
 
 class GravityModelBase(abc.ABC):
