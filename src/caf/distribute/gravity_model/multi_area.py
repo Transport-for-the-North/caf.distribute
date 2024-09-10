@@ -19,7 +19,10 @@ from scipy import optimize
 # Local Imports
 from caf.distribute import cost_functions, furness
 from caf.distribute.gravity_model import core
-from caf.distribute.gravity_model.core import GravityModelCalibrateResults, GravityModelRunResults
+from caf.distribute.gravity_model.core import (
+    GravityModelCalibrateResults,
+    GravityModelRunResults,
+)
 
 # # # CONSTANTS # # #
 LOG = logging.getLogger(__name__)
@@ -91,6 +94,7 @@ class MultiDistInput(BaseConfig):
     furness_tolerance: float = 1e-6
     furness_jac: float = False
 
+
 @dataclass
 class MultiDistData:
     distributions: list[MultiCostDistribution]
@@ -127,10 +131,6 @@ class MultiCostDistribution:
     cost_distribution: cost_utils.CostDistribution
     zones: np.ndarray
     function_params: dict[str, float]
-
-#TODO fix inputs 
-
-#TODO wrapper
 
 
 class MultiAreaGravityModelCalibrator(core.GravityModelBase):
@@ -170,7 +170,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         col_targets: np.ndarray,
         cost_matrix: np.ndarray,
         cost_function: cost_functions.CostFunction,
-        #TODO move these parameters as inputs of calibrate and run
+        # TODO move these parameters as inputs of calibrate and run
     ):
         super().__init__(cost_function=cost_function, cost_matrix=cost_matrix)
         self.row_targets = row_targets
@@ -179,7 +179,6 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             raise IndexError("row_targets doesn't match cost_matrix")
         if len(col_targets) != cost_matrix.shape[1]:
             raise IndexError("col_targets doesn't match cost_matrix")
-
 
     def process_tlds(self):
         """Get distributions in the right format for a multi-area gravity model."""
@@ -234,18 +233,19 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
     # pylint: disable=too-many-locals
     def _calibrate(
         self,
-        distributions: list[MultiCostDistribution], 
-        running_log_path:Path,
+        distributions: list[MultiCostDistribution],
+        running_log_path: Path,
         furness_jac: bool = False,
         diff_step: float = 1e-8,
         ftol: float = 1e-4,
         xtol: float = 1e-4,
+        furness_tol=1e-6,
         grav_max_iters: int = 100,
         failure_tol: float = 0,
         default_retry: bool = True,
         verbose: int = 0,
         **kwargs,
-    ) -> dict[str|int, GravityModelCalibrateResults]:
+    ) -> dict[str | int, GravityModelCalibrateResults]:
         params_len = len(distributions[0].function_params)
         ordered_init_params = []
         for dist in distributions:
@@ -258,7 +258,8 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             "cost_distributions": distributions,
             "diff_step": diff_step,
             "params_len": params_len,
-            "furness_jac": furness_jac
+            "furness_jac": furness_jac,
+            "furness_tol": furness_tol,
         }
         optimise_cost_params = functools.partial(
             optimize.least_squares,
@@ -333,11 +334,11 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
 
     def calibrate(
         self,
-        distributions: list[MultiCostDistribution], 
+        distributions: list[MultiCostDistribution],
         running_log_path: os.PathLike,
         *args,
         **kwargs,
-    ) -> dict[str|int, GravityModelCalibrateResults]:
+    ) -> dict[str | int, GravityModelCalibrateResults]:
         """Find the optimal parameters for self.cost_function.
 
         Optimal parameters are found using `scipy.optimize.least_squares`
@@ -428,7 +429,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         self._validate_running_log(running_log_path)
         self._initialise_internal_params()
         return self._calibrate(  # type: ignore
-            distributions, 
+            distributions,
             running_log_path,
             *args,
             **kwargs,
@@ -438,6 +439,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         self,
         init_params: list[float],
         cost_distributions: list[MultiCostDistribution],
+        furness_tol:int,
         diff_step: float,
         furness_jac: bool,
         running_log_path,
@@ -478,7 +480,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
                         seed_vals=adj_dist,
                         row_targets=self.achieved_distribution.sum(axis=1),
                         col_targets=self.achieved_distribution.sum(axis=0),
-                        tol=self.furness_tol / 10,
+                        tol=furness_tol / 10,
                         max_iters=20,
                         warning=False,
                     )
@@ -502,7 +504,14 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         return jacobian
 
     def _gravity_function(
-        self, init_params, cost_distributions, running_log_path, params_len, diff_step=0
+        self,
+        init_params,
+        cost_distributions,
+        furness_tol,
+        running_log_path,
+        params_len,
+        diff_step=0,
+        **_,
     ):
         del diff_step
 
@@ -511,7 +520,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             seed_vals=base_mat,
             row_targets=self.row_targets,
             col_targets=self.col_targets,
-            tol=self.furness_tol,
+            tol=furness_tol,
         )
         convergences, distributions, residuals = {}, [], []
         for dist in cost_distributions:
@@ -561,7 +570,9 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         return achieved_residuals
 
     # pylint:enable=too-many-locals
-    def  run(self, distributions: list[MultiCostDistribution], running_log_path:Path)->dict[int|str, GravityModelCalibrateResults]:
+    def run(
+        self, distributions: list[MultiCostDistribution], running_log_path: Path
+    ) -> dict[int | str, GravityModelCalibrateResults]:
         """
         Run the gravity_model without calibrating.
 
