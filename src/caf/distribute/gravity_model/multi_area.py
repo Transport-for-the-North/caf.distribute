@@ -94,16 +94,7 @@ class MultiDistInput(BaseConfig):
     furness_tolerance: float = 1e-6
     furness_jac: float = False
 
-
-@dataclass
-class MultiDistData:
-    distributions: list[MultiCostDistribution]
-    init_params: dict[str, float]
-    log_path: Path
-    furness_tolerance: float = 1e-6
-    furness_jac: float = False
-
-
+    
 @dataclass
 class MultiCostDistribution:
     """
@@ -127,10 +118,58 @@ class MultiCostDistribution:
         implemented.
     """
 
+    #cost_distribution: dict[id, cost_utils.CostDistribution]
+    #matrix_id_lookup: np.ndarray
+    #function_params: dict[id, dict[str,float]]
+
     name: str
     cost_distribution: cost_utils.CostDistribution
     zones: np.ndarray
     function_params: dict[str, float]
+
+    @classmethod
+    def from_pandas(
+        cls,
+        category: str|int, 
+        ordered_zones: pd.Series, 
+        tld: pd.DataFrame,
+        cat_zone_correspondence: pd.DataFrame,
+        func_params: dict[str, float],
+        tld_cat_col: str = "category",
+        tld_min_col: str = "from",
+        tld_max_col: str = "to",
+        tld_avg_col: str = "av_distance",
+        tld_trips_col: str = "trips",
+        lookup_cat_col: str = "category",
+        lookup_zone_col: str = "zone_id",
+    )->MultiCostDistribution:
+        #get a list of zones that use this category of TLD
+        cat_zones = cat_zone_correspondence.loc[
+            cat_zone_correspondence[lookup_cat_col] == category, lookup_zone_col
+        ].to_numpy()
+
+        zones = ordered_zones.to_numpy()
+        
+        #tell user if we have zones in cat->lookup that arent in zones 
+        if not np.all(np.isin(cat_zones, zones)):
+            missing_values = cat_zones[~np.isin(cat_zones, zones)]
+            raise ValueError(
+                f"The following values from cat->zone lookup are not present in the tld zones: {missing_values}"
+            )
+
+        # get the indices
+        cat_zone_indices = np.where(np.isin(cat_zones, zones))
+
+        # get tld for cat
+        cat_tld = tld[tld[tld_cat_col] == category]
+
+        cat_cost_distribution = cost_utils.CostDistribution(
+            cat_tld, tld_min_col, tld_max_col, tld_avg_col, tld_trips_col, tld_avg_col
+        )
+
+        return cls(
+                    category, cat_cost_distribution, cat_zone_indices, func_params
+                )
 
 
 class MultiAreaGravityModelCalibrator(core.GravityModelBase):
@@ -158,10 +197,6 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         The cost function to use when calibrating the gravity model. This
         function is applied to `cost_matrix` before Furnessing during
         calibration.
-
-    params: Optional[MultiDistInput]
-        Info needed for a multi-distribution gravity model. See documentation
-        for MultiDistInput.
     """
 
     def __init__(
@@ -344,78 +379,19 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         Optimal parameters are found using `scipy.optimize.least_squares`
         to fit the distributed row/col targets to `target_cost_distribution`.
 
+        NOTE: The achieved distribution is found by accessing self.achieved 
+        distribution of the object this method is called on. The output of 
+        this method shows the distribution and results for each individual TLD.
+
         Parameters
         ----------
-        init_params:
-            A dictionary of {parameter_name: parameter_value} to pass
-            into the cost function as initial parameters.
-
-        running_log_path:
-            Path to output the running log to. This log will detail the
-            performance of the run and is written in .csv format.
-
-        target_cost_distribution:
-            The cost distribution to calibrate towards during the calibration
-            process.
-
-        diff_step:
-            Copied from scipy.optimize.least_squares documentation, where it
-            is passed to:
-            Determines the relative step size for the finite difference
-            approximation of the Jacobian. The actual step is computed as
-            `x * diff_step`. If None (default), then diff_step is taken to be a
-            conventional “optimal” power of machine epsilon for the finite
-            difference scheme used
-
-        ftol:
-            The tolerance to pass to `scipy.optimize.least_squares`. The search
-            will stop once this tolerance has been met. This is the
-            tolerance for termination by the change of the cost function
-
-        xtol:
-            The tolerance to pass to `scipy.optimize.least_squares`. The search
-            will stop once this tolerance has been met. This is the
-            tolerance for termination by the change of the independent
-            variables.
-
-        grav_max_iters:
-            The maximum number of calibration iterations to complete before
-            termination if the ftol has not been met.
-
-        failure_tol:
-            If, after initial calibration using `init_params`, the achieved
-            convergence is less than this value, calibration will be run again with
-            the default parameters from `self.cost_function`.
-
-        default_retry:
-            If, after running with `init_params`, the achieved convergence
-            is less than `failure_tol`, calibration will be run again with the
-            default parameters of `self.cost_function`.
-            This argument is ignored if the default parameters are given
-            as `init_params.
-
-        n_random_tries:
-            If, after running with default parameters of `self.cost_function`,
-            the achieved convergence is less than `failure_tol`, calibration will
-            be run again using random values for the cost parameters this
-            number of times.
-
-        verbose:
-            Copied from scipy.optimize.least_squares documentation, where it
-            is passed to:
-            Level of algorithm’s verbosity:
-            - 0 (default) : work silently.
-            - 1 : display a termination report.
-            - 2 : display progress during iterations (not supported by ‘lm’ method).
-
-        kwargs:
-            Additional arguments passed to self.gravity_furness.
-            Empty by default. The calling signature is:
-            `self.gravity_furness(seed_matrix, **kwargs)`
-
+        distributions: list[MultiCostDistribution],
+        running_log_path: os.PathLike,
+        *args,
+        **kwargs,
         Returns
         -------
-        results:
+        dict[str | int, GravityModelCalibrateResults]:
             An instance of GravityModelCalibrateResults containing the
             results of this run.
 
