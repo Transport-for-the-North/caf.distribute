@@ -26,7 +26,7 @@ from caf.distribute.gravity_model.core import (
 
 # # # CONSTANTS # # #
 LOG = logging.getLogger(__name__)
-
+DEFAULT_FURNESS_TOL= 1e-6
 
 # pylint:disable=duplicate-code
 # Furness called with same parameters in single and multi-area
@@ -274,7 +274,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         diff_step: float = 1e-8,
         ftol: float = 1e-4,
         xtol: float = 1e-4,
-        furness_tol=1e-6,
+        furness_tol=DEFAULT_FURNESS_TOL,
         grav_max_iters: int = 100,
         failure_tol: float = 0,
         default_retry: bool = True,
@@ -547,7 +547,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
 
     # pylint:enable=too-many-locals
     def run(
-        self, distributions: list[MultiCostDistribution], running_log_path: Path
+        self, distributions: list[MultiCostDistribution], running_log_path: Path, furness_tol=DEFAULT_FURNESS_TOL
     ) -> dict[int | str, GravityModelCalibrateResults]:
         """
         Run the gravity_model without calibrating.
@@ -566,6 +566,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             cost_distributions=distributions,
             running_log_path=running_log_path,
             params_len=params_len,
+            furness_tol=furness_tol
         )
 
         assert self.achieved_cost_dist is not None
