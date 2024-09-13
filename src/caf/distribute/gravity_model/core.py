@@ -56,7 +56,6 @@ class GravityModelResults:
     cost_distribution: cost_utils.CostDistribution
     cost_convergence: float
     value_distribution: np.ndarray
-    
 
 
 @dataclasses.dataclass
@@ -125,9 +124,9 @@ class GravityModelCalibrateResults(GravityModelResults):
         ax.legend()
 
         return fig
-    
+
     @property
-    def summary(self)->pd.Series:
+    def summary(self) -> pd.Series:
         """summary of the GM calibration parameters as a series.
 
 
@@ -137,9 +136,9 @@ class GravityModelCalibrateResults(GravityModelResults):
         -------
         pd.DataFrame
             a summary of the calibration
-        """        
+        """
         output_params = self.cost_params.copy()
-        output_params["convergence"]=self.cost_convergence
+        output_params["convergence"] = self.cost_convergence
         return pd.Series(output_params)
 
 
@@ -180,10 +179,10 @@ class GravityModelRunResults(GravityModelResults):
     cost_params: Optional[dict[str, Any]] = None
 
     @property
-    def summary(self)->pd.Series:
+    def summary(self) -> pd.Series:
         """summary of the GM run parameters as a series.
 
-        
+
         Outputs the gravity model parameters used to generate the distribution.
         Parameters
 
@@ -191,7 +190,7 @@ class GravityModelRunResults(GravityModelResults):
         -------
         pd.DataFrame
             a summary of the run
-        """        
+        """
         return pd.Series(self.cost_params)
 
 

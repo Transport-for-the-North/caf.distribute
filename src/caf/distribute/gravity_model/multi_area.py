@@ -26,7 +26,8 @@ from caf.distribute.gravity_model.core import (
 
 # # # CONSTANTS # # #
 LOG = logging.getLogger(__name__)
-DEFAULT_FURNESS_TOL= 1e-6
+DEFAULT_FURNESS_TOL = 1e-6
+
 
 # pylint:disable=duplicate-code
 # Furness called with same parameters in single and multi-area
@@ -94,7 +95,7 @@ class MultiDistInput(BaseConfig):
     furness_tolerance: float = 1e-6
     furness_jac: float = False
 
-    
+
 @dataclass
 class MultiCostDistribution:
     """
@@ -118,9 +119,9 @@ class MultiCostDistribution:
         implemented.
     """
 
-    #cost_distribution: dict[id, cost_utils.CostDistribution]
-    #matrix_id_lookup: np.ndarray
-    #function_params: dict[id, dict[str,float]]
+    # cost_distribution: dict[id, cost_utils.CostDistribution]
+    # matrix_id_lookup: np.ndarray
+    # function_params: dict[id, dict[str,float]]
 
     name: str
     cost_distribution: cost_utils.CostDistribution
@@ -130,8 +131,8 @@ class MultiCostDistribution:
     @classmethod
     def from_pandas(
         cls,
-        category: str|int, 
-        ordered_zones: pd.Series, 
+        category: str | int,
+        ordered_zones: pd.Series,
         tld: pd.DataFrame,
         cat_zone_correspondence: pd.DataFrame,
         func_params: dict[str, float],
@@ -142,15 +143,15 @@ class MultiCostDistribution:
         tld_trips_col: str = "trips",
         lookup_cat_col: str = "category",
         lookup_zone_col: str = "zone_id",
-    )->MultiCostDistribution:
-        #get a list of zones that use this category of TLD
+    ) -> MultiCostDistribution:
+        # get a list of zones that use this category of TLD
         cat_zones = cat_zone_correspondence.loc[
             cat_zone_correspondence[lookup_cat_col] == category, lookup_zone_col
         ].to_numpy()
 
         zones = ordered_zones.to_numpy()
-        
-        #tell user if we have zones in cat->lookup that arent in zones 
+
+        # tell user if we have zones in cat->lookup that arent in zones
         if not np.all(np.isin(cat_zones, zones)):
             missing_values = cat_zones[~np.isin(cat_zones, zones)]
             raise ValueError(
@@ -167,9 +168,7 @@ class MultiCostDistribution:
             cat_tld, tld_min_col, tld_max_col, tld_avg_col, tld_trips_col, tld_avg_col
         )
 
-        return cls(
-                    category, cat_cost_distribution, cat_zone_indices, func_params
-                )
+        return cls(category, cat_cost_distribution, cat_zone_indices, func_params)
 
 
 class MultiAreaGravityModelCalibrator(core.GravityModelBase):
@@ -379,8 +378,8 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         Optimal parameters are found using `scipy.optimize.least_squares`
         to fit the distributed row/col targets to `target_cost_distribution`.
 
-        NOTE: The achieved distribution is found by accessing self.achieved 
-        distribution of the object this method is called on. The output of 
+        NOTE: The achieved distribution is found by accessing self.achieved
+        distribution of the object this method is called on. The output of
         this method shows the distribution and results for each individual TLD.
 
         Parameters
@@ -415,7 +414,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         self,
         init_params: list[float],
         cost_distributions: list[MultiCostDistribution],
-        furness_tol:int,
+        furness_tol: int,
         diff_step: float,
         furness_jac: bool,
         running_log_path,
@@ -547,7 +546,10 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
 
     # pylint:enable=too-many-locals
     def run(
-        self, distributions: list[MultiCostDistribution], running_log_path: Path, furness_tol=DEFAULT_FURNESS_TOL
+        self,
+        distributions: list[MultiCostDistribution],
+        running_log_path: Path,
+        furness_tol=DEFAULT_FURNESS_TOL,
     ) -> dict[int | str, GravityModelCalibrateResults]:
         """
         Run the gravity_model without calibrating.
@@ -566,7 +568,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             cost_distributions=distributions,
             running_log_path=running_log_path,
             params_len=params_len,
-            furness_tol=furness_tol
+            furness_tol=furness_tol,
         )
 
         assert self.achieved_cost_dist is not None
