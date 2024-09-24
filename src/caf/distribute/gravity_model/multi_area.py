@@ -128,6 +128,8 @@ class MultiCostDistribution:
     zones: np.ndarray
     function_params: dict[str, float]
 
+    #TODO validate params
+
     @classmethod
     def from_pandas(
         cls,
