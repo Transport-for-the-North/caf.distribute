@@ -128,7 +128,7 @@ class MultiCostDistribution:
     zones: np.ndarray
     function_params: dict[str, float]
 
-    #TODO validate params
+    # TODO validate params
 
     @classmethod
     def from_pandas(
@@ -209,6 +209,28 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         # TODO move these parameters as inputs of calibrate and run
     ):
         super().__init__(cost_function=cost_function, cost_matrix=cost_matrix)
+
+        if row_targets.sum() != col_targets.sum():
+            LOG.info(
+                "row and column target totals do not match. This is likely to cause Furnessing to fail."
+            )
+
+        checks = {
+            "row targets": row_targets,
+            "column targets": col_targets,
+            "cost matrix": cost_matrix,
+        }
+
+        for name, data in checks.items():
+            if np.isnan(data).any():
+                LOG.warning(f"There are NaNs in {name}, this may cause a problem.")
+            if np.isinf(data).any():
+                LOG.warning(f"There are Infs in {name}, this may cause a problem.")
+
+            num_zeros = (data == 0).sum()  # casting bool as 1,0
+
+            LOG.info(f"There are {num_zeros} 0s in {name}")
+
         self.row_targets = row_targets
         self.col_targets = col_targets
         if len(row_targets) != cost_matrix.shape[0]:
@@ -288,6 +310,31 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             params = self._order_cost_params(dist.function_params)
             for val in params:
                 ordered_init_params.append(val)
+
+            max_binning = dist.cost_distribution.max_vals.max()
+            min_binning = dist.cost_distribution.min_vals.min()
+
+            max_cost = self.cost_matrix[dist.zones, :].max()
+            min_cost = self.cost_matrix[dist.zones, :].min()
+
+            if max_cost > max_binning:
+                LOG.warning(
+                    f"the maximum cost in the cost matrix for"
+                    f" category {dist.name}, was {max_cost}, "
+                    "whereas the highest bin edge in cost"
+                    f" distribution was {max_binning}, "
+                    "you will not be fitting to trips"
+                    " with a cost greater than the binning"
+                )
+            if min_cost > min_binning:
+                LOG.warning(
+                    f"the min cost in the cost matrix for"
+                    f" category {dist.name}, was {min_cost}, "
+                    "whereas the lowest bin edge in cost"
+                    f" distribution was {min_binning}, "
+                    "you will not be fitting to trips"
+                    " with a cost less than the binning"
+                )
 
         gravity_kwargs: dict[str, Any] = {
             "running_log_path": running_log_path,
