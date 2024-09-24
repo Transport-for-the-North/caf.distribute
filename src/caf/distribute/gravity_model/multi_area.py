@@ -216,9 +216,9 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             )
 
         checks = {
+            "cost matrix": cost_matrix,
             "row targets": row_targets,
             "column targets": col_targets,
-            "cost matrix": cost_matrix,
         }
 
         for name, data in checks.items():
@@ -227,9 +227,16 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             if np.isinf(data).any():
                 LOG.warning(f"There are Infs in {name}, this may cause a problem.")
 
-            num_zeros = (data == 0).sum()  # casting bool as 1,0
+            num_zeros = (data == 0).sum()  # casting bool as 1, 0
 
-            LOG.info(f"There are {num_zeros} 0s in {name}")
+            LOG.info(f"There are {num_zeros} 0s in {name} ({(num_zeros/data.size)*100} %)")
+
+
+        
+        zero_in_both = np.stack(row_targets==0, col_targets==0, axis=1).all(axis=1).sum()
+
+        LOG.info(f"There are {zero_in_both} zones with both 0 row and column targets.")
+        
 
         self.row_targets = row_targets
         self.col_targets = col_targets
