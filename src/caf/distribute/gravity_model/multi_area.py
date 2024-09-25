@@ -231,12 +231,9 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
 
             LOG.info(f"There are {num_zeros} 0s in {name} ({(num_zeros/data.size)*100} %)")
 
-
-        
-        zero_in_both = np.stack([row_targets==0, col_targets==0], axis=1).all(axis=1).sum()
+        zero_in_both = np.stack([row_targets == 0, col_targets == 0], axis=1).all(axis=1).sum()
 
         LOG.info(f"There are {zero_in_both} zones with both 0 row and column targets.")
-        
 
         self.row_targets = row_targets
         self.col_targets = col_targets
