@@ -223,9 +223,9 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
 
         for name, data in checks.items():
             if np.isnan(data).any():
-                LOG.warning(f"There are NaNs in {name}, this may cause a problem.")
+                raise ValueError(f"There are NaNs in {name}")
             if np.isinf(data).any():
-                LOG.warning(f"There are Infs in {name}, this may cause a problem.")
+                raise ValueError(f"There are Infs in {name}")
 
             num_zeros = (data == 0).sum()  # casting bool as 1, 0
 
@@ -233,7 +233,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
 
 
         
-        zero_in_both = np.stack(row_targets==0, col_targets==0, axis=1).all(axis=1).sum()
+        zero_in_both = np.stack([row_targets==0, col_targets==0], axis=1).all(axis=1).sum()
 
         LOG.info(f"There are {zero_in_both} zones with both 0 row and column targets.")
         
@@ -333,7 +333,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
                     "you will not be fitting to trips"
                     " with a cost greater than the binning"
                 )
-            if min_cost > min_binning:
+            if min_cost < min_binning:
                 LOG.warning(
                     f"the min cost in the cost matrix for"
                     f" category {dist.name}, was {min_cost}, "
