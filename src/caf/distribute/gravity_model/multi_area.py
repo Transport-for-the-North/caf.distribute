@@ -8,7 +8,7 @@ import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, Iterator
 
 # Third Party
 import numpy as np
@@ -98,6 +98,85 @@ class MultiDistInput(BaseConfig):
 
 @dataclass
 class MultiCostDistribution:
+    distributions: list[MGMCostDistribution]
+
+    @classmethod
+    def from_pandas(
+        cls,
+        ordered_zones: pd.Series,
+        tld: pd.DataFrame,
+        cat_zone_correspondence: pd.DataFrame,
+        func_params: dict[str, float],
+        tld_cat_col: str = "category",
+        tld_min_col: str = "from",
+        tld_max_col: str = "to",
+        tld_avg_col: str = "av_distance",
+        tld_trips_col: str = "trips",
+        lookup_cat_col: str = "category",
+        lookup_zone_col: str = "zone_id",
+    ):
+        
+        distributions: list[MGMCostDistribution] = [] 
+
+        for category in cat_zone_correspondence[lookup_cat_col].unique():
+
+            distributions.append(
+                MGMCostDistribution.from_pandas(
+                    category,
+                    pd.Series(ordered_zones),
+                    tld,
+                    cat_zone_correspondence,
+                    func_params,
+                    tld_cat_col,
+                    tld_min_col,
+                    tld_max_col,
+                    tld_avg_col,
+                    tld_trips_col,
+                    lookup_cat_col,
+                    lookup_zone_col,
+                )
+            )
+
+        cls.validate(distributions)
+
+        return cls(distributions)
+    
+    @classmethod
+    def validate(cls, distributions: list[MGMCostDistribution]):
+
+        if len(distributions) == 0:
+            raise ValueError("no distributions provided")
+        
+        all_zones: Optional[np.ndarray] = None
+
+        for dist in distributions:
+            if all_zones is None:
+                all_zones = dist.zones
+            else:
+                all_zones = np.concatenate((all_zones, dist.zones))
+
+        assert all_zones is not None
+
+
+        if len(np.unique(all_zones))!=len(all_zones):
+            raise ValueError("duplicate zones found in the distribution zone definition")
+        
+    def __iter__(self)-> Iterator[MGMCostDistribution]:
+        yield from self.distributions 
+    
+    def __getitem__(self, x)->MGMCostDistribution:
+        return self.distributions[x]
+    
+    def __len__(self)->int:
+        return len(self.distributions)
+    
+    def copy(self)->MultiCostDistribution:
+        return MultiCostDistribution(self.distributions)
+
+
+
+@dataclass
+class MGMCostDistribution:
     """
     Dataclass for storing needed info for a MultiCostDistribution model.
 
@@ -161,7 +240,7 @@ class MultiCostDistribution:
             )
 
         # get the indices
-        cat_zone_indices = np.where(np.isin(cat_zones, zones))
+        cat_zone_indices = np.where(np.isin(zones, cat_zones))[0]
 
         # get tld for cat
         cat_tld = tld[tld[tld_cat_col] == category]
@@ -295,7 +374,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
     # pylint: disable=too-many-locals
     def _calibrate(
         self,
-        distributions: list[MultiCostDistribution],
+        distributions: MultiCostDistribution,
         running_log_path: Path,
         furness_jac: bool = False,
         diff_step: float = 1e-8,
@@ -310,6 +389,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
     ) -> dict[str | int, GravityModelCalibrateResults]:
         params_len = len(distributions[0].function_params)
         ordered_init_params = []
+        #TODO validate cost distributions
         for dist in distributions:
             params = self._order_cost_params(dist.function_params)
             for val in params:
@@ -421,7 +501,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
 
     def calibrate(
         self,
-        distributions: list[MultiCostDistribution],
+        distributions: MultiCostDistribution,
         running_log_path: os.PathLike,
         *args,
         **kwargs,
