@@ -115,8 +115,8 @@ class MultiCostDistribution:
         lookup_cat_col: str = "category",
         lookup_zone_col: str = "zone_id",
     ):
-        
-        distributions: list[MGMCostDistribution] = [] 
+
+        distributions: list[MGMCostDistribution] = []
 
         for category in cat_zone_correspondence[lookup_cat_col].unique():
 
@@ -140,13 +140,13 @@ class MultiCostDistribution:
         cls.validate(distributions)
 
         return cls(distributions)
-    
+
     @classmethod
     def validate(cls, distributions: list[MGMCostDistribution]):
 
         if len(distributions) == 0:
             raise ValueError("no distributions provided")
-        
+
         all_zones: Optional[np.ndarray] = None
 
         for dist in distributions:
@@ -157,22 +157,20 @@ class MultiCostDistribution:
 
         assert all_zones is not None
 
-
-        if len(np.unique(all_zones))!=len(all_zones):
+        if len(np.unique(all_zones)) != len(all_zones):
             raise ValueError("duplicate zones found in the distribution zone definition")
-        
-    def __iter__(self)-> Iterator[MGMCostDistribution]:
-        yield from self.distributions 
-    
-    def __getitem__(self, x)->MGMCostDistribution:
-        return self.distributions[x]
-    
-    def __len__(self)->int:
-        return len(self.distributions)
-    
-    def copy(self)->MultiCostDistribution:
-        return MultiCostDistribution(self.distributions)
 
+    def __iter__(self) -> Iterator[MGMCostDistribution]:
+        yield from self.distributions
+
+    def __getitem__(self, x) -> MGMCostDistribution:
+        return self.distributions[x]
+
+    def __len__(self) -> int:
+        return len(self.distributions)
+
+    def copy(self) -> MultiCostDistribution:
+        return MultiCostDistribution(self.distributions)
 
 
 @dataclass
@@ -389,7 +387,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
     ) -> dict[str | int, GravityModelCalibrateResults]:
         params_len = len(distributions[0].function_params)
         ordered_init_params = []
-        #TODO validate cost distributions
+        # TODO validate cost distributions
         for dist in distributions:
             params = self._order_cost_params(dist.function_params)
             for val in params:
