@@ -106,7 +106,7 @@ class MultiCostDistribution:
         ordered_zones: pd.Series,
         tld: pd.DataFrame,
         cat_zone_correspondence: pd.DataFrame,
-        func_params: dict[str, dict[str, float]],
+        func_params: dict[int | str, dict[str, float]],
         tld_cat_col: str = "category",
         tld_min_col: str = "from",
         tld_max_col: str = "to",
