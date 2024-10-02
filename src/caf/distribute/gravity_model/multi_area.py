@@ -106,7 +106,7 @@ class MultiCostDistribution:
         ordered_zones: pd.Series,
         tld: pd.DataFrame,
         cat_zone_correspondence: pd.DataFrame,
-        func_params: dict[str, float],
+        func_params: dict[str, dict[str, float]],
         tld_cat_col: str = "category",
         tld_min_col: str = "from",
         tld_max_col: str = "to",
@@ -126,7 +126,7 @@ class MultiCostDistribution:
                     pd.Series(ordered_zones),
                     tld,
                     cat_zone_correspondence,
-                    func_params,
+                    func_params[category],
                     tld_cat_col,
                     tld_min_col,
                     tld_max_col,
@@ -222,7 +222,7 @@ class MGMCostDistribution:
         tld_trips_col: str = "trips",
         lookup_cat_col: str = "category",
         lookup_zone_col: str = "zone_id",
-    ) -> MultiCostDistribution:
+    ) -> MGMCostDistribution:
         # get a list of zones that use this category of TLD
         cat_zones = cat_zone_correspondence.loc[
             cat_zone_correspondence[lookup_cat_col] == category, lookup_zone_col
