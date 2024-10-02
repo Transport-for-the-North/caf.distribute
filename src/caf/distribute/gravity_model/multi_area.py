@@ -126,7 +126,7 @@ class MultiCostDistribution:
                     pd.Series(ordered_zones),
                     tld,
                     cat_zone_correspondence,
-                    func_params,
+                    func_params[category],
                     tld_cat_col,
                     tld_min_col,
                     tld_max_col,
