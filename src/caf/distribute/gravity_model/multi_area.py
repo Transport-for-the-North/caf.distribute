@@ -515,7 +515,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
 
         Parameters
         ----------
-        distributions: list[MultiCostDistribution],
+        distributions: MultiCostDistribution,
         running_log_path: os.PathLike,
         *args,
         **kwargs,
