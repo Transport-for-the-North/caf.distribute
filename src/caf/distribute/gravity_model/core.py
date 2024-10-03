@@ -100,7 +100,6 @@ class GravityModelCalibrateResults(GravityModelResults):
         as the user decides.
         """
 
-        
         fig, ax = plt.subplots(figsize=(10, 6))
 
         if (
@@ -117,7 +116,9 @@ class GravityModelCalibrateResults(GravityModelResults):
                 != set(self.target_cost_distribution.avg_vals)
             )
         ):
-            raise ValueError("To plot distributions, the target and achieved distributions must have the same binning.")
+            raise ValueError(
+                "To plot distributions, the target and achieved distributions must have the same binning."
+            )
 
         max_bin_edge = self.cost_distribution.max_vals
 
@@ -127,17 +128,13 @@ class GravityModelCalibrateResults(GravityModelResults):
 
         if truncate_last_bin:
             max_bin = max_bin_edge.max()
-            max_bin_edge[max_bin_edge.argmax()] = (
-                min_bin_edge[max_bin_edge.argmax()] * 1.2
-            )
+            max_bin_edge[max_bin_edge.argmax()] = min_bin_edge[max_bin_edge.argmax()] * 1.2
 
             bin_centres[max_bin_edge.argmax()] = (
-                max_bin_edge[max_bin_edge.argmax()]
-                + min_bin_edge[max_bin_edge.argmax()]
+                max_bin_edge[max_bin_edge.argmax()] + min_bin_edge[max_bin_edge.argmax()]
             ) / 2
 
-            fig.text(.8, .025, f"final bin edge cut from {max_bin}", ha='center')
-
+            fig.text(0.8, 0.025, f"final bin edge cut from {max_bin}", ha="center")
 
         ax.bar(
             bin_centres,
