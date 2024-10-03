@@ -92,27 +92,65 @@ class GravityModelCalibrateResults(GravityModelResults):
     cost_function: cost_functions.CostFunction
     cost_params: dict[str, Any]
 
-    def plot_distributions(self) -> figure.Figure:
+    def plot_distributions(self, truncate_last_bin: bool = False) -> figure.Figure:
         """
         Plot a comparison of the achieved and target distributions.
 
         This method returns a matplotlib figure which can be saved or plotted
         as the user decides.
         """
+
+        
         fig, ax = plt.subplots(figsize=(10, 6))
+
+        if (
+            (
+                set(self.cost_distribution.max_vals)
+                != set(self.target_cost_distribution.max_vals)
+            )
+            or (
+                set(self.cost_distribution.min_vals)
+                != set(self.target_cost_distribution.min_vals)
+            )
+            or (
+                set(self.cost_distribution.avg_vals)
+                != set(self.target_cost_distribution.avg_vals)
+            )
+        ):
+            raise ValueError("To plot distributions, the target and achieved distributions must have the same binning.")
+
+        max_bin_edge = self.cost_distribution.max_vals
+
+        min_bin_edge = self.cost_distribution.min_vals
+
+        bin_centres = self.cost_distribution.avg_vals
+
+        if truncate_last_bin:
+            max_bin = max_bin_edge.max()
+            max_bin_edge[max_bin_edge.argmax()] = (
+                min_bin_edge[max_bin_edge.argmax()] * 1.2
+            )
+
+            bin_centres[max_bin_edge.argmax()] = (
+                max_bin_edge[max_bin_edge.argmax()]
+                + min_bin_edge[max_bin_edge.argmax()]
+            ) / 2
+
+            fig.text(.8, .025, f"final bin edge cut from {max_bin}", ha='center')
+
+
         ax.bar(
-            self.cost_distribution.avg_vals,
+            bin_centres,
             self.cost_distribution.band_share_vals,
-            width=self.cost_distribution.max_vals - self.cost_distribution.min_vals,
+            width=max_bin_edge - min_bin_edge,
             label="Achieved Distribution",
             color="blue",
             alpha=0.7,
         )
         ax.bar(
-            self.cost_distribution.avg_vals,
+            bin_centres,
             self.target_cost_distribution.band_share_vals,
-            width=self.target_cost_distribution.max_vals
-            - self.target_cost_distribution.min_vals,
+            width=max_bin_edge - min_bin_edge,
             label="Target Distribution",
             color="orange",
             alpha=0.7,
