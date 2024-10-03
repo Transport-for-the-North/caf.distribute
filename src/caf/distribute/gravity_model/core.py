@@ -92,27 +92,62 @@ class GravityModelCalibrateResults(GravityModelResults):
     cost_function: cost_functions.CostFunction
     cost_params: dict[str, Any]
 
-    def plot_distributions(self) -> figure.Figure:
+    def plot_distributions(self, truncate_last_bin: bool = False) -> figure.Figure:
         """
         Plot a comparison of the achieved and target distributions.
 
         This method returns a matplotlib figure which can be saved or plotted
         as the user decides.
         """
+
         fig, ax = plt.subplots(figsize=(10, 6))
+
+        if (
+            (
+                set(self.cost_distribution.max_vals)
+                != set(self.target_cost_distribution.max_vals)
+            )
+            or (
+                set(self.cost_distribution.min_vals)
+                != set(self.target_cost_distribution.min_vals)
+            )
+            or (
+                set(self.cost_distribution.avg_vals)
+                != set(self.target_cost_distribution.avg_vals)
+            )
+        ):
+            raise ValueError(
+                "To plot distributions, the target and achieved distributions must have the same binning."
+            )
+
+        max_bin_edge = self.cost_distribution.max_vals
+
+        min_bin_edge = self.cost_distribution.min_vals
+
+        bin_centres = self.cost_distribution.avg_vals
+
+        if truncate_last_bin:
+            max_bin = max_bin_edge.max()
+            max_bin_edge[max_bin_edge.argmax()] = min_bin_edge[max_bin_edge.argmax()] * 1.2
+
+            bin_centres[max_bin_edge.argmax()] = (
+                max_bin_edge[max_bin_edge.argmax()] + min_bin_edge[max_bin_edge.argmax()]
+            ) / 2
+
+            fig.text(0.8, 0.025, f"final bin edge cut from {max_bin}", ha="center")
+
         ax.bar(
-            self.cost_distribution.avg_vals,
+            bin_centres,
             self.cost_distribution.band_share_vals,
-            width=self.cost_distribution.max_vals - self.cost_distribution.min_vals,
+            width=max_bin_edge - min_bin_edge,
             label="Achieved Distribution",
             color="blue",
             alpha=0.7,
         )
         ax.bar(
-            self.cost_distribution.avg_vals,
+            bin_centres,
             self.target_cost_distribution.band_share_vals,
-            width=self.target_cost_distribution.max_vals
-            - self.target_cost_distribution.min_vals,
+            width=max_bin_edge - min_bin_edge,
             label="Target Distribution",
             color="orange",
             alpha=0.7,
@@ -124,6 +159,22 @@ class GravityModelCalibrateResults(GravityModelResults):
         ax.legend()
 
         return fig
+
+    @property
+    def summary(self) -> pd.Series:
+        """summary of the GM calibration parameters as a series.
+
+
+        Outputs the gravity model achieved parameters and the convergence.
+
+        Returns
+        -------
+        pd.DataFrame
+            a summary of the calibration
+        """
+        output_params = self.cost_params.copy()
+        output_params["convergence"] = self.cost_convergence
+        return pd.Series(output_params)
 
 
 @dataclasses.dataclass
@@ -161,6 +212,21 @@ class GravityModelRunResults(GravityModelResults):
     target_cost_distribution: Optional[cost_utils.CostDistribution] = None
     cost_function: Optional[cost_functions.CostFunction] = None
     cost_params: Optional[dict[str, Any]] = None
+
+    @property
+    def summary(self) -> pd.Series:
+        """summary of the GM run parameters as a series.
+
+
+        Outputs the gravity model parameters used to generate the distribution.
+        Parameters
+
+        Returns
+        -------
+        pd.DataFrame
+            a summary of the run
+        """
+        return pd.Series(self.cost_params)
 
 
 class GravityModelBase(abc.ABC):
