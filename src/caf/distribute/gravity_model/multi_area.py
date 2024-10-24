@@ -11,8 +11,8 @@ from typing import Any, Optional
 # Third Party
 import numpy as np
 import pandas as pd
-from scipy import optimize
 from caf.toolkit import BaseConfig, cost_utils, timing
+from scipy import optimize
 
 # Local Imports
 from caf.distribute import cost_functions, furness
@@ -189,7 +189,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
                     params.cat_col: "cat",
                     params.min_col: "min",
                     params.max_col: "max",
-                    params.ave_col: "ave",
+                    params.ave_col: "avg",
                     params.trips_col: "trips",
                 },
                 inplace=True,
