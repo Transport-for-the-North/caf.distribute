@@ -272,7 +272,9 @@ def sectoral_constraint(inputs: SectoralConstraintInputs):
     seed_vals_inner = finputs.seed_vals.copy()
     # seed_vals_inner[np.where(inputs.target_mat == 0)] = 0
     zonal_excl = [i for i in inputs.zonal_zones if i not in inputs.trans_vector[inputs.to_col]]
-    sectoral_excl = [i for i in inputs.trans_vector[inputs.to_col] if i not in inputs.zonal_zones]
+    sectoral_excl = [
+        i for i in inputs.trans_vector[inputs.to_col] if i not in inputs.zonal_zones
+    ]
     n_vals = len(finputs.row_targets)
     if (inputs.trans_vector[inputs.factor_col] != 1).all():
         raise ValueError(
@@ -281,7 +283,7 @@ def sectoral_constraint(inputs: SectoralConstraintInputs):
             "implies this isn't the case. Either fix the translation "
             "or reconsider using this function."
         )
-    
+
     if inputs.zonal_zones is None:
         inputs.zonal_zones = range(1, len(finputs.seed_vals) + 1)
     while True:
@@ -309,7 +311,10 @@ def sectoral_constraint(inputs: SectoralConstraintInputs):
         # This is for factors, so everything is multiplied by one to match
         # sectoral factors to zones
         adjustment_mat = translation.pandas_matrix_zone_translation(
-            pd.DataFrame(inputs.target_mat, index=aggregated.index, columns=aggregated.columns).div(aggregated).fillna(1).replace(to_replace={np.inf :1}),
+            pd.DataFrame(inputs.target_mat, index=aggregated.index, columns=aggregated.columns)
+            .div(aggregated)
+            .fillna(1)
+            .replace(to_replace={np.inf: 1}),
             inputs.trans_vector,
             inputs.to_col,
             inputs.from_col,
