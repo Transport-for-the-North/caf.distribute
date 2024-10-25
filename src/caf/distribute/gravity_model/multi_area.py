@@ -678,7 +678,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
     # pylint:enable=too-many-locals
     def run(
         self,
-        distributions: list[MultiCostDistribution],
+        distributions: MultiCostDistribution,
         running_log_path: Path,
         furness_tol=DEFAULT_FURNESS_TOL,
     ) -> dict[int | str, GravityModelCalibrateResults]:
