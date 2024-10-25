@@ -9,6 +9,7 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Optional, Iterator
+import warnings
 
 # Third Party
 import numpy as np
@@ -21,7 +22,6 @@ from caf.distribute import cost_functions, furness
 from caf.distribute.gravity_model import core
 from caf.distribute.gravity_model.core import (
     GravityModelCalibrateResults,
-    GravityModelRunResults,
 )
 
 # # # CONSTANTS # # #
@@ -98,6 +98,13 @@ class MultiDistInput(BaseConfig):
 
 @dataclass
 class MultiCostDistribution:
+    """Cost distributions to be used for the multi-cost distribution gravity model
+
+    Parameters
+    ----------
+    distributions: list[MGMCostDistribution]
+        Distributions to be used for the multicost distributions
+    """    
     distributions: list[MGMCostDistribution]
 
     @classmethod
@@ -107,6 +114,7 @@ class MultiCostDistribution:
         tld: pd.DataFrame,
         cat_zone_correspondence: pd.DataFrame,
         func_params: dict[int | str, dict[str, float]],
+        *,
         tld_cat_col: str = "category",
         tld_min_col: str = "from",
         tld_max_col: str = "to",
@@ -114,12 +122,57 @@ class MultiCostDistribution:
         tld_trips_col: str = "trips",
         lookup_cat_col: str = "category",
         lookup_zone_col: str = "zone_id",
-    ):
+    ) -> MultiCostDistribution:
+        """constructor using pandas dataframes
+
+        Parameters
+        ----------
+        ordered_zones : pd.Series
+            list of zones in the same order as other inputs
+        tld : pd.DataFrame
+            tld data - should contain the tlds for each distribution
+            labeled by the `tld_cat_col`
+        cat_zone_correspondence : pd.DataFrame
+            lookup between categories values within `tld` and zones which
+            use the corresponding distribution
+        func_params : dict[int  |  str, dict[str, float]]
+            starting/run cost function params to use for each distribution 
+            key: distribution category,  value: dict[param name, param value] 
+        tld_cat_col : str, optional
+            column name for the category column in `tld`, by default "category"
+        tld_min_col : str, optional
+            column name for the min bin edge column in `tld`, by default "from"
+        tld_max_col : str, optional
+            column name for the max bin edge column in `tld`, by default "to"
+        tld_avg_col : str, optional
+            column name for the average distance column in `tld`, by default "av_distance"
+        tld_trips_col : str, optional
+            column name for the trips column in `tld`, by default "trips"
+        lookup_cat_col : str, optional
+            column name for the category column in `cat_zone_correspondence`, by default "category"
+        lookup_zone_col : str, optional
+            column name for the zone column in `cat_zone_correspondence`, by default "zone_id"
+
+        Returns
+        -------
+        MultiCostDistribution
+
+        
+        Raises
+        ------
+        KeyError
+            when a category value is not founf in the function parameter keys 
+
+        See Also
+        --------
+        `validate`
+        """        
 
         distributions: list[MGMCostDistribution] = []
 
         for category in cat_zone_correspondence[lookup_cat_col].unique():
-
+            if category not in func_params:  
+                raise KeyError(f"function parameters not provided for {category = }")
             distributions.append(
                 MGMCostDistribution.from_pandas(
                     category,
@@ -127,13 +180,13 @@ class MultiCostDistribution:
                     tld,
                     cat_zone_correspondence,
                     func_params[category],
-                    tld_cat_col,
-                    tld_min_col,
-                    tld_max_col,
-                    tld_avg_col,
-                    tld_trips_col,
-                    lookup_cat_col,
-                    lookup_zone_col,
+                    tld_cat_col = tld_cat_col,
+                    tld_min_col = tld_min_col,
+                    tld_max_col = tld_max_col,
+                    tld_avg_col = tld_avg_col,
+                    tld_trips_col = tld_trips_col,
+                    lookup_cat_col = lookup_cat_col,
+                    lookup_zone_col = lookup_zone_col,
                 )
             )
 
@@ -143,6 +196,20 @@ class MultiCostDistribution:
 
     @classmethod
     def validate(cls, distributions: list[MGMCostDistribution]):
+        """ Validates the distributions passed
+
+        Parameters
+        ----------
+        distributions : list[MGMCostDistribution]
+            Distributions to validate
+
+        Raises
+        ------
+        ValueError
+            The length of the list of the distributions passed is 0
+        ValueError
+            The same  zones are found in multiple distributions
+        """        
 
         if len(distributions) == 0:
             raise ValueError("no distributions provided")
@@ -158,7 +225,7 @@ class MultiCostDistribution:
         assert all_zones is not None
 
         if len(np.unique(all_zones)) != len(all_zones):
-            raise ValueError("duplicate zones found in the distribution zone definition")
+            raise ValueError("duplicate found in the distribution zone definition")
 
     def __iter__(self) -> Iterator[MGMCostDistribution]:
         yield from self.distributions
@@ -200,12 +267,14 @@ class MGMCostDistribution:
     # matrix_id_lookup: np.ndarray
     # function_params: dict[id, dict[str,float]]
 
-    name: str
+    name: str|int
     cost_distribution: cost_utils.CostDistribution
     zones: np.ndarray
     function_params: dict[str, float]
 
-    # TODO validate params
+    # TODO(kf) validate params
+
+    # TODO(kf) validate cost distributions
 
     @classmethod
     def from_pandas(
@@ -215,6 +284,7 @@ class MGMCostDistribution:
         tld: pd.DataFrame,
         cat_zone_correspondence: pd.DataFrame,
         func_params: dict[str, float],
+        *,
         tld_cat_col: str = "category",
         tld_min_col: str = "from",
         tld_max_col: str = "to",
@@ -223,6 +293,47 @@ class MGMCostDistribution:
         lookup_cat_col: str = "category",
         lookup_zone_col: str = "zone_id",
     ) -> MGMCostDistribution:
+        """constructor that uses pandas dataframes and series
+
+        Parameters
+        ----------
+        category : str | int
+            distribution category, used to label gravity model run 
+        ordered_zones : pd.Series
+            zones ordered in the same way as other inputs
+        tld : pd.DataFrame
+            tld data - should contain the tlds for each distribution
+            labeled by the `tld_cat_col`
+        cat_zone_correspondence : pd.DataFrame
+            lookup between categories values within `tld` and zones which
+            use the corresponding distribution
+        func_params : dict[int  |  str, dict[str, float]]
+            starting/run cost function params to use for each distribution 
+            key: distribution category,  value: dict[param name, param value] 
+        tld_cat_col : str, optional
+            column name for the category column in `tld`, by default "category"
+        tld_min_col : str, optional
+            column name for the min bin edge column in `tld`, by default "from"
+        tld_max_col : str, optional
+            column name for the max bin edge column in `tld`, by default "to"
+        tld_avg_col : str, optional
+            column name for the average distance column in `tld`, by default "av_distance"
+        tld_trips_col : str, optional
+            column name for the trips column in `tld`, by default "trips"
+        lookup_cat_col : str, optional
+            column name for the category column in `cat_zone_correspondence`, by default "category"
+        lookup_zone_col : str, optional
+            column name for the zone column in `cat_zone_correspondence`, by default "zone_id"
+
+        Returns
+        -------
+        MGMCostDistribution
+
+        Raises
+        ------
+        ValueError
+            if zones in `cat_zone_correspondence` are not present in `ordered_zones` 
+        """        
         # get a list of zones that use this category of TLD
         cat_zones = cat_zone_correspondence.loc[
             cat_zone_correspondence[lookup_cat_col] == category, lookup_zone_col
@@ -288,8 +399,9 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         super().__init__(cost_function=cost_function, cost_matrix=cost_matrix)
 
         if row_targets.sum() != col_targets.sum():
-            LOG.info(
+            warnings.warn(
                 "row and column target totals do not match. This is likely to cause Furnessing to fail."
+                f" Difference (row targets - col targets) = {round(row_targets.sum() - col_targets.sum(),2)}"
             )
 
         checks = {
@@ -306,11 +418,11 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
 
             num_zeros = (data == 0).sum()  # casting bool as 1, 0
 
-            LOG.info(f"There are {num_zeros} 0s in {name} ({(num_zeros/data.size)*100} %)")
+            LOG.info("There are %s 0s in %s (%s %)", num_zeros, name, (num_zeros/data.size)*100)
 
         zero_in_both = np.stack([row_targets == 0, col_targets == 0], axis=1).all(axis=1).sum()
 
-        LOG.info(f"There are {zero_in_both} zones with both 0 row and column targets.")
+        LOG.info("There are %s zones with both 0 row and column targets.", zero_in_both)
 
         self.row_targets = row_targets
         self.col_targets = col_targets
@@ -387,7 +499,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
     ) -> dict[str | int, GravityModelCalibrateResults]:
         params_len = len(distributions[0].function_params)
         ordered_init_params = []
-        # TODO validate cost distributions
+        
         for dist in distributions:
             params = self._order_cost_params(dist.function_params)
             for val in params:
@@ -409,7 +521,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
                     " with a cost greater than the binning"
                 )
             if min_cost < min_binning:
-                LOG.warning(
+                warnings.warn(
                     f"the min cost in the cost matrix for"
                     f" category {dist.name}, was {min_cost}, "
                     "whereas the lowest bin edge in cost"
