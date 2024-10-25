@@ -680,7 +680,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         self,
         distributions: MultiCostDistribution,
         running_log_path: Path,
-        furness_tol=DEFAULT_FURNESS_TOL,
+        furness_tol: float = DEFAULT_FURNESS_TOL,
     ) -> dict[int | str, GravityModelCalibrateResults]:
         """
         Run the gravity_model without calibrating.
