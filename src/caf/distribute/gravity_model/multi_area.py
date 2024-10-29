@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 # Built-Ins
+import copy
 import functools
 import logging
 import os
@@ -304,8 +305,15 @@ class MultiCostDistribution:
     def __len__(self) -> int:
         return len(self.distributions)
 
+    @property
     def copy(self) -> MultiCostDistribution:
-        return MultiCostDistribution(self.distributions)
+        """
+        Returns
+        -------
+        MultiCostDistribution
+            Deep copy of the object
+        """
+        return copy.deepcopy(self)
 
 
 @dataclass
@@ -462,7 +470,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         col_targets: np.ndarray,
         cost_matrix: np.ndarray,
         cost_function: cost_functions.CostFunction,
-        # TODO move these parameters as inputs of calibrate and run
+        # TODO(kf) move these parameters as inputs of calibrate and run
     ):
         super().__init__(cost_function=cost_function, cost_matrix=cost_matrix)
 
@@ -592,13 +600,16 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             min_cost = self.cost_matrix[dist.zones, :].min()
 
             if max_cost > max_binning:
-                LOG.warning(
-                    f"the maximum cost in the cost matrix for"
-                    f" category {dist.name}, was {max_cost}, "
+                warnings.warn(
+                    "the maximum cost in the cost matrix for"
+                    " category %s, was %s, "
                     "whereas the highest bin edge in cost"
-                    f" distribution was {max_binning}, "
+                    " distribution was %s, "
                     "you will not be fitting to trips"
-                    " with a cost greater than the binning"
+                    " with a cost greater than the binning",
+                    dist.name,
+                    max_cost,
+                    max_binning,
                 )
             if min_cost < min_binning:
                 warnings.warn(
