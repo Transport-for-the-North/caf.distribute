@@ -207,7 +207,11 @@ class TestDist:
             cost_matrix=infilled,
             cost_function=cost_functions.BuiltInCostFunction.LOG_NORMAL.get_cost_function(),
         )
-        results = model.calibrate(multi_tld, running_log_path=mock_dir / "temp_log.csv", gm_params=gm.GMCalibParams(furness_jac=True))
+        results = model.calibrate(
+            multi_tld,
+            running_log_path=mock_dir / "temp_log.csv",
+            gm_params=gm.GMCalibParams(furness_jac=True),
+        )
         return results
 
     @pytest.mark.parametrize("area", ["City", "Town", "External", "Village"])

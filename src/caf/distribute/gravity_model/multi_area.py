@@ -783,8 +783,8 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
 
     def _gravity_function(
         self,
-        init_params: dict[str, float],
-        cost_distributions: MGMCostDistribution,
+        init_params: dict[str|int, float],
+        cost_distributions: MultiCostDistribution,
         furness_tol: float,
         running_log_path: os.PathLike,
         params_len: int,
