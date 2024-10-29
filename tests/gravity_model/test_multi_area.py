@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 # Built-Ins
 from pathlib import Path
 
