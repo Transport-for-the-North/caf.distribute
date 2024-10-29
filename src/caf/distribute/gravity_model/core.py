@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """Core abstract functionality for gravity model classes to build on."""
 from __future__ import annotations
+
 # Built-Ins
 import abc
 import dataclasses
