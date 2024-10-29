@@ -10,4 +10,4 @@ from caf.distribute.gravity_model.multi_area import (
 
 # Models
 from caf.distribute.gravity_model.single_area import SingleAreaGravityModelCalibrator
-from caf.distribute.gravity_model.multi_area import MultiAreaGravityModelCalibrator
+from caf.distribute.gravity_model.multi_area import MultiAreaGravityModelCalibrator, GMCalibParams

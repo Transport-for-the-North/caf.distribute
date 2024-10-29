@@ -184,7 +184,7 @@ def fixture_cal_no_furness(data_dir, infilled, multi_tld, trip_ends, mock_dir):
         cost_function=cost_functions.BuiltInCostFunction.LOG_NORMAL.get_cost_function(),
     )
     results = model.calibrate(
-        multi_tld, running_log_path=mock_dir / "temp_log.csv", furness_jac=False
+        multi_tld, running_log_path=mock_dir / "temp_log.csv", gm_params=gm.GMCalibParams()
     )
     return results
 
@@ -207,7 +207,7 @@ class TestDist:
             cost_matrix=infilled,
             cost_function=cost_functions.BuiltInCostFunction.LOG_NORMAL.get_cost_function(),
         )
-        results = model.calibrate(multi_tld, running_log_path=mock_dir / "temp_log.csv")
+        results = model.calibrate(multi_tld, running_log_path=mock_dir / "temp_log.csv", gm_params=gm.GMCalibParams(furness_jac=True))
         return results
 
     @pytest.mark.parametrize("area", ["City", "Town", "External", "Village"])
