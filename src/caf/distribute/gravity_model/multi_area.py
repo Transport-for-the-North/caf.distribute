@@ -24,7 +24,6 @@ from caf.distribute.gravity_model.core import GravityModelCalibrateResults
 
 # # # CONSTANTS # # #
 LOG = logging.getLogger(__name__)
-DEFAULT_FURNESS_TOL = 1e-6
 
 
 # pylint:disable=duplicate-code
@@ -96,11 +95,69 @@ class MultiDistInput(BaseConfig):
 
 @dataclass
 class GMCalibParams:
+    """Parameters required for the multi tld gravity mode calibrate method
+
+    All of the arguements have defaults, i.e. you can create the default object with
+    no arguements. HOWEVER, read the parameter section below, it is important to
+    understand the impact and implications of the parameters you use. If they don't make
+    sense, go pester your nearest Demand Modelling expert.
+
+    Parameters
+    ----------
+    furness_jac: bool, optional
+        Whether to Furness within the Jacobian function. Not furnessing within
+        the Jacobian does not represent knock on effects to other areas of
+        altering parameters for a given area. If you expect these effects to be
+        significant this should be set to True, but otherwise the process runs
+        quicker with it set to False. Default False.
+
+    diff_step: float, optional
+        Copied from scipy.optimize.least_squares documentation, where it
+        is passed to:
+        Determines the relative step size for the finite difference
+        approximation of the Jacobian. The actual step is computed as
+        `x * diff_step`. If None (default), then diff_step is taken to be a
+        conventional “optimal” power of machine epsilon for the finite
+        difference scheme used, default 1e-8
+
+    ftol: float, optional
+        The tolerance to pass to `scipy.optimize.least_squares`. The search
+        will stop once this tolerance has been met. This is the
+        tolerance for termination by the change of the cost function, default 1e-4
+
+    xtol: float, optional
+        The tolerance to pass to `scipy.optimize.least_squares`. The search
+        will stop once this tolerance has been met. This is the
+        tolerance for termination by the change of the independent
+        variables. Default 1e-4
+
+    furness_tol: float, optional
+        Target Root Mean Square Error that is aimed for with each furness iteration,
+        once condition is met furness with terminate, returning that iterations results.
+        Default 1e-6
+
+    grav_max_iters: int, optional
+        The maximum number of calibration iterations to complete before
+        termination if the ftol has not been met. Default 100
+
+    failure_tol: float, optional
+        If, after initial calibration using `init_params`, the achieved
+        convergence is less than this value, calibration will be run again with
+        the default parameters from `self.cost_function`. Default 0
+
+    default_retry: bool, optional:
+        If, after running with `init_params`, the achieved convergence
+        is less than `failure_tol`, calibration will be run again with the
+        default parameters of `self.cost_function`.
+        This argument is ignored if the default parameters are given
+        as `init_params. Default True
+    """
+
     furness_jac: bool = False
     diff_step: float = 1e-8
     ftol: float = 1e-4
     xtol: float = 1e-4
-    furness_tol: float = DEFAULT_FURNESS_TOL
+    furness_tol: float = 1e-6
     grav_max_iters: int = 100
     failure_tol: float = 0
     default_retry: bool = True
@@ -430,7 +487,10 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             num_zeros = (data == 0).sum()  # casting bool as 1, 0
 
             LOG.info(
-                "There are %s 0s in %s (%s percent)", num_zeros, name, (num_zeros / data.size) * 100
+                "There are %s 0s in %s (%s percent)",
+                num_zeros,
+                name,
+                (num_zeros / data.size) * 100,
             )
 
         zero_in_both = np.stack([row_targets == 0, col_targets == 0], axis=1).all(axis=1).sum()
@@ -792,7 +852,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         self,
         distributions: MultiCostDistribution,
         running_log_path: Path,
-        furness_tol: float = DEFAULT_FURNESS_TOL,
+        furness_tol: float = 1e-6,
     ) -> dict[int | str, GravityModelCalibrateResults]:
         """
         Run the gravity_model without calibrating.
@@ -808,7 +868,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             Csv path to log results and info
         furness_tol : float, optional
             tolerance for difference in target and achieved value,
-            at which to stop furnessing, by default DEFAULT_FURNESS_TOL
+            at which to stop furnessing, by default 1e-6
 
         """
         params_len = len(distributions[0].function_params)
