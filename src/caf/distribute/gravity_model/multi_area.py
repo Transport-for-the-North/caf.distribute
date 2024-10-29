@@ -1,15 +1,15 @@
 # -*- coding: utf-8 -*-
 """Implementation of a self-calibrating single area gravity model."""
-# Built-Ins
 from __future__ import annotations
 
+# Built-Ins
 import functools
 import logging
 import os
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Optional, Iterator
-import warnings
+from typing import Any, Iterator, Optional
 
 # Third Party
 import numpy as np
@@ -20,9 +20,7 @@ from scipy import optimize
 # Local Imports
 from caf.distribute import cost_functions, furness
 from caf.distribute.gravity_model import core
-from caf.distribute.gravity_model.core import (
-    GravityModelCalibrateResults,
-)
+from caf.distribute.gravity_model.core import GravityModelCalibrateResults
 
 # # # CONSTANTS # # #
 LOG = logging.getLogger(__name__)
@@ -104,7 +102,8 @@ class MultiCostDistribution:
     ----------
     distributions: list[MGMCostDistribution]
         Distributions to be used for the multicost distributions
-    """    
+    """
+
     distributions: list[MGMCostDistribution]
 
     @classmethod
@@ -136,8 +135,8 @@ class MultiCostDistribution:
             lookup between categories values within `tld` and zones which
             use the corresponding distribution
         func_params : dict[int  |  str, dict[str, float]]
-            starting/run cost function params to use for each distribution 
-            key: distribution category,  value: dict[param name, param value] 
+            starting/run cost function params to use for each distribution
+            key: distribution category,  value: dict[param name, param value]
         tld_cat_col : str, optional
             column name for the category column in `tld`, by default "category"
         tld_min_col : str, optional
@@ -157,21 +156,21 @@ class MultiCostDistribution:
         -------
         MultiCostDistribution
 
-        
+
         Raises
         ------
         KeyError
-            when a category value is not founf in the function parameter keys 
+            when a category value is not founf in the function parameter keys
 
         See Also
         --------
         `validate`
-        """        
+        """
 
         distributions: list[MGMCostDistribution] = []
 
         for category in cat_zone_correspondence[lookup_cat_col].unique():
-            if category not in func_params:  
+            if category not in func_params:
                 raise KeyError(f"function parameters not provided for {category = }")
             distributions.append(
                 MGMCostDistribution.from_pandas(
@@ -180,13 +179,13 @@ class MultiCostDistribution:
                     tld,
                     cat_zone_correspondence,
                     func_params[category],
-                    tld_cat_col = tld_cat_col,
-                    tld_min_col = tld_min_col,
-                    tld_max_col = tld_max_col,
-                    tld_avg_col = tld_avg_col,
-                    tld_trips_col = tld_trips_col,
-                    lookup_cat_col = lookup_cat_col,
-                    lookup_zone_col = lookup_zone_col,
+                    tld_cat_col=tld_cat_col,
+                    tld_min_col=tld_min_col,
+                    tld_max_col=tld_max_col,
+                    tld_avg_col=tld_avg_col,
+                    tld_trips_col=tld_trips_col,
+                    lookup_cat_col=lookup_cat_col,
+                    lookup_zone_col=lookup_zone_col,
                 )
             )
 
@@ -196,7 +195,7 @@ class MultiCostDistribution:
 
     @classmethod
     def validate(cls, distributions: list[MGMCostDistribution]):
-        """ Validates the distributions passed
+        """Validates the distributions passed
 
         Parameters
         ----------
@@ -209,7 +208,7 @@ class MultiCostDistribution:
             The length of the list of the distributions passed is 0
         ValueError
             The same  zones are found in multiple distributions
-        """        
+        """
 
         if len(distributions) == 0:
             raise ValueError("no distributions provided")
@@ -267,7 +266,7 @@ class MGMCostDistribution:
     # matrix_id_lookup: np.ndarray
     # function_params: dict[id, dict[str,float]]
 
-    name: str|int
+    name: str | int
     cost_distribution: cost_utils.CostDistribution
     zones: np.ndarray
     function_params: dict[str, float]
@@ -298,7 +297,7 @@ class MGMCostDistribution:
         Parameters
         ----------
         category : str | int
-            distribution category, used to label gravity model run 
+            distribution category, used to label gravity model run
         ordered_zones : pd.Series
             zones ordered in the same way as other inputs
         tld : pd.DataFrame
@@ -308,8 +307,8 @@ class MGMCostDistribution:
             lookup between categories values within `tld` and zones which
             use the corresponding distribution
         func_params : dict[int  |  str, dict[str, float]]
-            starting/run cost function params to use for each distribution 
-            key: distribution category,  value: dict[param name, param value] 
+            starting/run cost function params to use for each distribution
+            key: distribution category,  value: dict[param name, param value]
         tld_cat_col : str, optional
             column name for the category column in `tld`, by default "category"
         tld_min_col : str, optional
@@ -332,8 +331,8 @@ class MGMCostDistribution:
         Raises
         ------
         ValueError
-            if zones in `cat_zone_correspondence` are not present in `ordered_zones` 
-        """        
+            if zones in `cat_zone_correspondence` are not present in `ordered_zones`
+        """
         # get a list of zones that use this category of TLD
         cat_zones = cat_zone_correspondence.loc[
             cat_zone_correspondence[lookup_cat_col] == category, lookup_zone_col
@@ -418,7 +417,9 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
 
             num_zeros = (data == 0).sum()  # casting bool as 1, 0
 
-            LOG.info("There are %s 0s in %s (%s %)", num_zeros, name, (num_zeros/data.size)*100)
+            LOG.info(
+                "There are %s 0s in %s (%s %)", num_zeros, name, (num_zeros / data.size) * 100
+            )
 
         zero_in_both = np.stack([row_targets == 0, col_targets == 0], axis=1).all(axis=1).sum()
 
@@ -499,7 +500,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
     ) -> dict[str | int, GravityModelCalibrateResults]:
         params_len = len(distributions[0].function_params)
         ordered_init_params = []
-        
+
         for dist in distributions:
             params = self._order_cost_params(dist.function_params)
             for val in params:
@@ -627,8 +628,10 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
 
         Parameters
         ----------
-        distributions: MultiCostDistribution,
+        distributions: MultiCostDistribution
+            distributions to use for the calibrations
         running_log_path: os.PathLike,
+            path to a csv to log the model iterations and results
         *args,
         **kwargs,
         Returns
@@ -656,7 +659,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
     def _jacobian_function(
         self,
         init_params: list[float],
-        cost_distributions: list[MultiCostDistribution],
+        cost_distributions: MultiCostDistribution,
         furness_tol: int,
         diff_step: float,
         furness_jac: bool,
@@ -723,12 +726,12 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
 
     def _gravity_function(
         self,
-        init_params,
-        cost_distributions,
-        furness_tol,
-        running_log_path,
-        params_len,
-        diff_step=0,
+        init_params: dict[str, float],
+        cost_distributions: MGMCostDistribution,
+        furness_tol: float,
+        running_log_path: os.PathLike,
+        params_len: int,
+        diff_step: int = 0,
         **_,
     ):
         del diff_step
@@ -799,6 +802,17 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
 
         This should be done when you have calibrating previously to find the
         correct parameters for the cost function.
+
+        Parameters
+        ----------
+        distributions : MultiCostDistribution
+            Distributions to use to run the gravity model
+        running_log_path : Path
+            Csv path to log results and info
+        furness_tol : float, optional
+            tolerance for difference in target and achieved value,
+            at which to stop furnessing, by default DEFAULT_FURNESS_TOL
+
         """
         params_len = len(distributions[0].function_params)
         cost_args = []

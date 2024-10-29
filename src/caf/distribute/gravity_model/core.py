@@ -93,7 +93,7 @@ class GravityModelCalibrateResults(GravityModelResults):
     cost_params: dict[str, Any]
 
     def plot_distributions(self, truncate_last_bin: bool = False) -> figure.Figure:
-        """ Plot a comparison of the achieved and target distributions.
+        """Plot a comparison of the achieved and target distributions.
 
         This method returns a matplotlib figure which can be saved or plotted
         as the user decides.
@@ -112,8 +112,8 @@ class GravityModelCalibrateResults(GravityModelResults):
         ------
         ValueError
             when the target and achieved distributions have different binning
-        """        
-        
+        """
+
         fig, ax = plt.subplots(figsize=(10, 6))
 
         errors = []
@@ -134,8 +134,6 @@ class GravityModelCalibrateResults(GravityModelResults):
         min_bin_edge = self.cost_distribution.min_vals
         bin_centres = self.cost_distribution.avg_vals
 
-        
-
         ax.bar(
             bin_centres,
             self.cost_distribution.band_share_vals,
@@ -155,7 +153,7 @@ class GravityModelCalibrateResults(GravityModelResults):
 
         if truncate_last_bin:
             top_min_bin = min_bin_edge.max()
-            ax.set_xlim(0, top_min_bin[-1] * 1.2)  
+            ax.set_xlim(0, top_min_bin[-1] * 1.2)
             fig.text(0.8, 0.025, f"final bin edge cut from {max_bin_edge.max()}", ha="center")
 
         ax.set_xlabel("Cost")
@@ -216,9 +214,9 @@ class GravityModelRunResults(GravityModelResults):
 
     @property
     def summary(self) -> pd.Series:
-        """Summary of the GM run parameters as a series.  
+        """Summary of the GM run parameters as a series.
 
-        Outputs the gravity model parameters used to generate the distribution.  
+        Outputs the gravity model parameters used to generate the distribution.
 
         Returns
         -------

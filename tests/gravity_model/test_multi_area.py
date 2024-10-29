@@ -147,8 +147,34 @@ def fixture_jac_furn(data_dir, mock_dir):
     return conf
 
 
+@pytest.fixture(name="multi_tld", scope="session")
+def _multi_tld(data_dir, mock_dir):
+    tld_lookup = pd.read_csv(data_dir / "distributions_lookup.csv")
+
+    ordered_zones = tld_lookup["zone"]
+
+    func_parameters = {}
+    for cat in tld_lookup["cat"].unique():
+        func_parameters[cat] = {"mu": 1, "sigma": 2}
+
+    multitld = gm.MultiCostDistribution.from_pandas(
+        ordered_zones,
+        pd.read_csv(data_dir / "distributions.csv"),
+        tld_lookup,
+        func_parameters,
+        tld_cat_col="cat",
+        tld_min_col="lower",
+        tld_max_col="upper",
+        tld_avg_col="avg",
+        tld_trips_col="trips",
+        lookup_cat_col="cat",
+        lookup_zone_col="zone",
+    )
+    return multitld
+
+
 @pytest.fixture(name="cal_no_furness", scope="session")
-def fixture_cal_no_furness(data_dir, infilled, no_furness_jac_conf, trip_ends, mock_dir):
+def fixture_cal_no_furness(data_dir, infilled, multi_tld, trip_ends, mock_dir):
     row_targets = trip_ends["origin"].values
     col_targets = trip_ends["destination"].values
     model = gm.MultiAreaGravityModelCalibrator(
@@ -156,9 +182,10 @@ def fixture_cal_no_furness(data_dir, infilled, no_furness_jac_conf, trip_ends, m
         col_targets=col_targets,
         cost_matrix=infilled,
         cost_function=cost_functions.BuiltInCostFunction.LOG_NORMAL.get_cost_function(),
-        params=no_furness_jac_conf,
     )
-    results = model.calibrate(running_log_path=mock_dir / "temp_log.csv")
+    results = model.calibrate(
+        multi_tld, running_log_path=mock_dir / "temp_log.csv", furness_jac=False
+    )
     return results
 
 
@@ -171,7 +198,7 @@ class TestUtils:
 
 class TestDist:
     @pytest.fixture(name="cal_furness", scope="session")
-    def fixture_cal_furness(self, data_dir, infilled, furness_jac_conf, trip_ends, mock_dir):
+    def fixture_cal_furness(self, data_dir, infilled, multi_tld, trip_ends, mock_dir):
         row_targets = trip_ends["origin"].values
         col_targets = trip_ends["destination"].values
         model = gm.MultiAreaGravityModelCalibrator(
@@ -179,9 +206,8 @@ class TestDist:
             col_targets=col_targets,
             cost_matrix=infilled,
             cost_function=cost_functions.BuiltInCostFunction.LOG_NORMAL.get_cost_function(),
-            params=furness_jac_conf,
         )
-        results = model.calibrate(running_log_path=mock_dir / "temp_log.csv")
+        results = model.calibrate(multi_tld, running_log_path=mock_dir / "temp_log.csv")
         return results
 
     @pytest.mark.parametrize("area", ["City", "Town", "External", "Village"])

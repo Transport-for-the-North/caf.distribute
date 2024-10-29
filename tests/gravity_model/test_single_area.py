@@ -20,7 +20,6 @@ from caf.toolkit import cost_utils
 from caf.distribute import cost_functions
 from caf.distribute.gravity_model import (
     GravityModelCalibrateResults,
-    GravityModelResults,
     GravityModelRunResults,
     SingleAreaGravityModelCalibrator,
 )
@@ -438,6 +437,7 @@ def fixture_simple_tanner_calib(tmp_path) -> GMCalibrateResults:
     """Load in the small_and_simple log normal test"""
     path = tmp_path / "simple_tanner_calib"
     path.mkdir()
+    # TODO(KF) sense check these data sets make sure all is good
     return simple_gm_calib_results(
         tmp_path=path,
         cost_function=cost_functions.BuiltInCostFunction.TANNER.get_cost_function(),
@@ -563,6 +563,7 @@ class TestCalibrationMethods:
             init_params=run_and_results.calib_init_params,
             n_random_tries=0,
         )
+
         run_and_results.assert_results(
             gm_results=gm_results,
         )
