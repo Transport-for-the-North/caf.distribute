@@ -176,6 +176,7 @@ class MultiCostDistribution:
 
     distributions: list[MGMCostDistribution]
 
+    # pylint: disable=Too many arguments
     @classmethod
     def from_pandas(
         cls,
@@ -351,7 +352,7 @@ class MGMCostDistribution:
     # TODO(kf) validate params
 
     # TODO(kf) validate cost distributions
-
+    # pylint: disable=too-many-arguments, too-many-locals
     @classmethod
     def from_pandas(
         cls,
