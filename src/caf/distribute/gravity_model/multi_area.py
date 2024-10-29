@@ -176,7 +176,6 @@ class MultiCostDistribution:
 
     distributions: list[MGMCostDistribution]
 
-    
     @classmethod
     def from_pandas(
         cls,
@@ -412,7 +411,7 @@ class MGMCostDistribution:
             if zones in `cat_zone_correspondence` are not present in `ordered_zones`
         """
         # pylint: disable=too-many-arguments, too-many-locals
-        
+
         # get a list of zones that use this category of TLD
         cat_zones = cat_zone_correspondence.loc[
             cat_zone_correspondence[lookup_cat_col] == category, lookup_zone_col
