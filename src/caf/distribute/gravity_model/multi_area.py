@@ -504,28 +504,6 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         if len(col_targets) != cost_matrix.shape[1]:
             raise IndexError("col_targets doesn't match cost_matrix")
 
-    def process_tlds(self):
-        """Get distributions in the right format for a multi-area gravity model."""
-        dists = []
-        for cat in self.tlds.index.unique():
-            tld = self.tlds.loc[cat]
-            tld = cost_utils.CostDistribution(tld)
-            zones = self.lookup[self.lookup["cat"] == cat].index.values
-            if len(zones) == 0:
-                raise ValueError(
-                    f"{cat} doesn't seem to appear in the given tld "
-                    "lookup. Check for any typos (e.g. lower/upper case). "
-                    f"If this is expected, remove {cat} from your "
-                    "tlds dataframe before inputting."
-                )
-
-            distribution = MultiCostDistribution(
-                name=cat, cost_distribution=tld, zones=zones, function_params=self.init_params
-            )
-            dists.append(distribution)
-
-        return dists
-
     def _calculate_perceived_factors(
         self,
         target_cost_distribution: cost_utils.CostDistribution,
@@ -624,12 +602,15 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
                 )
             if min_cost < min_binning:
                 warnings.warn(
-                    f"the min cost in the cost matrix for"
-                    f" category {dist.name}, was {min_cost}, "
-                    "whereas the lowest bin edge in cost"
-                    f" distribution was {min_binning}, "
-                    "you will not be fitting to trips"
-                    " with a cost less than the binning"
+                    "the min cost in the cost matrix for"
+                    " category %s, was %s,"
+                    " whereas the lowest bin edge in cost"
+                    " distribution was %s, "
+                    " you will not be fitting to trips"
+                    " with a cost less than the binning",
+                    dist.name,
+                    min_cost,
+                    min_binning,
                 )
 
         gravity_kwargs: dict[str, Any] = {
