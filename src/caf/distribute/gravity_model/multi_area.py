@@ -176,7 +176,7 @@ class MultiCostDistribution:
 
     distributions: list[MGMCostDistribution]
 
-    # pylint: disable=Too many arguments
+    
     @classmethod
     def from_pandas(
         cls,
@@ -237,6 +237,7 @@ class MultiCostDistribution:
         --------
         `validate`
         """
+        # pylint: disable=too-many-arguments
 
         distributions: list[MGMCostDistribution] = []
 
@@ -352,7 +353,6 @@ class MGMCostDistribution:
     # TODO(kf) validate params
 
     # TODO(kf) validate cost distributions
-    # pylint: disable=too-many-arguments, too-many-locals
     @classmethod
     def from_pandas(
         cls,
@@ -411,6 +411,8 @@ class MGMCostDistribution:
         ValueError
             if zones in `cat_zone_correspondence` are not present in `ordered_zones`
         """
+        # pylint: disable=too-many-arguments, too-many-locals
+        
         # get a list of zones that use this category of TLD
         cat_zones = cat_zone_correspondence.loc[
             cat_zone_correspondence[lookup_cat_col] == category, lookup_zone_col
@@ -603,26 +605,20 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             if max_cost > max_binning:
                 warnings.warn(
                     "the maximum cost in the cost matrix for"
-                    " category %s, was %s, "
+                    f" category {dist.name}, was {max_cost}, "
                     "whereas the highest bin edge in cost"
-                    " distribution was %s, "
+                    f" distribution was {max_binning}, "
                     "you will not be fitting to trips"
-                    " with a cost greater than the binning",
-                    dist.name,
-                    max_cost,
-                    max_binning,
+                    " with a cost greater than the binning"
                 )
             if min_cost < min_binning:
                 warnings.warn(
                     "the min cost in the cost matrix for"
-                    " category %s, was %s,"
+                    f" category {dist.name}, was {min_cost},"
                     " whereas the lowest bin edge in cost"
-                    " distribution was %s, "
+                    f" distribution was {min_binning}, "
                     " you will not be fitting to trips"
-                    " with a cost less than the binning",
-                    dist.name,
-                    min_cost,
-                    min_binning,
+                    " with a cost less than the binning"
                 )
 
         gravity_kwargs: dict[str, Any] = {
