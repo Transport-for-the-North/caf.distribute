@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """Implementation of a self-calibrating single area gravity model."""
+from __future__ import annotations
 # Built-Ins
 import functools
 import logging
