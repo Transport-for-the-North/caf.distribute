@@ -90,7 +90,7 @@ class GravityModelCalibrateResults(GravityModelResults):
     # Targets
     target_cost_distribution: cost_utils.CostDistribution
     cost_function: cost_functions.CostFunction
-    cost_params: dict[str|int, Any]
+    cost_params: dict[str | int, Any]
 
     def plot_distributions(self, truncate_last_bin: bool = False) -> figure.Figure:
         """Plot a comparison of the achieved and target distributions.
