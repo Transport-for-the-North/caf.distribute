@@ -266,7 +266,7 @@ class MultiCostDistribution:
 
     @classmethod
     def validate(cls, distributions: list[MGMCostDistribution]):
-        """Checks the distributions passed.
+        """Check the distributions passed.
 
         Raises an error if duplicate zones are found across different
         distributions.
@@ -301,7 +301,7 @@ class MultiCostDistribution:
             raise ValueError("duplicate found in the distribution zone definition")
 
     def __iter__(self) -> Iterator[MGMCostDistribution]:
-        """Iterates through each distribution.
+        """Iterate through each distribution.
 
         Yields
         ------
@@ -311,7 +311,7 @@ class MultiCostDistribution:
         yield from self.distributions
 
     def __getitem__(self, x: int) -> MGMCostDistribution:
-        """Retrieves the xth distribution.
+        """Retrieve the xth distribution.
 
         Parameters
         ----------
@@ -326,7 +326,7 @@ class MultiCostDistribution:
         return self.distributions[x]
 
     def __len__(self) -> int:
-        """The number of distrubtions.
+        """Number of distrubtions.
 
         Returns
         -------
@@ -336,7 +336,7 @@ class MultiCostDistribution:
         return len(self.distributions)
 
     def copy(self) -> MultiCostDistribution:
-        """A wrapper around deepcopy.
+        """Wrapper around deepcopy.
 
         Returns
         -------
