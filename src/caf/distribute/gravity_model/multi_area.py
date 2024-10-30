@@ -306,7 +306,7 @@ class MultiCostDistribution:
     def __len__(self) -> int:
         return len(self.distributions)
 
-    @property
+
     def copy(self) -> MultiCostDistribution:
         """
         Returns
@@ -475,6 +475,10 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         # TODO(kf) move these parameters as inputs of calibrate and run
     ):
         super().__init__(cost_function=cost_function, cost_matrix=cost_matrix)
+
+        # This is to stop MyPy moaning
+        self.achieved_distribution: np.ndarray
+        self._loop_start_time: float
 
         if row_targets.sum() != col_targets.sum():
             warnings.warn(
@@ -771,7 +775,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
 
     def _gravity_function(
         self,
-        init_params: dict[str | int, float],
+        init_params: list[float],
         cost_distributions: MultiCostDistribution,
         furness_tol: float,
         running_log_path: os.PathLike,
@@ -828,7 +832,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         self._loop_start_time = timing.current_milli_time()
 
         self.achieved_cost_dist: list[cost_utils.CostDistribution] = distributions
-        self.achieved_convergence: dict[str, float] = convergences
+        self.achieved_convergence: dict[str|int, float] = convergences
         self.achieved_distribution = matrix
 
         achieved_residuals = np.concatenate(residuals)
@@ -894,7 +898,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
 def gravity_model(
     row_targets: pd.Series,
     col_targets: np.ndarray,
-    cost_distributions: list[MultiCostDistribution],
+    cost_distributions: MultiCostDistribution,
     cost_function: cost_functions.CostFunction,
     cost_mat: pd.DataFrame,
     furness_max_iters: int,

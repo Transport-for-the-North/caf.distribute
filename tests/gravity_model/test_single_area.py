@@ -20,6 +20,7 @@ from caf.toolkit import cost_utils
 from caf.distribute import cost_functions
 from caf.distribute.gravity_model import (
     GravityModelCalibrateResults,
+    GravityModelResults,
     GravityModelRunResults,
     SingleAreaGravityModelCalibrator,
 )
@@ -359,66 +360,84 @@ def simple_gm_calib_results(tmp_path, cost_function) -> GMCalibrateResults:
     """Load in the small_and_simple test"""
     running_log_path = tmp_path / "run_log.csv"
     data_path = TEST_DATA_PATH / "small_and_simple"
-    return GMCalibrateResults.from_file(
+    results = GMCalibrateResults.from_file(
         path=data_path,
         running_log_path=running_log_path,
         cost_function=cost_function,
     )
+    # this is to stop MyPy moaning
+    assert isinstance(results, GMCalibrateResults)
+    return results
 
 
 def real_gm_calib_results(tmp_path, cost_function) -> GMCalibrateResults:
     """Load in the real world test"""
     running_log_path = tmp_path / "run_log.csv"
     data_path = TEST_DATA_PATH / "realistic"
-    return GMCalibrateResults.from_file(
+    results = GMCalibrateResults.from_file(
         path=data_path,
         running_log_path=running_log_path,
         cost_function=cost_function,
     )
+    # this is to stop MyPy moaning
+    assert isinstance(results, GMCalibrateResults)
+    return results
 
 
-def real_gm_calib_perceived_results(tmp_path, cost_function) -> GMCalibrateResults:
+def real_gm_calib_perceived_results(tmp_path, cost_function) -> GMCalibratePerceivedResults:
     """Load in the real world test"""
     running_log_path = tmp_path / "run_log.csv"
     data_path = TEST_DATA_PATH / "realistic"
-    return GMCalibratePerceivedResults.from_file(
+    results = GMCalibratePerceivedResults.from_file(
         path=data_path,
         running_log_path=running_log_path,
         cost_function=cost_function,
     )
+    # this is to stop MyPy moaning
+    assert isinstance(results, GMCalibratePerceivedResults)
+    return results
 
 
 def simple_gm_run_results(tmp_path, cost_function) -> GMRunResults:
     """Load in the small_and_simple test"""
     running_log_path = tmp_path / "run_log.csv"
     data_path = TEST_DATA_PATH / "small_and_simple"
-    return GMRunResults.from_file(
+    results = GMRunResults.from_file(
         path=data_path,
         running_log_path=running_log_path,
         cost_function=cost_function,
     )
+    # this is to stop MyPy moaning
+    assert isinstance(results, GMRunResults)
+    return results
 
 
 def real_gm_run_results(tmp_path, cost_function) -> GMRunResults:
     """Load in the real world test"""
     running_log_path = tmp_path / "run_log.csv"
     data_path = TEST_DATA_PATH / "realistic"
-    return GMRunResults.from_file(
+    results = GMRunResults.from_file(
         path=data_path,
         running_log_path=running_log_path,
         cost_function=cost_function,
     )
+    # this is to stop MyPy moaning
+    assert isinstance(results, GMRunResults)
+    return results
 
 
-def real_gm_run_perceived_results(tmp_path, cost_function) -> GMRunResults:
+def real_gm_run_perceived_results(tmp_path, cost_function) -> GMRunPerceivedResults:
     """Load in the real world test"""
     running_log_path = tmp_path / "run_log.csv"
     data_path = TEST_DATA_PATH / "realistic"
-    return GMRunPerceivedResults.from_file(
+    results = GMRunPerceivedResults.from_file(
         path=data_path,
         running_log_path=running_log_path,
         cost_function=cost_function,
     )
+    # this is to stop MyPy moaning
+    assert isinstance(results, GMRunPerceivedResults)
+    return results
 
 
 @pytest.fixture(name="simple_log_normal_calib")
