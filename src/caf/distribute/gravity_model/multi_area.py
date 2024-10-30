@@ -326,7 +326,7 @@ class MultiCostDistribution:
         return self.distributions[x]
 
     def __len__(self) -> int:
-        """Number of distrubtions.
+        """ Get the number of distrubtions.
 
         Returns
         -------
@@ -336,7 +336,7 @@ class MultiCostDistribution:
         return len(self.distributions)
 
     def copy(self) -> MultiCostDistribution:
-        """Wrapper around deepcopy.
+        """ Get a copy of the object.
 
         Returns
         -------
