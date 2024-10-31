@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 """Core abstract functionality for gravity model classes to build on."""
+from __future__ import annotations
+
 # Built-Ins
 import abc
 import dataclasses
@@ -90,33 +92,71 @@ class GravityModelCalibrateResults(GravityModelResults):
     # Targets
     target_cost_distribution: cost_utils.CostDistribution
     cost_function: cost_functions.CostFunction
-    cost_params: dict[str, Any]
+    cost_params: dict[str | int, Any]
 
-    def plot_distributions(self) -> figure.Figure:
-        """
-        Plot a comparison of the achieved and target distributions.
+    def plot_distributions(self, truncate_last_bin: bool = False) -> figure.Figure:
+        """Plot a comparison of the achieved and target distributions.
 
         This method returns a matplotlib figure which can be saved or plotted
         as the user decides.
+
+        Parameters
+        ----------
+        truncate_last_bin : bool, optional
+            whether to truncate the graph to 1.2x the lower bin edge, by default False
+
+        Returns
+        -------
+        figure.Figure
+            the plotted distributions
+
+        Raises
+        ------
+        ValueError
+            when the target and achieved distributions have different binning
         """
+
         fig, ax = plt.subplots(figsize=(10, 6))
+
+        errors = []
+        for attr in ("max_vals", "min_vals", "avg_vals"):
+            if set(getattr(self.cost_distribution, attr)) != set(
+                getattr(self.target_cost_distribution, attr)
+            ):
+                errors.append(attr)
+
+        if len(errors) > 0:
+            raise ValueError(
+                "To plot distributions, the target and achieved distributions"
+                " must have the same binning. The distributions have different "
+                + " and ".join(errors)
+            )
+
+        max_bin_edge = self.cost_distribution.max_vals
+        min_bin_edge = self.cost_distribution.min_vals
+        bin_centres = self.cost_distribution.avg_vals
+
         ax.bar(
-            self.cost_distribution.avg_vals,
+            bin_centres,
             self.cost_distribution.band_share_vals,
-            width=self.cost_distribution.max_vals - self.cost_distribution.min_vals,
+            width=max_bin_edge - min_bin_edge,
             label="Achieved Distribution",
             color="blue",
             alpha=0.7,
         )
         ax.bar(
-            self.cost_distribution.avg_vals,
+            bin_centres,
             self.target_cost_distribution.band_share_vals,
-            width=self.target_cost_distribution.max_vals
-            - self.target_cost_distribution.min_vals,
+            width=max_bin_edge - min_bin_edge,
             label="Target Distribution",
             color="orange",
             alpha=0.7,
         )
+
+        if truncate_last_bin:
+            top_min_bin = min_bin_edge.max()
+            ax.set_xlim(0, top_min_bin[-1] * 1.2)
+            fig.text(0.8, 0.025, f"final bin edge cut from {max_bin_edge.max()}", ha="center")
 
         ax.set_xlabel("Cost")
         ax.set_ylabel("Trips")
@@ -124,6 +164,18 @@ class GravityModelCalibrateResults(GravityModelResults):
         ax.legend()
 
         return fig
+
+    @property
+    def summary(self) -> pd.Series:
+        """Summary of the GM calibration parameters as a series.
+
+        Outputs the gravity model achieved parameters and the convergence.
+
+        Returns
+        -------
+        pd.DataFrame
+            a summary of the calibration
+        """
 
 
 @dataclasses.dataclass
@@ -161,6 +213,19 @@ class GravityModelRunResults(GravityModelResults):
     target_cost_distribution: Optional[cost_utils.CostDistribution] = None
     cost_function: Optional[cost_functions.CostFunction] = None
     cost_params: Optional[dict[str, Any]] = None
+
+    @property
+    def summary(self) -> pd.Series:
+        """Summary of the GM run parameters as a series.
+
+        Outputs the gravity model parameters used to generate the distribution.
+
+        Returns
+        -------
+        pd.DataFrame
+            a summary of the run
+        """
+        return pd.Series(self.cost_params)
 
 
 class GravityModelBase(abc.ABC):

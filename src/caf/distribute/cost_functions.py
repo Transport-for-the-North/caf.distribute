@@ -34,8 +34,8 @@ class BuiltInCostFunction(enum.Enum):
         if self == BuiltInCostFunction.TANNER:
             return CostFunction(
                 name=self.name,
-                params={"alpha": (-5, 5), "beta": (-5, 5)},
-                default_params={"alpha": 1, "beta": 1},
+                params={"alpha": (-1, 1), "beta": (-1, 1)},
+                default_params={"alpha": 0.1, "beta": -0.1},
                 function=tanner,
             )
 
