@@ -134,7 +134,7 @@ class GravityModelCalibrateResults(GravityModelResults):
 
         max_bin_edge = self.cost_distribution.max_vals
         min_bin_edge = self.cost_distribution.min_vals
-        bin_centres = (max_bin_edge+min_bin_edge)/2
+        bin_centres = (max_bin_edge + min_bin_edge) / 2
 
         ax.bar(
             bin_centres,
