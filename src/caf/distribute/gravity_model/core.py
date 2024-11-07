@@ -119,7 +119,7 @@ class GravityModelCalibrateResults(GravityModelResults):
         fig, ax = plt.subplots(figsize=(10, 6))
 
         errors = []
-        for attr in ("max_vals", "min_vals", "avg_vals"):
+        for attr in ("max_vals", "min_vals"):
             if set(getattr(self.cost_distribution, attr)) != set(
                 getattr(self.target_cost_distribution, attr)
             ):
@@ -134,7 +134,7 @@ class GravityModelCalibrateResults(GravityModelResults):
 
         max_bin_edge = self.cost_distribution.max_vals
         min_bin_edge = self.cost_distribution.min_vals
-        bin_centres = self.cost_distribution.avg_vals
+        bin_centres = (max_bin_edge + min_bin_edge) / 2
 
         ax.bar(
             bin_centres,
@@ -176,6 +176,10 @@ class GravityModelCalibrateResults(GravityModelResults):
         pd.DataFrame
             a summary of the calibration
         """
+
+        output_params = self.cost_params.copy()
+        output_params["convergence"] = self.cost_convergence
+        return pd.Series(output_params)
 
 
 @dataclasses.dataclass
