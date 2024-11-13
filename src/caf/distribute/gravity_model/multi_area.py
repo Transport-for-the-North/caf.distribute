@@ -953,7 +953,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         results = {}
         for i, dist in enumerate(distributions):
             result_i = GravityModelCalibrateResults(
-                cost_distribution=self.achieved_cost_dist[i],
+                cost_distribution=self.achieved_cost_dist[dist.name],
                 cost_convergence=self.achieved_convergence[dist.name],
                 value_distribution=self.achieved_distribution[dist.zones],
                 target_cost_distribution=dist.cost_distribution,
@@ -991,7 +991,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
                 distributions, running_log_path, calib_params, return_distributions=True
             )
 
-        self.run(distributions, running_log_path, furness_tol, four_d_inputs)
+        return self.run(distributions, running_log_path, furness_tol, four_d_inputs)
 
 
 def gravity_model(
