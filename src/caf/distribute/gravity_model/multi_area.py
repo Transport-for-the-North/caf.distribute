@@ -30,68 +30,68 @@ LOG = logging.getLogger(__name__)
 # pylint:disable=duplicate-code
 # Furness called with same parameters in single and multi-area
 # # # CLASSES # # #
-class MultiDistInput(BaseConfig):
-    """
-    Input to multi cost distribution calibrator.
-
-    Parameters
-    ----------
-    tld_file: Path
-        Path to a file containing distributions. This should contain 5 columns,
-        the names of which must be specified below.
-    tld_lookup_file: Path
-        Path to a lookup from distribution areas to zones. Should contain 2
-        columns which are explained below.
-    cat_col: str
-        The name of the column containing distribution area/categories in TLDFile.
-        E.g. 'City', 'Village', 'Town', if there are different distributions for
-        these different are types
-    min_col: str
-        The name of the column containing lower bounds of cost bands.
-    max_col: str
-        The name of the column containing upper bounds of cost bands.
-    ave_col: str
-        The name of the column containing average values of cost bands.
-    trips_col: str
-        The name of the column containing numbers of trips for a given cost band.
-    lookup_cat_col: str
-        The name of the column in the lookup containing the categories. The
-        names of the values (but not the column name) must match the names in
-        the cat_col of the TLD file. There must not be any distributions defined
-        in the TLDFile which do not appear in the lookup.
-    lookup_zone_col: str
-        The column in the lookup containing zone identifiers. The lookup must
-        contain all zones in the zone system.
-    init_params: dict[str, float]
-        A dict containing init_params for the cost function when calibrating.
-        If left blank the default value from the cost_function will be used.
-    log_path: Path
-        Path to where the log file should be saved. Saved as a csv but this can
-        also be a path to a txt file.
-    furness_tolerance: float
-        The tolerance for the furness in the gravity function. In general lower
-        tolerance will take longer but may yield better results.
-    furness_jac: bool
-        Whether to furness within the jacobian function. Not furnessing within
-        the jacobian does not represent knock on effects to other areas of
-        altering parameters for a given area. If you expect these effects to be
-        significant this should be set to True, but otherwise the process runs
-        quicker with it set to False.
-    """
-
-    tld_file: Path | pd.DataFrame
-    tld_lookup_file: Path | pd.DataFrame
-    cat_col: str = "cat"
-    min_col: str = "min"
-    max_col: str = "max"
-    ave_col: str = "ave"
-    trips_col: str = "trips"
-    lookup_cat_col: str = "cat"
-    lookup_zone_col: str = "zone"
-    init_params: dict[str, float]
-    log_path: Path
-    furness_tolerance: float = 1e-6
-    furness_jac: float = False
+# class MultiDistInput(BaseConfig):
+#     """
+#     Input to multi cost distribution calibrator.
+#
+#     Parameters
+#     ----------
+#     tld_file: Path
+#         Path to a file containing distributions. This should contain 5 columns,
+#         the names of which must be specified below.
+#     tld_lookup_file: Path
+#         Path to a lookup from distribution areas to zones. Should contain 2
+#         columns which are explained below.
+#     cat_col: str
+#         The name of the column containing distribution area/categories in TLDFile.
+#         E.g. 'City', 'Village', 'Town', if there are different distributions for
+#         these different are types
+#     min_col: str
+#         The name of the column containing lower bounds of cost bands.
+#     max_col: str
+#         The name of the column containing upper bounds of cost bands.
+#     ave_col: str
+#         The name of the column containing average values of cost bands.
+#     trips_col: str
+#         The name of the column containing numbers of trips for a given cost band.
+#     lookup_cat_col: str
+#         The name of the column in the lookup containing the categories. The
+#         names of the values (but not the column name) must match the names in
+#         the cat_col of the TLD file. There must not be any distributions defined
+#         in the TLDFile which do not appear in the lookup.
+#     lookup_zone_col: str
+#         The column in the lookup containing zone identifiers. The lookup must
+#         contain all zones in the zone system.
+#     init_params: dict[str, float]
+#         A dict containing init_params for the cost function when calibrating.
+#         If left blank the default value from the cost_function will be used.
+#     log_path: Path
+#         Path to where the log file should be saved. Saved as a csv but this can
+#         also be a path to a txt file.
+#     furness_tolerance: float
+#         The tolerance for the furness in the gravity function. In general lower
+#         tolerance will take longer but may yield better results.
+#     furness_jac: bool
+#         Whether to furness within the jacobian function. Not furnessing within
+#         the jacobian does not represent knock on effects to other areas of
+#         altering parameters for a given area. If you expect these effects to be
+#         significant this should be set to True, but otherwise the process runs
+#         quicker with it set to False.
+#     """
+#
+#     tld_file: Path | pd.DataFrame
+#     tld_lookup_file: Path | pd.DataFrame
+#     cat_col: str = "cat"
+#     min_col: str = "min"
+#     max_col: str = "max"
+#     ave_col: str = "ave"
+#     trips_col: str = "trips"
+#     lookup_cat_col: str = "cat"
+#     lookup_zone_col: str = "zone"
+#     init_params: dict[str, float]
+#     log_path: Path
+#     furness_tolerance: float = 1e-6
+#     furness_jac: float = False
 
 
 @dataclass
@@ -175,6 +175,13 @@ class MultiCostDistribution:
     """
 
     distributions: list[MGMCostDistribution]
+
+    def set_by_name(self, name, value):
+        for val in self:
+            if val.name == name:
+                val.function_params = value
+                return
+        raise KeyError(f"{name} not in distributions.")
 
     @classmethod
     def from_pandas(
@@ -566,7 +573,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
     def _create_seed_matrix(self, cost_distributions, cost_args, params_len):
         base_mat = np.zeros_like(self.cost_matrix)
         zones = []
-        for i, dist in enumerate(cost_distributions.values()):
+        for i, dist in enumerate(cost_distributions):
             init_params = cost_args[i * params_len : i * params_len + params_len]
             init_params_kwargs = self._cost_params_to_kwargs(init_params)
             mat_slice = self.cost_function.calculate(
@@ -585,6 +592,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         distributions: MultiCostDistribution,
         running_log_path: Path,
         gm_params: GMCalibParams,
+        return_distributions: bool = False,
         verbose: int = 0,
         **kwargs,
     ) -> dict[str | int, GravityModelCalibrateResults]:
@@ -603,6 +611,9 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             distributions to use for the calibrations
         running_log_path: os.PathLike,
             path to a csv to log the model iterations and results
+        return_distributions: bool = True
+            Whether to update the input distributions with the best params found,
+            and return.
         gm_params: GMCalibParams
             defines the detailed parameters, see `GMCalibParams` documentation for more info
         *args,
@@ -726,16 +737,22 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         results = {}
         for i, dist in enumerate(distributions):
             result_i = GravityModelCalibrateResults(
-                cost_distribution=self.achieved_cost_dist[i],
+                cost_distribution=self.achieved_cost_dist[dist.name],
                 cost_convergence=self.achieved_convergence[dist.name],
                 value_distribution=self.achieved_distribution[dist.zones],
                 target_cost_distribution=dist.cost_distribution,
                 cost_function=self.cost_function,
-                cost_params=iter_params,
+                cost_params=self._cost_params_to_kwargs(
+                    best_params[i * params_len : i * params_len + params_len]
+                ),
             )
-            dist.function_params = iter_params
 
-            i += 1
+            results[dist.name] = result_i
+        if return_distributions:
+            for area, dist in results.items():
+                distributions.set_by_name(area, dist.cost_params)
+            return results, distributions
+
         return results
 
     def _jacobian_function(
@@ -750,7 +767,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
     ):
         del running_log_path
         # Build empty jacobian matrix
-        jac_length = sum(len(dist.cost_distribution) for dist in cost_distributions.values())
+        jac_length = sum(len(dist.cost_distribution) for dist in cost_distributions)
         jac_width = len(cost_distributions) * params_len
         jacobian = np.zeros((jac_length, jac_width))
         # Build seed matrix
@@ -765,7 +782,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         # Allows iteration of cost_distributions within a loop of cost_distributions
         inner_dists = cost_distributions.copy()
 
-        for j, dist in enumerate(cost_distributions.values()):
+        for j, dist in enumerate(cost_distributions):
             distributions = init_params[j * params_len : j * params_len + params_len]
             init_params_kwargs = self._cost_params_to_kwargs(distributions)
             for i, cost_param in enumerate(self.cost_function.kw_order):
@@ -788,7 +805,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
                         warning=False,
                     )
                 test_res = []
-                for inner_dist in inner_dists.values():
+                for inner_dist in inner_dists:
                     adj_cost_dist = cost_utils.CostDistribution.from_data(
                         matrix=adj_dist[inner_dist.zones],
                         cost_matrix=self.cost_matrix[inner_dist.zones],
@@ -853,9 +870,9 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
 
         log_costs = {}
 
-        for i, dist in enumerate(cost_distributions.values()):
+        for i, dist in enumerate(cost_distributions):
             j = 0
-            #TODO(kf) Fix this to reflect TLD class
+            # TODO(kf) Fix this to reflect TLD class
             for name in dist.function_params.keys():
                 log_costs[f"{name}_{i}"] = init_params[params_len * i + j]
                 j += 1
@@ -886,7 +903,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
 
     # pylint:enable=too-many-locals
     def run(
-        self, 
+        self,
         distributions: MultiCostDistribution,
         running_log_path: Path,
         furness_tol: float = 1e-6,
@@ -941,10 +958,40 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
                 value_distribution=self.achieved_distribution[dist.zones],
                 target_cost_distribution=dist.cost_distribution,
                 cost_function=self.cost_function,
-                cost_params=cost_args,
+                cost_params=self._cost_params_to_kwargs(
+                    cost_args[i * params_len : i * params_len + params_len]
+                ),
             )
+            results[dist.name] = result_i
 
         return results
+
+    def sectoral_run(
+        self,
+        distributions: MultiCostDistribution,
+        four_d_inputs: [furness.SectoralConstraintInputs],
+        running_log_path: Path,
+        calibrate: bool = False,
+        calib_params: GMCalibParams | None = None,
+        furness_tol: float = 1e-6,
+    ):
+        """
+        Full run using a sectoral constraint, either with or without first
+        calibrating the gravity model.
+
+        Parameters
+        ----------
+        distributions: MultiCostDistribution
+            The distributions to calibrate against
+        """
+        if calibrate:
+            if calib_params is None:
+                calib_params = GMCalibParams
+            calibrated, distributions = self.calibrate(
+                distributions, running_log_path, calib_params, return_distributions=True
+            )
+
+        self.run(distributions, running_log_path, furness_tol, four_d_inputs)
 
 
 def gravity_model(
