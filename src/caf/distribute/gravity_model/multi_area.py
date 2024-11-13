@@ -462,7 +462,11 @@ class MGMCostDistribution:
         cat_tld = tld[tld[tld_cat_col] == category]
 
         cat_cost_distribution = cost_utils.CostDistribution(
-            cat_tld, tld_min_col, tld_max_col, tld_avg_col, tld_trips_col
+            cat_tld,
+            min_col=tld_min_col,
+            max_col=tld_max_col,
+            avg_col=tld_avg_col,
+            trips_col=tld_trips_col,
         )
 
         return cls(category, cat_cost_distribution, cat_zone_indices, func_params)
