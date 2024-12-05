@@ -96,6 +96,50 @@ class SectoralConstraintInputs:
     zonal_zones: Optional[np.ndarray] = None
     furness_inputs: Optional[FurnessInputs] = None
 
+@dataclass
+class PropsInput:
+    """
+    Input to triply constrained furness.
+    This is returned from cost_to_prop
+    Parameters
+    ----------
+    props: np.ndarray
+        This is essentially a cost matrix, but costs are replaced by the percentage
+        from the given cost band.
+    zones: np.ndarray
+        The zones in your zone system this prop matrix applies to
+    prop_vals: np.ndarray
+        The unique values in props
+    """
+
+    props: np.ndarray
+    zones: np.ndarray
+    prop_vals: np.ndarray
+
+
+def cost_to_prop(costs: np.ndarray, bands: pd.DataFrame, val_col: str):
+    """
+    Convert a cost matrix and cost bands into proportions expected.
+    Parameters
+    ----------
+    costs: np.ndarray
+        The costs matrix. If this is being run for a multi-area distribution,
+        only include costs for the bands applicable.
+    bands: pd.DataFrame
+        The cost bands for the given costs.
+    val_col: str
+        The column name of the values in the bands DataFrame.
+    """
+    bands_sum = bands[val_col].sum()
+    bands.loc[:, val_col] /= bands_sum
+    bands_array = bands.values
+    band_indices = np.zeros_like(costs, dtype=float)
+    for band_start, band_end, prop in bands_array:
+        band_mask = (costs >= band_start) & (costs <= band_end)
+        band_indices[band_mask] = prop
+
+    band_indices[band_indices == 0] = bands[val_col].min() * 0.5
+    return band_indices, bands[val_col].values
 
 # # # FUNCTIONS # # #
 def calc_rmse(col_targets, furnessed_mat, row_targets, n_vals: Optional[int] = None):
@@ -242,6 +286,112 @@ def doubly_constrained_furness(
 
     return furnessed_mat, iter_num + 1, cur_rmse
 
+def triply_constrained_furness(
+    props: list[PropsInput],
+    row_targets,
+    col_targets,
+    max_iters,
+    mat_size: tuple[int, int],
+    init_mat: Optional[np.ndarray] = None,
+    tol=1e-5,
+):
+    """
+    Furness a seed matrix with triple constraints.
+
+    Furnesses with the matrix tightly constrained to origin and destination
+    targets (with rmse checked against tolerance), and loosely constrained
+    to cost band shares, i.e. constrained in each furness iteration, but no
+    exit criteria for this constraint. This theoretically gives good flexibilty,
+    where the furness should achieve good convergence on all three constraints
+    where possible, and achieve the first two where the third may not be possible.
+
+    Parameters
+    ----------
+    props: list[PropsInput]
+        A list of info about cost bins. This is produced by cost_to_props
+    row_targets: np.ndarray
+        The targets for the rows (origins) in the matrix
+    col_targets: np.ndarray
+        The targets for the cols (destinations) in the matrix
+    max_iters: int
+        Max iterations for the furness to run before exiting
+    mat_size: tuplr[int, int]
+        The size of the matrix being furnessed
+    tol: float
+        The convergence criteria
+    """
+    early_exit = False
+    cur_rmse = np.inf
+    iter_num = 0
+    n_vals = len(row_targets)
+    if init_mat is None:
+        # build seed
+        furnessed_mat = np.zeros(mat_size)
+        for distro in props:
+            furnessed_mat[distro.zones] = distro.props
+
+        furnessed_mat, _, _ = doubly_constrained_furness(
+            furnessed_mat, row_targets, col_targets, max_iters=10, warning=False
+        )
+    else:
+        furnessed_mat = init_mat
+    for iter_num in range(1, max_iters):
+        # first adjust to match cost bands; this is the 'third' constraint but
+        # is done first as the other two need to be matched more closely
+        for distro in props:
+            to_alter = furnessed_mat[distro.zones]
+            checker = {}
+            for i in distro.prop_vals:
+                tot_demand = to_alter[distro.props == i].sum()
+                checker[i] = tot_demand
+            # pylint: disable=unsupported-assignment-operation, unsubscriptable-object
+            # pylint error
+            checker_df = pd.DataFrame.from_dict(checker, orient="index").reset_index()
+            checker_df.columns = ["target_prop", "demand"]
+            checker_df["act_prop"] = checker_df["demand"] / checker_df["demand"].sum()
+            checker_df["adj"] = checker_df["target_prop"] / checker_df["act_prop"]
+            checker_df.fillna(0, inplace=True)
+            checker_df.set_index("target_prop", inplace=True)
+
+            for i in checker_df.index:
+                to_alter[distro.props == i] *= checker_df.loc[i, "adj"]
+            furnessed_mat[distro.zones] = to_alter
+            # pylint:enable=unsupported-assignment-operation, unsubscriptable-object
+        # Adjust rows
+        row_ach = np.sum(furnessed_mat, axis=1)
+        diff_factor = np.divide(
+            row_targets,
+            row_ach,
+            where=row_ach != 0,
+            out=np.ones_like(row_targets, dtype=float),
+        )
+
+        furnessed_mat = np.multiply(furnessed_mat.T, diff_factor).T
+        # Adjust cols
+        col_ach = np.sum(furnessed_mat, axis=0)
+        diff_factor = np.divide(
+            col_targets,
+            col_ach,
+            where=col_ach != 0,
+            out=np.ones_like(col_targets, dtype=float),
+        )
+        furnessed_mat *= diff_factor
+
+        row_diff = (row_targets - np.sum(furnessed_mat, axis=1)) ** 2
+        col_diff = (col_targets - np.sum(furnessed_mat, axis=0)) ** 2
+        cur_rmse = ((np.sum(row_diff) + np.sum(col_diff)) / n_vals) ** 0.5
+        if cur_rmse < tol:
+            early_exit = True
+            break
+    if (not early_exit) & (iter_num >= max_iters):
+        warnings.warn(
+            f"The triply constrained furness exhausted its max "
+            f"number of loops ({max_iters:d}), while achieving an RMSE "
+            f"difference of {cur_rmse:f}. The values returned may not be "
+            f"accurate."
+        )
+
+    return furnessed_mat
 
 def sectoral_constraint(inputs: SectoralConstraintInputs):
     """
