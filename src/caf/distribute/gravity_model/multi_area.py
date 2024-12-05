@@ -907,7 +907,6 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         distributions: MultiCostDistribution,
         running_log_path: Path,
         furness_tol: float = 1e-6,
-        four_d_inputs: Optional[furness.SectoralConstraintInputs] = None,
     ) -> dict[int | str, GravityModelCalibrateResults]:
         """
         Run the gravity_model without calibrating.
@@ -946,7 +945,6 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             running_log_path=running_log_path,
             params_len=params_len,
             furness_tol=furness_tol,
-            four_d_inputs=four_d_inputs,
         )
 
         assert self.achieved_cost_dist is not None
@@ -964,6 +962,125 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             )
             results[dist.name] = result_i
 
+        return results
+
+    def triple_run(self,
+                   distributions: MultiCostDistribution,
+                   running_log_path: Path,
+                   furness_tol: float = 1e-6,
+                   xamax: int = 2):
+        """
+        Run the gravity_model without calibrating.
+
+        This should be done when you have calibrated previously to find the
+        correct parameters for the cost function.
+
+        Parameters
+        ----------
+        triply_constrain: bool = False
+            Choose whether to run a triply constrained furness after running
+            gravity_function. This must be done on
+        """
+        params_len = len(distributions[0].function_params)
+        cost_args = []
+        for dist in distributions:
+            for param in dist.function_params.values():
+                cost_args.append(param)
+
+        self._gravity_function(
+            init_params=cost_args,
+            cost_distributions=distributions,
+            running_log_path=running_log_path,
+            params_len=params_len,
+            furness_tol=furness_tol
+        )
+        results = {}
+
+        # create seed matrix from parameters
+        props_list = []
+        for i, dist in enumerate(distributions):
+            # Limit how much the achieved distribution can be adjusted to xamax
+            achieved = self.achieved_cost_dist[i].df.copy()
+            target = dist.cost_distribution.df.copy().reset_index()
+            achieved["normalised"] = (
+                    achieved[self.achieved_cost_dist[i].trips_col]
+                    / achieved[self.achieved_cost_dist[i].trips_col].sum()
+            )
+            target["normalised"] = (
+                    target[dist.cost_distribution.trips_col]
+                    / target[dist.cost_distribution.trips_col].sum()
+            )
+            target.loc[
+                target["normalised"] > achieved["normalised"] * xamax, "normalised"
+            ] = (
+                    achieved.loc[
+                        target["normalised"] > achieved["normalised"] * xamax, "normalised"
+                    ]
+                    * xamax
+            )
+            target.loc[
+                target["normalised"] < achieved["normalised"] / xamax, "normalised"
+            ] = (
+                    achieved.loc[
+                        target["normalised"] < achieved["normalised"] / xamax, "normalised"
+                    ]
+                    / xamax
+            )
+            # Re-normalise after adjustment
+            target["normalised"] /= target["normalised"].sum()
+            prop_cost, band_vals = furness.cost_to_prop(
+                self.cost_matrix[dist.zones],
+                target[
+                    [
+                        dist.cost_distribution.min_col,
+                        dist.cost_distribution.max_col,
+                        "normalised",
+                    ]
+                ],
+                val_col="normalised",
+            )
+            props = furness.PropsInput(prop_cost, dist.zones, band_vals)
+            props_list.append(props)
+        # triply contrained furness on seed matrix
+        # tol is higher as it is more difficult to converge when triply contrained
+        new_mat = furness.triply_constrained_furness(
+            props_list,
+            self.row_targets,
+            self.col_targets,
+            5000,
+            init_mat=self.achieved_distribution,
+            mat_size=(self.cost_matrix.shape[0], self.cost_matrix.shape[1]),
+            tol=0.01,
+        )
+
+        assert self.achieved_cost_dist is not None
+        for i, dist in enumerate(self.dists):
+            (
+                single_cost_distribution,
+                _,
+                single_convergence,
+            ) = core.cost_distribution_stats(
+                achieved_trip_distribution=new_mat[dist.zones],
+                cost_matrix=self.cost_matrix[dist.zones],
+                target_cost_distribution=dist.cost_distribution,
+            )
+
+            self.achieved_distribution[dist.zones] = new_mat[dist.zones]
+
+            gresult = GravityModelCalibrateResults(
+                cost_distribution=single_cost_distribution,
+                cost_convergence=single_convergence,
+                value_distribution=new_mat[dist.zones],
+                target_cost_distribution=dist.cost_distribution,
+                cost_function=self.cost_function,
+                cost_params=self._cost_params_to_kwargs(
+                    cost_args[i * params_len: i * params_len + params_len]
+                ),
+            )
+            gresult.save(self.out_path / dist.name)
+
+            results[dist.name] = gresult
+            
         return results
 
     def sectoral_run(
