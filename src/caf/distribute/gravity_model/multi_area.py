@@ -352,6 +352,21 @@ class MultiCostDistribution:
         """
         return copy.deepcopy(self)
 
+    def combine(self) -> cost_utils.CostDistribution:
+        out = None
+        for dist in self:
+            df = dist.cost_distribution.df
+            df.set_index(['lower', 'upper'], inplace=True)
+            if out is not None:
+                inner = out.join(df, rsuffix='join').fillna(0)
+                for col in df.columns:
+                    inner[col] += inner[f"{col}join"]
+                out = inner[df.columns]
+            else:
+                out = df
+        out['avg'] /= len(self)
+        out['weighted_avg'] /= len(self)
+        return cost_utils.CostDistribution(out.reset_index(), min_col='lower', max_col='upper')
 
 @dataclass
 class MGMCostDistribution:
