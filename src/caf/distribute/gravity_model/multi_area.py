@@ -21,7 +21,10 @@ from scipy import optimize
 # Local Imports
 from caf.distribute import cost_functions, furness
 from caf.distribute.gravity_model import core
-from caf.distribute.gravity_model.core import GravityModelCalibrateResults
+from caf.distribute.gravity_model.core import (
+    GravityModelCalibrateResults,
+    GravityModelRunResults,
+)
 
 # # # CONSTANTS # # #
 LOG = logging.getLogger(__name__)
@@ -909,11 +912,10 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         assert self.achieved_cost_dist is not None
         results = {}
         for i, dist in enumerate(distributions):
-            result_i = GravityModelCalibrateResults(
+            result_i = GravityModelRunResults(
                 cost_distribution=self.achieved_cost_dist[i],
                 cost_convergence=self.achieved_convergence[dist.name],
                 value_distribution=self.achieved_distribution[dist.zones],
-                target_cost_distribution=dist.cost_distribution,
                 cost_function=self.cost_function,
                 cost_params=self._cost_params_to_kwargs(
                     cost_args[i * params_len : i * params_len + params_len]

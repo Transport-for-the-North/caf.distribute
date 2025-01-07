@@ -26,24 +26,8 @@ LOG = logging.getLogger(__name__)
 
 
 # # # CLASSES # # #
-@dataclasses.dataclass
-class GravityModelResults:
+class GravityModelResults(abc.ABC):
     """A collection of results from a run of the Gravity Model.
-
-    Parameters
-    ----------
-    cost_distribution:
-        The achieved cost distribution of the run.
-
-    cost_convergence:
-        The achieved cost convergence value of the run. If
-        `target_cost_distribution` is not set, then this should be 0.
-        This will be the same as calculating the convergence of
-        `cost_distribution` and `target_cost_distribution`.
-
-    value_distribution:
-        The achieved distribution of the given values (usually trip values
-        between different places).
 
     target_cost_distribution:
         The cost distribution the gravity model was aiming for during its run.
@@ -56,43 +40,74 @@ class GravityModelResults:
     """
 
     cost_distribution: cost_utils.CostDistribution
+    """The achieved cost distribution of the run."""
     cost_convergence: float
-    value_distribution: np.ndarray
-
-
-@dataclasses.dataclass
-class GravityModelCalibrateResults(GravityModelResults):
-    """A collection of results from a run of the Gravity Model.
-
-    Parameters
-    ----------
-    cost_distribution:
-        The achieved cost distribution of the run.
-
-    cost_convergence:
-        The achieved cost convergence value of the run. If
+    """The achieved cost convergence value of the run. If
         `target_cost_distribution` is not set, then this should be 0.
         This will be the same as calculating the convergence of
         `cost_distribution` and `target_cost_distribution`.
-
-    value_distribution:
-        The achieved distribution of the given values (usually trip values
-        between different places).
-
-    target_cost_distribution:
-        The cost distribution the gravity model was aiming for during its run.
-
-    cost_function:
-        The cost function used in the gravity model run.
-
-    cost_params:
-        The cost parameters used with the cost_function to achieve the results.
     """
+    value_distribution: np.ndarray
+    """The achieved distribution of the given values (usually trip values
+        between different places).
+    """
+    cost_function: cost_functions.CostFunction
+    """The cost function used in the gravity model run."""
+    cost_params: dict[str | int, Any]
+    """The final/used cost parameters used by the cost function."""
+
+    def __init__(
+        self,
+        cost_distribution: cost_utils.CostDistribution,
+        cost_convergence: float,
+        value_distribution: np.ndarray,
+        cost_function: cost_functions.CostFunction,
+        cost_params: dict[str | int, Any],
+    ) -> None:
+
+        self.cost_distribution = cost_distribution
+        self.cost_convergence = cost_convergence
+        self.value_distribution = value_distribution
+        self.cost_function = cost_function
+        self.cost_params = cost_params
+
+    @abc.abstractmethod
+    def plot_distributions(self, truncate_last_bin: bool = False) -> figure.Figure:
+        """Plot the distributions associated with the results.
+
+        Parameters
+        ----------
+        truncate_last_bin : bool, optional
+            whether to truncate the graph to 1.2x the lower bin edge, by default False
+        """
+
+    @property
+    @abc.abstractmethod
+    def summary(self) -> pd.Series:
+        """Summary of the results parameters as a series."""
+
+
+class GravityModelCalibrateResults(GravityModelResults):
+    """A collection of results from a calibration of the Gravity Model."""
 
     # Targets
     target_cost_distribution: cost_utils.CostDistribution
-    cost_function: cost_functions.CostFunction
-    cost_params: dict[str | int, Any]
+    """The cost distribution the gravity model was aiming for during its run."""
+
+    def __init__(
+        self,
+        cost_distribution: cost_utils.CostDistribution,
+        cost_convergence: float,
+        value_distribution: np.ndarray,
+        target_cost_distribution: cost_utils.CostDistribution,
+        cost_function: cost_functions.CostFunction,
+        cost_params: dict[str | int, Any],
+    ) -> None:
+
+        super().__init__(
+            cost_distribution, cost_convergence, value_distribution, cost_function, cost_params
+        )
+        self.target_cost_distribution = target_cost_distribution
 
     def plot_distributions(self, truncate_last_bin: bool = False) -> figure.Figure:
         """Plot a comparison of the achieved and target distributions.
@@ -182,41 +197,20 @@ class GravityModelCalibrateResults(GravityModelResults):
         return pd.Series(output_params)
 
 
-@dataclasses.dataclass
 class GravityModelRunResults(GravityModelResults):
-    """A collection of results from a run of the Gravity Model.
+    """A collection of results from a run of the Gravity Model."""
 
-    Parameters
-    ----------
-    cost_distribution:
-        The achieved cost distribution of the run.
-
-    cost_convergence:
-        The achieved cost convergence value of the run. If
-        `target_cost_distribution` is not set, then this should be 0.
-        This will be the same as calculating the convergence of
-        `cost_distribution` and `target_cost_distribution`.
-
-    value_distribution:
-        The achieved distribution of the given values (usually trip values
-        between different places).
-
-    target_cost_distribution:
-        If set, this will be the cost distribution the gravity
-        model was aiming for during its run.
-
-    cost_function:
-        If set, this will be the cost function used in the gravity model run.
-
-    cost_params:
-        If set, the cost parameters used with the cost_function to achieve
-        the results.
-    """
-
-    # Targets
-    target_cost_distribution: Optional[cost_utils.CostDistribution] = None
-    cost_function: Optional[cost_functions.CostFunction] = None
-    cost_params: Optional[dict[str, Any]] = None
+    def __init__(
+        self,
+        cost_distribution: cost_utils.CostDistribution,
+        cost_convergence: float,
+        value_distribution: np.ndarray,
+        cost_function: cost_functions.CostFunction,
+        cost_params: dict[int | str, Any],
+    ) -> None:
+        super().__init__(
+            cost_distribution, cost_convergence, value_distribution, cost_function, cost_params
+        )
 
     @property
     def summary(self) -> pd.Series:
@@ -230,6 +224,55 @@ class GravityModelRunResults(GravityModelResults):
             a summary of the run
         """
         return pd.Series(self.cost_params)
+
+    def plot_distributions(self, truncate_last_bin: bool = False) -> figure.Figure:
+        """Plot a comparison of the achieved and target distributions.
+
+        This method returns a matplotlib figure which can be saved or plotted
+        as the user decides.
+
+        Parameters
+        ----------
+        truncate_last_bin : bool, optional
+            whether to truncate the graph to 1.2x the lower bin edge, by default False
+
+        Returns
+        -------
+        figure.Figure
+            the plotted distributions
+
+        Raises
+        ------
+        ValueError
+            when the target and achieved distributions have different binning
+        """
+
+        fig, ax = plt.subplots(figsize=(10, 6))
+
+        max_bin_edge = self.cost_distribution.max_vals
+        min_bin_edge = self.cost_distribution.min_vals
+        bin_centres = (max_bin_edge + min_bin_edge) / 2
+
+        ax.bar(
+            bin_centres,
+            self.cost_distribution.band_share_vals,
+            width=max_bin_edge - min_bin_edge,
+            label="Achieved Distribution",
+            color="blue",
+            alpha=0.7,
+        )
+
+        if truncate_last_bin:
+            top_min_bin = min_bin_edge.max()
+            ax.set_xlim(0, top_min_bin[-1] * 1.2)
+            fig.text(0.8, 0.025, f"final bin edge cut from {max_bin_edge.max()}", ha="center")
+
+        ax.set_xlabel("Cost")
+        ax.set_ylabel("Trips")
+        ax.set_title("Distribution Achieved")
+        ax.legend()
+
+        return fig
 
 
 class GravityModelBase(abc.ABC):
