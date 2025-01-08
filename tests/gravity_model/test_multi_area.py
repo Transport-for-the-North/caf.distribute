@@ -4,11 +4,10 @@ from __future__ import annotations
 from pathlib import Path
 
 # Third Party
-from matplotlib import pyplot as plt
 import numpy as np
 import pandas as pd
 import pytest
-from caf.toolkit import cost_utils
+from matplotlib import pyplot as plt
 
 # Local Imports
 from caf.distribute import cost_functions
@@ -249,5 +248,5 @@ class TestResults:
         assert isinstance(cal_results, dict)
         for result in cal_results.values():
             assert isinstance(result, GravityModelResults)
-            assert isinstance(result.summary(), pd.Series)
+            assert isinstance(result.summary, pd.Series)
             assert isinstance(result.plot_distributions(), plt.Figure)
