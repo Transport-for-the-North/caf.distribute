@@ -4,6 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 
 # Third Party
+from matplotlib import pyplot as plt
 import numpy as np
 import pandas as pd
 import pytest
@@ -13,7 +14,7 @@ from caf.toolkit import cost_utils
 from caf.distribute import cost_functions
 from caf.distribute import gravity_model as gm
 from caf.distribute import utils
-
+from caf.distribute.gravity_model import GravityModelResults
 
 @pytest.fixture(name="cost_from_code", scope="session")
 def fixture_code_costs():
@@ -186,10 +187,27 @@ def fixture_cal_no_furness(data_dir, infilled, multi_tld, trip_ends, mock_dir):
         cost_function=cost_functions.BuiltInCostFunction.LOG_NORMAL.get_cost_function(),
     )
     results = model.calibrate(
-        multi_tld, running_log_path=mock_dir / "temp_log.csv", gm_params=gm.GMCalibParams()
+        multi_tld, running_log_path=mock_dir / "temp_log.csv", gm_params=gm.GMCalibParams(furness_jac=False)
     )
     return results
 
+
+@pytest.fixture(name="cal_furness", scope="session")
+def fixture_cal_furness(self, data_dir, infilled, multi_tld, trip_ends, mock_dir):
+    row_targets = trip_ends["origin"].values
+    col_targets = trip_ends["destination"].values
+    model = gm.MultiAreaGravityModelCalibrator(
+        row_targets=row_targets,
+        col_targets=col_targets,
+        cost_matrix=infilled,
+        cost_function=cost_functions.BuiltInCostFunction.LOG_NORMAL.get_cost_function(),
+    )
+    results = model.calibrate(
+        multi_tld,
+        running_log_path=mock_dir / "temp_log.csv",
+        gm_params=gm.GMCalibParams(furness_jac=True),
+    )
+    return results
 
 class TestUtils:
     # TODO(IS) only one test currently so leaving in this file
@@ -199,23 +217,6 @@ class TestUtils:
 
 
 class TestDist:
-    @pytest.fixture(name="cal_furness", scope="session")
-    def fixture_cal_furness(self, data_dir, infilled, multi_tld, trip_ends, mock_dir):
-        row_targets = trip_ends["origin"].values
-        col_targets = trip_ends["destination"].values
-        model = gm.MultiAreaGravityModelCalibrator(
-            row_targets=row_targets,
-            col_targets=col_targets,
-            cost_matrix=infilled,
-            cost_function=cost_functions.BuiltInCostFunction.LOG_NORMAL.get_cost_function(),
-        )
-        results = model.calibrate(
-            multi_tld,
-            running_log_path=mock_dir / "temp_log.csv",
-            gm_params=gm.GMCalibParams(furness_jac=True),
-        )
-        return results
-
     @pytest.mark.parametrize("area", ["City", "Town", "External", "Village"])
     @pytest.mark.parametrize("cal_results", ["cal_furness", "cal_no_furness"])
     @pytest.mark.filterwarnings("ignore:Given a log path:UserWarning")
@@ -234,3 +235,14 @@ class TestDist:
         sigma = dist.cost_params["sigma"]
         assert 0 < sigma < 3
         assert 0 < mu < 3
+
+class TestResults:
+    @pytest.mark.parametrize("results", ["cal_furness", "cal_no_furness"])
+    def test_results(self, cal_results, request):
+        """Test the the GravityModelResults object methods run as expected"""        
+        cal_results = request.getfixturevalue(cal_results)
+        assert isinstance(cal_results, dict)
+        for result in cal_results.values():
+            assert isinstance(result, GravityModelResults)
+            assert isinstance(result.summary(), pd.Series)
+            assert isinstance(result.plot_distributions(), plt.Figure)
