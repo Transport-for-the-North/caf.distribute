@@ -21,10 +21,7 @@ from scipy import optimize
 # Local Imports
 from caf.distribute import cost_functions, furness
 from caf.distribute.gravity_model import core
-from caf.distribute.gravity_model.core import (
-    GravityModelCalibrateResults,
-    GravityModelRunResults,
-)
+from caf.distribute.gravity_model.core import GravityModelResults
 
 # # # CONSTANTS # # #
 LOG = logging.getLogger(__name__)
@@ -585,7 +582,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         gm_params: GMCalibParams,
         verbose: int = 0,
         **kwargs,
-    ) -> dict[str | int, GravityModelCalibrateResults]:
+    ) -> dict[str | int, GravityModelResults]:
         """Find the optimal parameters for self.cost_function.
 
         Optimal parameters are found using `scipy.optimize.least_squares`
@@ -608,7 +605,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
 
         Returns
         -------
-        dict[str | int, GravityModelCalibrateResults]:
+        dict[str | int, GravityModelResults]:
             containings the achieved distributions for each tld category. To access
             the combined distribution use self.achieved_distribution
 
@@ -723,7 +720,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         assert self.achieved_cost_dist is not None
         results = {}
         for i, dist in enumerate(distributions):
-            result_i = GravityModelCalibrateResults(
+            result_i = GravityModelResults(
                 cost_distribution=self.achieved_cost_dist[i],
                 cost_convergence=self.achieved_convergence[dist.name],
                 value_distribution=self.achieved_distribution[dist.zones],
@@ -877,7 +874,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         distributions: MultiCostDistribution,
         running_log_path: Path,
         furness_tol: float = 1e-6,
-    ) -> dict[int | str, GravityModelCalibrateResults]:
+    ) -> dict[int | str, GravityModelResults]:
         """
         Run the gravity_model without calibrating.
 
@@ -894,6 +891,10 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             tolerance for difference in target and achieved value,
             at which to stop furnessing, by default 1e-6
 
+        Returns
+        -------
+        dict[int | str, GravityModelResults]
+            The results of the gravity model run for each distribution
         """
         params_len = len(distributions[0].function_params)
         cost_args = []
@@ -912,7 +913,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         assert self.achieved_cost_dist is not None
         results = {}
         for i, dist in enumerate(distributions):
-            result_i = GravityModelRunResults(
+            result_i = GravityModelResults(
                 cost_distribution=self.achieved_cost_dist[i],
                 cost_convergence=self.achieved_convergence[dist.name],
                 value_distribution=self.achieved_distribution[dist.zones],

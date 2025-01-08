@@ -26,21 +26,14 @@ LOG = logging.getLogger(__name__)
 
 
 # # # CLASSES # # #
-class GravityModelResults(abc.ABC):
-    """A collection of results from a run of the Gravity Model.
-
-    target_cost_distribution:
-        The cost distribution the gravity model was aiming for during its run.
-
-    cost_function:
-        The cost function used in the gravity model run.
-
-    cost_params:
-        The cost parameters used with the cost_function to achieve the results.
-    """
+@dataclasses.dataclass
+class GravityModelResults:
+    """A collection of results from the Gravity Model."""
 
     cost_distribution: cost_utils.CostDistribution
-    """The achieved cost distribution of the run."""
+    """The achieved cost distribution of the results."""
+    target_cost_distribution: cost_utils.CostDistribution
+    """The taregt cost distribution used to obtain the results."""
     cost_convergence: float
     """The achieved cost convergence value of the run. If
         `target_cost_distribution` is not set, then this should be 0.
@@ -55,59 +48,6 @@ class GravityModelResults(abc.ABC):
     """The cost function used in the gravity model run."""
     cost_params: dict[str | int, Any]
     """The final/used cost parameters used by the cost function."""
-
-    def __init__(
-        self,
-        cost_distribution: cost_utils.CostDistribution,
-        cost_convergence: float,
-        value_distribution: np.ndarray,
-        cost_function: cost_functions.CostFunction,
-        cost_params: dict[str | int, Any],
-    ) -> None:
-
-        self.cost_distribution = cost_distribution
-        self.cost_convergence = cost_convergence
-        self.value_distribution = value_distribution
-        self.cost_function = cost_function
-        self.cost_params = cost_params
-
-    @abc.abstractmethod
-    def plot_distributions(self, truncate_last_bin: bool = False) -> figure.Figure:
-        """Plot the distributions associated with the results.
-
-        Parameters
-        ----------
-        truncate_last_bin : bool, optional
-            whether to truncate the graph to 1.2x the lower bin edge, by default False
-        """
-
-    @property
-    @abc.abstractmethod
-    def summary(self) -> pd.Series:
-        """Summary of the results parameters as a series."""
-
-
-class GravityModelCalibrateResults(GravityModelResults):
-    """A collection of results from a calibration of the Gravity Model."""
-
-    # Targets
-    target_cost_distribution: cost_utils.CostDistribution
-    """The cost distribution the gravity model was aiming for during its run."""
-
-    def __init__(
-        self,
-        cost_distribution: cost_utils.CostDistribution,
-        cost_convergence: float,
-        value_distribution: np.ndarray,
-        target_cost_distribution: cost_utils.CostDistribution,
-        cost_function: cost_functions.CostFunction,
-        cost_params: dict[str | int, Any],
-    ) -> None:
-
-        super().__init__(
-            cost_distribution, cost_convergence, value_distribution, cost_function, cost_params
-        )
-        self.target_cost_distribution = target_cost_distribution
 
     def plot_distributions(self, truncate_last_bin: bool = False) -> figure.Figure:
         """Plot a comparison of the achieved and target distributions.
@@ -195,84 +135,6 @@ class GravityModelCalibrateResults(GravityModelResults):
         output_params = self.cost_params.copy()
         output_params["convergence"] = self.cost_convergence
         return pd.Series(output_params)
-
-
-class GravityModelRunResults(GravityModelResults):
-    """A collection of results from a run of the Gravity Model."""
-
-    def __init__(
-        self,
-        cost_distribution: cost_utils.CostDistribution,
-        cost_convergence: float,
-        value_distribution: np.ndarray,
-        cost_function: cost_functions.CostFunction,
-        cost_params: dict[int | str, Any],
-    ) -> None:
-        super().__init__(
-            cost_distribution, cost_convergence, value_distribution, cost_function, cost_params
-        )
-
-    @property
-    def summary(self) -> pd.Series:
-        """Summary of the GM run parameters as a series.
-
-        Outputs the gravity model parameters used to generate the distribution.
-
-        Returns
-        -------
-        pd.DataFrame
-            a summary of the run
-        """
-        return pd.Series(self.cost_params)
-
-    def plot_distributions(self, truncate_last_bin: bool = False) -> figure.Figure:
-        """Plot a comparison of the achieved and target distributions.
-
-        This method returns a matplotlib figure which can be saved or plotted
-        as the user decides.
-
-        Parameters
-        ----------
-        truncate_last_bin : bool, optional
-            whether to truncate the graph to 1.2x the lower bin edge, by default False
-
-        Returns
-        -------
-        figure.Figure
-            the plotted distributions
-
-        Raises
-        ------
-        ValueError
-            when the target and achieved distributions have different binning
-        """
-
-        fig, ax = plt.subplots(figsize=(10, 6))
-
-        max_bin_edge = self.cost_distribution.max_vals
-        min_bin_edge = self.cost_distribution.min_vals
-        bin_centres = (max_bin_edge + min_bin_edge) / 2
-
-        ax.bar(
-            bin_centres,
-            self.cost_distribution.band_share_vals,
-            width=max_bin_edge - min_bin_edge,
-            label="Achieved Distribution",
-            color="blue",
-            alpha=0.7,
-        )
-
-        if truncate_last_bin:
-            top_min_bin = min_bin_edge.max()
-            ax.set_xlim(0, top_min_bin[-1] * 1.2)
-            fig.text(0.8, 0.025, f"final bin edge cut from {max_bin_edge.max()}", ha="center")
-
-        ax.set_xlabel("Cost")
-        ax.set_ylabel("Trips")
-        ax.set_title("Distribution Achieved")
-        ax.legend()
-
-        return fig
 
 
 class GravityModelBase(abc.ABC):
