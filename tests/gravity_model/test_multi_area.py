@@ -16,6 +16,7 @@ from caf.distribute import gravity_model as gm
 from caf.distribute import utils
 from caf.distribute.gravity_model import GravityModelResults
 
+
 @pytest.fixture(name="cost_from_code", scope="session")
 def fixture_code_costs():
     np.random.seed(42)
@@ -177,7 +178,7 @@ def _multi_tld(data_dir, mock_dir):
 
 
 @pytest.fixture(name="cal_no_furness", scope="session")
-def fixture_cal_no_furness(data_dir, infilled, multi_tld, trip_ends, mock_dir):
+def fixture_cal_no_furness(infilled, multi_tld, trip_ends, mock_dir):
     row_targets = trip_ends["origin"].values
     col_targets = trip_ends["destination"].values
     model = gm.MultiAreaGravityModelCalibrator(
@@ -187,13 +188,15 @@ def fixture_cal_no_furness(data_dir, infilled, multi_tld, trip_ends, mock_dir):
         cost_function=cost_functions.BuiltInCostFunction.LOG_NORMAL.get_cost_function(),
     )
     results = model.calibrate(
-        multi_tld, running_log_path=mock_dir / "temp_log.csv", gm_params=gm.GMCalibParams(furness_jac=False)
+        multi_tld,
+        running_log_path=mock_dir / "temp_log.csv",
+        gm_params=gm.GMCalibParams(furness_jac=False),
     )
     return results
 
 
 @pytest.fixture(name="cal_furness", scope="session")
-def fixture_cal_furness(self, data_dir, infilled, multi_tld, trip_ends, mock_dir):
+def fixture_cal_furness(infilled, multi_tld, trip_ends, mock_dir):
     row_targets = trip_ends["origin"].values
     col_targets = trip_ends["destination"].values
     model = gm.MultiAreaGravityModelCalibrator(
@@ -208,6 +211,7 @@ def fixture_cal_furness(self, data_dir, infilled, multi_tld, trip_ends, mock_dir
         gm_params=gm.GMCalibParams(furness_jac=True),
     )
     return results
+
 
 class TestUtils:
     # TODO(IS) only one test currently so leaving in this file
@@ -236,10 +240,11 @@ class TestDist:
         assert 0 < sigma < 3
         assert 0 < mu < 3
 
+
 class TestResults:
-    @pytest.mark.parametrize("results", ["cal_furness", "cal_no_furness"])
+    @pytest.mark.parametrize("cal_results", ["cal_furness", "cal_no_furness"])
     def test_results(self, cal_results, request):
-        """Test the the GravityModelResults object methods run as expected"""        
+        """Test the the GravityModelResults object methods run as expected"""
         cal_results = request.getfixturevalue(cal_results)
         assert isinstance(cal_results, dict)
         for result in cal_results.values():
