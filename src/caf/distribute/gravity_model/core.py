@@ -33,7 +33,7 @@ class GravityModelResults:
     cost_distribution: cost_utils.CostDistribution
     """The achieved cost distribution of the results."""
     target_cost_distribution: cost_utils.CostDistribution
-    """The taregt cost distribution used to obtain the results."""
+    """The target cost distribution used to obtain the results."""
     cost_convergence: float
     """The achieved cost convergence value of the run. If
         `target_cost_distribution` is not set, then this should be 0.
