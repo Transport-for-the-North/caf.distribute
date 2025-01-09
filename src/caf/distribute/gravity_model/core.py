@@ -28,71 +28,26 @@ LOG = logging.getLogger(__name__)
 # # # CLASSES # # #
 @dataclasses.dataclass
 class GravityModelResults:
-    """A collection of results from a run of the Gravity Model.
-
-    Parameters
-    ----------
-    cost_distribution:
-        The achieved cost distribution of the run.
-
-    cost_convergence:
-        The achieved cost convergence value of the run. If
-        `target_cost_distribution` is not set, then this should be 0.
-        This will be the same as calculating the convergence of
-        `cost_distribution` and `target_cost_distribution`.
-
-    value_distribution:
-        The achieved distribution of the given values (usually trip values
-        between different places).
-
-    target_cost_distribution:
-        The cost distribution the gravity model was aiming for during its run.
-
-    cost_function:
-        The cost function used in the gravity model run.
-
-    cost_params:
-        The cost parameters used with the cost_function to achieve the results.
-    """
+    """A collection of results from the Gravity Model."""
 
     cost_distribution: cost_utils.CostDistribution
+    """The achieved cost distribution of the results."""
+    target_cost_distribution: cost_utils.CostDistribution
+    """The target cost distribution used to obtain the results."""
     cost_convergence: float
-    value_distribution: np.ndarray
-
-
-@dataclasses.dataclass
-class GravityModelCalibrateResults(GravityModelResults):
-    """A collection of results from a run of the Gravity Model.
-
-    Parameters
-    ----------
-    cost_distribution:
-        The achieved cost distribution of the run.
-
-    cost_convergence:
-        The achieved cost convergence value of the run. If
+    """The achieved cost convergence value of the run. If
         `target_cost_distribution` is not set, then this should be 0.
         This will be the same as calculating the convergence of
         `cost_distribution` and `target_cost_distribution`.
-
-    value_distribution:
-        The achieved distribution of the given values (usually trip values
-        between different places).
-
-    target_cost_distribution:
-        The cost distribution the gravity model was aiming for during its run.
-
-    cost_function:
-        The cost function used in the gravity model run.
-
-    cost_params:
-        The cost parameters used with the cost_function to achieve the results.
     """
-
-    # Targets
-    target_cost_distribution: cost_utils.CostDistribution
+    value_distribution: np.ndarray
+    """The achieved distribution of the given values (usually trip values
+        between different places).
+    """
     cost_function: cost_functions.CostFunction
+    """The cost function used in the gravity model run."""
     cost_params: dict[str | int, Any]
+    """The final/used cost parameters used by the cost function."""
 
     def plot_distributions(self, truncate_last_bin: bool = False) -> figure.Figure:
         """Plot a comparison of the achieved and target distributions.
@@ -180,56 +135,6 @@ class GravityModelCalibrateResults(GravityModelResults):
         output_params = self.cost_params.copy()
         output_params["convergence"] = self.cost_convergence
         return pd.Series(output_params)
-
-
-@dataclasses.dataclass
-class GravityModelRunResults(GravityModelResults):
-    """A collection of results from a run of the Gravity Model.
-
-    Parameters
-    ----------
-    cost_distribution:
-        The achieved cost distribution of the run.
-
-    cost_convergence:
-        The achieved cost convergence value of the run. If
-        `target_cost_distribution` is not set, then this should be 0.
-        This will be the same as calculating the convergence of
-        `cost_distribution` and `target_cost_distribution`.
-
-    value_distribution:
-        The achieved distribution of the given values (usually trip values
-        between different places).
-
-    target_cost_distribution:
-        If set, this will be the cost distribution the gravity
-        model was aiming for during its run.
-
-    cost_function:
-        If set, this will be the cost function used in the gravity model run.
-
-    cost_params:
-        If set, the cost parameters used with the cost_function to achieve
-        the results.
-    """
-
-    # Targets
-    target_cost_distribution: Optional[cost_utils.CostDistribution] = None
-    cost_function: Optional[cost_functions.CostFunction] = None
-    cost_params: Optional[dict[str, Any]] = None
-
-    @property
-    def summary(self) -> pd.Series:
-        """Summary of the GM run parameters as a series.
-
-        Outputs the gravity model parameters used to generate the distribution.
-
-        Returns
-        -------
-        pd.DataFrame
-            a summary of the run
-        """
-        return pd.Series(self.cost_params)
 
 
 class GravityModelBase(abc.ABC):
