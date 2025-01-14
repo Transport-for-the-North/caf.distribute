@@ -2,14 +2,14 @@
 """Furness functions for distributing vectors to matrices."""
 # Built-Ins
 import logging
+import operator
 import warnings
 
 # Third Party
 import numpy as np
-from numpy.testing import assert_approx_equal
 import pandas as pd
-import operator
 from caf.toolkit import pandas_utils as pd_utils
+from numpy.testing import assert_approx_equal
 
 # pylint: disable=import-error,wrong-import-position
 
