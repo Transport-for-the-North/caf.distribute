@@ -162,19 +162,21 @@ def doubly_constrained_furness(
 
     return furnessed_mat, iter_num + 1, cur_rmse
 
-def furness_pandas_wrapper(seed_values: pd.DataFrame,
-                           row_targets: pd.DataFrame,
-                           col_targets: pd.DataFrame,
-                           max_iters: int = 2000,
-                           seed_infill: float = 1e-3,
-                           normalise_seeds: bool = True,
-                           tol: float = 1e-9,
-                           idx_col: str = 'model_zone_id',
-                           unique_col: str = 'trips',
-                           round_dp: int = 8,
-                           unique_zones: list[int] = None,
-                           unique_zones_join_fn: callable = operator.and_,
-                           ) -> tuple[pd.DataFrame, int, float]:
+
+def furness_pandas_wrapper(
+    seed_values: pd.DataFrame,
+    row_targets: pd.DataFrame,
+    col_targets: pd.DataFrame,
+    max_iters: int = 2000,
+    seed_infill: float = 1e-3,
+    normalise_seeds: bool = True,
+    tol: float = 1e-9,
+    idx_col: str = "model_zone_id",
+    unique_col: str = "trips",
+    round_dp: int = 8,
+    unique_zones: list[int] = None,
+    unique_zones_join_fn: callable = operator.and_,
+) -> tuple[pd.DataFrame, int, float]:
     """
     Wrapper around doubly_constrained_furness() to handle pandas in/out
 
@@ -262,17 +264,15 @@ def furness_pandas_wrapper(seed_values: pd.DataFrame,
         raise ValueError("Row and Column target indexes do not match.")
 
     if len(ref_index.difference(seed_values.index)) > 0:
-        raise ValueError("Row and Column target indexes do not match "
-                         "seed index.")
+        raise ValueError("Row and Column target indexes do not match " "seed index.")
 
     if len(ref_index.difference(seed_values.columns)) > 0:
-        raise ValueError("Row and Column target indexes do not match "
-                         "seed columns.")
+        raise ValueError("Row and Column target indexes do not match " "seed columns.")
 
     assert_approx_equal(
         row_targets[unique_col].sum(),
         col_targets[unique_col].sum(),
-        err_msg="Row and Column target totals do not match. Cannot Furness."
+        err_msg="Row and Column target totals do not match. Cannot Furness.",
     )
 
     # ## TIDY AND INFILL SEED ## #
@@ -301,16 +301,14 @@ def furness_pandas_wrapper(seed_values: pd.DataFrame,
         row_targets=row_targets,
         col_targets=col_targets,
         tol=tol,
-        max_iters=max_iters
+        max_iters=max_iters,
     )
 
     furnessed_mat = np.round(furnessed_mat, round_dp)
 
     # ## STICK BACK INTO PANDAS ## #
-    furnessed_mat = pd.DataFrame(
-        index=ref_index,
-        columns=ref_index,
-        data=furnessed_mat
-    ).round(round_dp)
+    furnessed_mat = pd.DataFrame(index=ref_index, columns=ref_index, data=furnessed_mat).round(
+        round_dp
+    )
 
     return furnessed_mat, n_iters, achieved_rmse
