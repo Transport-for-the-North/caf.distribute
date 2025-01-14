@@ -2,10 +2,14 @@
 """Furness functions for distributing vectors to matrices."""
 # Built-Ins
 import logging
+import operator
 import warnings
 
 # Third Party
 import numpy as np
+import pandas as pd
+from caf.toolkit import pandas_utils as pd_utils
+from numpy.testing import assert_approx_equal
 
 # pylint: disable=import-error,wrong-import-position
 
@@ -157,3 +161,154 @@ def doubly_constrained_furness(
         )
 
     return furnessed_mat, iter_num + 1, cur_rmse
+
+
+def furness_pandas_wrapper(
+    seed_values: pd.DataFrame,
+    row_targets: pd.DataFrame,
+    col_targets: pd.DataFrame,
+    max_iters: int = 2000,
+    seed_infill: float = 1e-3,
+    normalise_seeds: bool = True,
+    tol: float = 1e-9,
+    idx_col: str = "model_zone_id",
+    unique_col: str = "trips",
+    round_dp: int = 8,
+    unique_zones: list[int] = None,
+    unique_zones_join_fn: callable = operator.and_,
+) -> tuple[pd.DataFrame, int, float]:
+    """
+    Wrapper around doubly_constrained_furness() to handle pandas in/out
+
+    Internally checks and converts the pandas inputs into numpy in order to
+    run doubly_constrained_furness(). Converts the output back into pandas
+    at the end
+
+    Parameters
+    ----------
+    seed_values:
+        The seed values to use for the furness. The index and columns must
+        match the idx_col of row_targets and col_targets.
+
+    row_targets:
+        The target values for the sum of each row. In production/attraction
+        furnessing, this would be the productions. The idx_col must match
+        the idx_col of col_targets.
+
+    col_targets:
+        The target values for the sum of each column. In production/attraction
+        furnessing, this would be the attractions. The idx_col must match
+        the idx_col of row_targets.
+
+    max_iters:
+        The maximum number of iterations to complete before exiting.
+
+    tol:
+        The maximum difference between the achieved and the target values
+        to tolerate before exiting early. R^2 is used to calculate the
+        difference.
+
+    seed_infill:
+        The value to infill any seed values that are 0.
+
+    normalise_seeds:
+        Whether to normalise the seeds so they total to one before
+        sending them to the furness.
+
+    idx_col:
+        Name of the columns in row_targets and col_targets that contain the
+        index data that matches seed_values index/columns
+
+    unique_col:
+        Name of the columns in row_targets and col_targets that contain the
+        values to target during the furness.
+
+    round_dp:
+        The number of decimal places to round the output values of the
+        furness to. Uses 4 by default.
+
+    unique_zones:
+        A list of unique zones to keep in the seed matrix when starting the
+        furness. The given productions and attractions will also be limited
+        to these zones as well.
+
+    unique_zones_join_fn:
+        The function to call on the column and index masks to join them for
+        the seed matrices. By default, a bitwise and is used. See pythons
+        builtin operator library for more options.
+
+    Returns
+    -------
+    furnessed_matrix:
+        The final furnessed matrix, in the same format as seed_values
+
+    completed_iters:
+        The number of completed iterations before exiting
+
+    achieved_rmse:
+        The Root Mean Squared Error difference achieved before exiting
+    """
+    # Init
+    row_targets = row_targets.copy()
+    col_targets = col_targets.copy()
+    seed_values = seed_values.copy()
+
+    row_targets = row_targets.reindex(columns=[idx_col, unique_col])
+    col_targets = col_targets.reindex(columns=[idx_col, unique_col])
+    row_targets = row_targets.set_index(idx_col)
+    col_targets = col_targets.set_index(idx_col)
+
+    # ## VALIDATE INPUTS ## #
+    ref_index = row_targets.index
+    if len(ref_index.difference(col_targets.index)) > 0:
+        raise ValueError("Row and Column target indexes do not match.")
+
+    if len(ref_index.difference(seed_values.index)) > 0:
+        raise ValueError("Row and Column target indexes do not match " "seed index.")
+
+    if len(ref_index.difference(seed_values.columns)) > 0:
+        raise ValueError("Row and Column target indexes do not match " "seed columns.")
+
+    assert_approx_equal(
+        row_targets[unique_col].sum(),
+        col_targets[unique_col].sum(),
+        err_msg="Row and Column target totals do not match. Cannot Furness.",
+    )
+
+    # ## TIDY AND INFILL SEED ## #
+    # Infill the 0 zones
+    seed_values = seed_values.mask(seed_values <= 0, seed_infill)
+    if normalise_seeds:
+        seed_values /= seed_values.sum()
+
+    # If we were given certain zones, make sure everything else is 0
+    if unique_zones is not None:
+        # Get the mask and extract the data
+        mask = pd_utils.get_wide_mask(
+            df=seed_values,
+            select=unique_zones,
+            join_fn=unique_zones_join_fn,
+        )
+        seed_values = seed_values.where(mask, 0)
+
+    # ## CONVERT TO NUMPY AND FURNESS ## #
+    row_targets = row_targets.values.flatten()
+    col_targets = col_targets.values.flatten()
+    seed_values = seed_values.values
+
+    furnessed_mat, n_iters, achieved_rmse = doubly_constrained_furness(
+        seed_vals=seed_values,
+        row_targets=row_targets,
+        col_targets=col_targets,
+        tol=tol,
+        max_iters=max_iters,
+    )
+
+    furnessed_mat = np.round(furnessed_mat, round_dp)
+
+    # ## STICK BACK INTO PANDAS ## #
+    furnessed_mat = pd.DataFrame(index=ref_index, columns=ref_index, data=furnessed_mat).round(
+        round_dp
+    )
+
+    return furnessed_mat, n_iters, achieved_rmse
