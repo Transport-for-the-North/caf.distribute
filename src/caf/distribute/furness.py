@@ -313,7 +313,14 @@ def furness_pandas_wrapper(
 
     return furnessed_mat, n_iters, achieved_rmse
 
-def pandas_ndim_furness(seed_mat: pd.DataFrame, targets: pd.DataFrame, dummy_name: str, max_iters: int = 10000, tol: float = 1e-9):
+
+def pandas_ndim_furness(
+    seed_mat: pd.DataFrame,
+    targets: pd.DataFrame,
+    dummy_name: str,
+    max_iters: int = 10000,
+    tol: float = 1e-9,
+):
     # Infer fixed and non-fixed dimensions from index and column names
     furness_dims = targets.columns
     stat_dims = [dim for dim in seed_mat.index.names if dim not in furness_dims]
@@ -343,11 +350,14 @@ def pandas_ndim_furness(seed_mat: pd.DataFrame, targets: pd.DataFrame, dummy_nam
             return mat
     return mat
 
-def numpy_ndim_furness(seed_mat: xr.DataArray,
-                       targets: list[xr.DataArray],
-                       targ_len: int,
-                       max_iters: int = 10000,
-                       tol: float = 1e-9):
+
+def numpy_ndim_furness(
+    seed_mat: xr.DataArray,
+    targets: list[xr.DataArray],
+    targ_len: int,
+    max_iters: int = 10000,
+    tol: float = 1e-9,
+):
     if isinstance(seed_mat, pd.Series):
         mat = seed_mat.to_xarray()
     else:
@@ -379,5 +389,3 @@ def numpy_ndim_furness(seed_mat: xr.DataArray,
         if prev_rmse - rmse < tol:
             return mat
     return mat
-
-
