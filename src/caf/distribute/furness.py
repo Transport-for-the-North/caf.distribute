@@ -8,6 +8,7 @@ import warnings
 # Third Party
 import numpy as np
 import pandas as pd
+import xarray as xr
 from caf.toolkit import pandas_utils as pd_utils
 from numpy.testing import assert_approx_equal
 
@@ -23,7 +24,6 @@ LOG = logging.getLogger(__name__)
 
 
 # # # FUNCTIONS # # #
-# TODO(BT): Add a pandas wrapper to doubly_constrained_furness()
 
 
 def doubly_constrained_furness(
@@ -264,10 +264,10 @@ def furness_pandas_wrapper(
         raise ValueError("Row and Column target indexes do not match.")
 
     if len(ref_index.difference(seed_values.index)) > 0:
-        raise ValueError("Row and Column target indexes do not match " "seed index.")
+        raise ValueError("Row and Column target indexes do not match seed index.")
 
     if len(ref_index.difference(seed_values.columns)) > 0:
-        raise ValueError("Row and Column target indexes do not match " "seed columns.")
+        raise ValueError("Row and Column target indexes do not match seed columns.")
 
     assert_approx_equal(
         row_targets[unique_col].sum(),
@@ -312,3 +312,72 @@ def furness_pandas_wrapper(
     )
 
     return furnessed_mat, n_iters, achieved_rmse
+
+def pandas_ndim_furness(seed_mat: pd.DataFrame, targets: pd.DataFrame, dummy_name: str, max_iters: int = 10000, tol: float = 1e-9):
+    # Infer fixed and non-fixed dimensions from index and column names
+    furness_dims = targets.columns
+    stat_dims = [dim for dim in seed_mat.index.names if dim not in furness_dims]
+    targets.index = targets.index.reorder_levels(stat_dims + [dummy_name])
+    mat = seed_mat.unstack(level=[stat_dims])
+    rmse = np.inf
+    targ_dict = {}
+    for dim in furness_dims:
+        targ = targets[dim]
+        targ.index.names = stat_dims + [dim]
+        targ_dict[dim] = targ
+    for iter in range(max_iters):
+        # adjust to match each target
+        for dim in furness_dims:
+            comp_mat = mat.groupby(dim).sum()
+            adj = (targ_dict[dim] / comp_mat).fillna(0)
+            mat = mat * adj
+        # calc rmse
+        diff = 0
+        for dim in furness_dims:
+            diff += (mat.groupby(dim).sum() - targ_dict[dim]) ** 2
+        prev_rmse = rmse
+        rmse = (diff / len(targets)) ** 0.5
+        if rmse < tol:
+            return mat
+        if prev_rmse - rmse < tol:
+            return mat
+    return mat
+
+def numpy_ndim_furness(seed_mat: xr.DataArray,
+                       targets: list[xr.DataArray],
+                       targ_len: int,
+                       max_iters: int = 10000,
+                       tol: float = 1e-9):
+    if isinstance(seed_mat, pd.Series):
+        mat = seed_mat.to_xarray()
+    else:
+        mat = seed_mat.copy()
+    if isinstance(targets, pd.DataFrame):
+        raise NotImplementedError("Will do later")
+    elif isinstance(targets, list):
+        if not isinstance(targets[0], xr.DataArray):
+            raise NotImplementedError("Will do later")
+    rmse = np.inf
+    for iter in range(max_iters):
+        for targ in targets:
+            check_dim = set(mat.dims).difference(set(targ.dims))
+            if len(check_dim) != 1:
+                raise ValueError("All targets must have 1 fewer dimensions than seed_mat.")
+            check_mat = mat.sum(dim=check_dim)
+            adj = (targ / check_mat).fillna(1)
+            mat *= adj
+        diff = 0
+        for targ in targets:
+            check_dim = set(mat.dims).difference(set(targ.dims))
+            check_mat = mat.sum(dim=check_dim)
+            diff += float(((check_mat - targ) ** 2).sum())
+        prev_rmse = rmse
+        rmse = (diff / targ_len) ** 0.5
+        print(rmse)
+        if rmse < tol:
+            return mat
+        if prev_rmse - rmse < tol:
+            return mat
+    return mat
+
+
