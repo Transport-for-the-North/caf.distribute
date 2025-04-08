@@ -15,11 +15,7 @@ from scipy import optimize
 
 # Local Imports
 from caf.distribute import cost_functions, furness
-from caf.distribute.gravity_model import (
-    GravityModelCalibrateResults,
-    GravityModelRunResults,
-    core,
-)
+from caf.distribute.gravity_model import GravityModelResults, core
 
 # # # CONSTANTS # # #
 LOG = logging.getLogger(__name__)
@@ -222,7 +218,7 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
         default_retry: bool = True,
         verbose: int = 0,
         **kwargs,
-    ) -> GravityModelCalibrateResults:
+    ) -> GravityModelResults:
         """Find the optimal parameters for self.cost_function.
 
         Optimal parameters are found using `scipy.optimize.least_squares`
@@ -400,7 +396,7 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
 
         # Populate internal arguments with optimal run results.
         assert self.achieved_cost_dist is not None
-        return GravityModelCalibrateResults(
+        return GravityModelResults(
             cost_distribution=self.achieved_cost_dist,
             cost_convergence=self.achieved_convergence,
             value_distribution=self.achieved_distribution,
@@ -415,7 +411,7 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
         running_log_path: os.PathLike,
         *args,
         **kwargs,
-    ) -> GravityModelCalibrateResults:
+    ) -> GravityModelResults:
         """Find the optimal parameters for self.cost_function.
 
         Optimal parameters are found using `scipy.optimize.least_squares`
@@ -519,7 +515,7 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
         *args,
         failure_tol: float = 0.5,
         **kwargs,
-    ) -> GravityModelCalibrateResults:
+    ) -> GravityModelResults:
         """Find the optimal parameters for self.cost_function.
 
         Optimal parameters are found using `scipy.optimize.least_squares`
@@ -650,7 +646,7 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
         running_log_path: os.PathLike,
         target_cost_distribution: Optional[cost_utils.CostDistribution] = None,
         **kwargs,
-    ) -> GravityModelRunResults:
+    ) -> GravityModelResults:
         """Run the gravity model with set cost parameters.
 
         This function will run a single iteration of the gravity model using
@@ -700,7 +696,7 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
         )
 
         assert self.achieved_cost_dist is not None
-        return GravityModelRunResults(
+        return GravityModelResults(
             cost_distribution=self.achieved_cost_dist,
             cost_convergence=self.achieved_convergence,
             value_distribution=self.achieved_distribution,
@@ -716,7 +712,7 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
         target_cost_distribution: cost_utils.CostDistribution,
         target_cost_convergence: float = 0.9,
         **kwargs,
-    ) -> GravityModelRunResults:
+    ) -> GravityModelResults:
         """Run the gravity model with set cost parameters.
 
         This function will run a single iteration of the gravity model using
@@ -794,7 +790,7 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
             )
 
         assert self.achieved_cost_dist is not None
-        return GravityModelRunResults(
+        return GravityModelResults(
             cost_distribution=self.achieved_cost_dist,
             cost_convergence=self.achieved_convergence,
             value_distribution=self.achieved_distribution,
