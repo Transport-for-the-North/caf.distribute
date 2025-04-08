@@ -279,7 +279,7 @@ def furness_pandas_wrapper(
     # Infill the 0 zones
     seed_values = seed_values.mask(seed_values <= 0, seed_infill)
     if normalise_seeds:
-        seed_values /= seed_values.sum()
+        seed_values /= seed_values.sum().fillna(0)
 
     # If we were given certain zones, make sure everything else is 0
     if unique_zones is not None:
@@ -325,13 +325,13 @@ def pandas_ndim_furness(
     furness_dims = targets.columns
     stat_dims = [dim for dim in seed_mat.index.names if dim not in furness_dims]
     targets.index = targets.index.reorder_levels(stat_dims + [dummy_name])
-    mat = seed_mat.unstack(level=[stat_dims])
+    mat = seed_mat.unstack(level=stat_dims)
     rmse = np.inf
     targ_dict = {}
     for dim in furness_dims:
         targ = targets[dim]
         targ.index.names = stat_dims + [dim]
-        targ_dict[dim] = targ
+        targ_dict[dim] = targ.unstack(stat_dims)
     for iter in range(max_iters):
         # adjust to match each target
         for dim in furness_dims:
@@ -341,7 +341,7 @@ def pandas_ndim_furness(
         # calc rmse
         diff = 0
         for dim in furness_dims:
-            diff += (mat.groupby(dim).sum() - targ_dict[dim]) ** 2
+            diff += ((mat.groupby(dim).sum() - targ_dict[dim]) ** 2).values.sum()
         prev_rmse = rmse
         rmse = (diff / len(targets)) ** 0.5
         if rmse < tol:
@@ -355,9 +355,14 @@ def numpy_ndim_furness(
     seed_mat: xr.DataArray,
     targets: list[xr.DataArray],
     targ_len: int,
+    normalise: bool = False,
+    norm_dims: list = None,
     max_iters: int = 10000,
     tol: float = 1e-9,
 ):
+    """
+    Furness an n dimensional numpy array
+    """
     if isinstance(seed_mat, pd.Series):
         mat = seed_mat.to_xarray()
     else:
@@ -383,9 +388,12 @@ def numpy_ndim_furness(
             diff += float(((check_mat - targ) ** 2).sum())
         prev_rmse = rmse
         rmse = (diff / targ_len) ** 0.5
-        print(rmse)
+        print(f"Current rmse = {rmse} after {iter} iterations.")
         if rmse < tol:
-            return mat
+            print(f"exiting after {iter} iterations with rmse of {rmse}")
+            return mat, rmse, iter
         if prev_rmse - rmse < tol:
-            return mat
-    return mat
+            print(f"RMSE has stopped improving at {rmse} after {iter} iterations. Exiting.")
+            return mat, rmse, iter
+    print(f"Max iters reached. Exiting with {rmse} rmse.")
+    return mat, rmse, iter
