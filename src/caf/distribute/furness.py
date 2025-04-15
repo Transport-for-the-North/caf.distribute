@@ -96,6 +96,7 @@ class SectoralConstraintInputs:
     zonal_zones: Optional[np.ndarray] = None
     furness_inputs: Optional[FurnessInputs] = None
 
+
 @dataclass
 class PropsInput:
     """
@@ -140,6 +141,7 @@ def cost_to_prop(costs: np.ndarray, bands: pd.DataFrame, val_col: str):
 
     band_indices[band_indices == 0] = bands[val_col].min() * 0.5
     return band_indices, bands[val_col].values
+
 
 # # # FUNCTIONS # # #
 def calc_rmse(col_targets, furnessed_mat, row_targets, n_vals: Optional[int] = None):
@@ -286,6 +288,7 @@ def doubly_constrained_furness(
 
     return furnessed_mat, iter_num + 1, cur_rmse
 
+
 def triply_constrained_furness(
     props: list[PropsInput],
     row_targets,
@@ -392,6 +395,7 @@ def triply_constrained_furness(
         )
 
     return furnessed_mat
+
 
 def sectoral_constraint(inputs: SectoralConstraintInputs):
     """
