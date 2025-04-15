@@ -597,6 +597,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         running_log_path: Path,
         gm_params: GMCalibParams,
         return_distributions: bool = False,
+        four_d_inputs: furness.SectoralConstraintInputs|None = None,
         verbose: int = 0,
         **kwargs,
     ) -> dict[str | int, GravityModelResults]:
@@ -680,6 +681,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             "params_len": params_len,
             "furness_jac": gm_params.furness_jac,
             "furness_tol": gm_params.furness_tol,
+            "four_d_inputs": four_d_inputs,
         }
         optimise_cost_params = functools.partial(
             optimize.least_squares,
@@ -741,7 +743,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         results = {}
         for i, dist in enumerate(distributions):
             result_i = GravityModelResults(
-                cost_distribution=self.achieved_cost_dist[i],
+                cost_distribution=self.achieved_cost_dist[dist.name],
                 cost_convergence=self.achieved_convergence[dist.name],
                 value_distribution=self.achieved_distribution[dist.zones],
                 target_cost_distribution=dist.cost_distribution,
@@ -897,7 +899,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         self._loop_num += 1
         self._loop_start_time = timing.current_milli_time()
 
-        self.achieved_cost_dist: list[cost_utils.CostDistribution] = distributions
+        self.achieved_cost_dist: dict[str|int, cost_utils.CostDistribution] = distributions
         self.achieved_convergence: dict[str | int, float] = convergences
         self.achieved_distribution = matrix
 
@@ -955,7 +957,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         results = {}
         for i, dist in enumerate(distributions):
             result_i = GravityModelResults(
-                cost_distribution=self.achieved_cost_dist[i],
+                cost_distribution=self.achieved_cost_dist[dist.name],
                 cost_convergence=self.achieved_convergence[dist.name],
                 target_cost_distribution=dist.cost_distribution,
                 value_distribution=self.achieved_distribution[dist.zones],
@@ -1007,8 +1009,8 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             achieved = self.achieved_cost_dist[i].df.copy()
             target = dist.cost_distribution.df.copy().reset_index()
             achieved["normalised"] = (
-                    achieved[self.achieved_cost_dist[i].trips_col]
-                    / achieved[self.achieved_cost_dist[i].trips_col].sum()
+                    achieved[self.achieved_cost_dist[dist.name].trips_col]
+                    / achieved[self.achieved_cost_dist[dist.name].trips_col].sum()
             )
             target["normalised"] = (
                     target[dist.cost_distribution.trips_col]
@@ -1071,7 +1073,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
 
             self.achieved_distribution[dist.zones] = new_mat[dist.zones]
 
-            gresult = GravityModelCalibrateResults(
+            gresult = GravityModelResults(
                 cost_distribution=single_cost_distribution,
                 cost_convergence=single_convergence,
                 value_distribution=new_mat[dist.zones],
@@ -1090,11 +1092,12 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
     def sectoral_run(
         self,
         distributions: MultiCostDistribution,
-        four_d_inputs: [furness.SectoralConstraintInputs],
+        four_d_inputs: furness.SectoralConstraintInputs,
         running_log_path: Path,
         calibrate: bool = False,
         calib_params: GMCalibParams | None = None,
         furness_tol: float = 1e-6,
+        return_distributions: bool = False,
     ):
         """
         Full run using a sectoral constraint, either with or without first
@@ -1108,8 +1111,8 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         if calibrate:
             if calib_params is None:
                 calib_params = GMCalibParams
-            calibrated, distributions = self.calibrate(
-                distributions, running_log_path, calib_params, return_distributions=True
+            self.calibrate(
+                distributions, running_log_path, calib_params, return_distributions=return_distributions
             )
 
         return self.run(distributions, running_log_path, furness_tol, four_d_inputs)
