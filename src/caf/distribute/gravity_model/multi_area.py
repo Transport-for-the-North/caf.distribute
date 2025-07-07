@@ -681,7 +681,6 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             "params_len": params_len,
             "furness_jac": gm_params.furness_jac,
             "furness_tol": gm_params.furness_tol,
-            "four_d_inputs": four_d_inputs,
         }
         optimise_cost_params = functools.partial(
             optimize.least_squares,
