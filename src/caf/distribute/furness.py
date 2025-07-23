@@ -5,11 +5,14 @@ import logging
 import warnings
 from typing import Optional
 from dataclasses import dataclass
+from copy import deepcopy
+from functools import partial
 
 # Third Party
 import numpy as np
 import pandas as pd
 from caf.toolkit import translation
+from caf.toolkit.concurrency import multiprocess
 
 # pylint: disable=import-error,wrong-import-position
 
@@ -327,6 +330,7 @@ def triply_constrained_furness(
     cur_rmse = np.inf
     iter_num = 0
     n_vals = len(row_targets)
+    checker_df = pd.DataFrame({'adj':np.inf}, index=[0])
     if init_mat is None:
         # build seed
         furnessed_mat = np.zeros(mat_size)
@@ -337,29 +341,30 @@ def triply_constrained_furness(
             furnessed_mat, row_targets, col_targets, max_iters=10, warning=False
         )
     else:
-        furnessed_mat = init_mat
+        furnessed_mat = deepcopy(init_mat)
     for iter_num in range(1, max_iters):
         # first adjust to match cost bands; this is the 'third' constraint but
         # is done first as the other two need to be matched more closely
-        for distro in props:
-            to_alter = furnessed_mat[distro.zones]
-            checker = {}
-            for i in distro.prop_vals:
-                tot_demand = to_alter[distro.props == i].sum()
-                checker[i] = tot_demand
-            # pylint: disable=unsupported-assignment-operation, unsubscriptable-object
-            # pylint error
-            checker_df = pd.DataFrame.from_dict(checker, orient="index").reset_index()
-            checker_df.columns = ["target_prop", "demand"]
-            checker_df["act_prop"] = checker_df["demand"] / checker_df["demand"].sum()
-            checker_df["adj"] = checker_df["target_prop"] / checker_df["act_prop"]
-            checker_df.fillna(0, inplace=True)
-            checker_df.set_index("target_prop", inplace=True)
+        if (checker_df['adj'] - 1).abs().max() > 5e-1:
+            for distro in props:
+                to_alter = furnessed_mat[distro.zones]
+                checker = {}
+                for i in distro.prop_vals:
+                    tot_demand = to_alter[distro.props == i].sum()
+                    checker[i] = tot_demand
+                # pylint: disable=unsupported-assignment-operation, unsubscriptable-object
+                # pylint error
+                checker_df = pd.DataFrame.from_dict(checker, orient="index").reset_index()
+                checker_df.columns = ["target_prop", "demand"]
+                checker_df["act_prop"] = checker_df["demand"] / checker_df["demand"].sum()
+                checker_df["adj"] = (checker_df["target_prop"] / checker_df["act_prop"]).replace(0,1)
+                checker_df.fillna(0, inplace=True)
+                checker_df.set_index("target_prop", inplace=True)
 
-            for i in checker_df.index:
-                to_alter[distro.props == i] *= checker_df.loc[i, "adj"]
-            furnessed_mat[distro.zones] = to_alter
-            # pylint:enable=unsupported-assignment-operation, unsubscriptable-object
+                for i in checker_df.index:
+                    to_alter[distro.props == i] *= checker_df.loc[i, "adj"]
+                furnessed_mat[distro.zones] = to_alter
+                # pylint:enable=unsupported-assignment-operation, unsubscriptable-object
         # Adjust rows
         row_ach = np.sum(furnessed_mat, axis=1)
         diff_factor = np.divide(
@@ -384,6 +389,7 @@ def triply_constrained_furness(
         col_diff = (col_targets - np.sum(furnessed_mat, axis=0)) ** 2
         cur_rmse = ((np.sum(row_diff) + np.sum(col_diff)) / n_vals) ** 0.5
         if cur_rmse < tol:
+            print(f"Converged in {iter_num} iterations with rmse of {cur_rmse}")
             early_exit = True
             break
     if (not early_exit) & (iter_num >= max_iters):
@@ -489,3 +495,109 @@ def sectoral_constraint(inputs: SectoralConstraintInputs):
                 f"the matrix as it currently is"
             )
             return adjusted.to_numpy(), iter, rmse
+
+
+@dataclass
+class SegInput:
+    props: PropsInput
+    col_targets: np.ndarray
+    row_targets: np.ndarray
+
+
+def segmentation_furness(
+    triple_inputs: dict[int, SegInput],
+    sum_mat: np.ndarray,
+    mat_size: tuple[int, int],
+    max_iters: int = 5000,
+    outer_max_iters: int = 50,
+    tol: float = 1e-5,
+):
+    results = {}
+    for seg, val in triple_inputs.items():
+        furnessed = triply_constrained_furness(
+                    val.props, val.row_targets, val.col_targets, max_iters, mat_size, tol=tol * 1e3, init_mat=sum_mat
+                )
+        results[seg] = furnessed
+    prev_rmse = np.inf
+    for iter_num in range(outer_max_iters):
+        total_achieved = 0
+        triple_kwargs = []
+        for seg, val in triple_inputs.items():
+            triple_kwargs.append({'props':val.props,
+                                'row_targets':val.row_targets,
+                                'col_targets':val.col_targets,
+                                'max_iters':max_iters,
+                                'mat_size':mat_size,
+                                'tol':tol,
+                                'init_mat':results[seg]})
+        multi_return = multiprocess(triply_constrained_furness, kwarg_list=triple_kwargs, in_order=True)
+        for key, val in triple_inputs.items():
+            furness_mat = multi_return[key-1]
+            total_achieved += furness_mat
+            results[key] = pd.DataFrame(furness_mat)
+        seed_mat = pd.concat(results).stack()
+        seed_mat.index.names = ['seg','o','d']
+        rows = pd.concat({i: j.row_targets for i,j in triple_inputs.items()})
+        rows.index.names = ['seg', 'o']
+        cols = pd.concat({i: j.col_targets for i,j in triple_inputs.items()})
+        cols.index.names = ['seg','d']
+        mat_targ = sum_mat.stack()
+        mat_targ.index.names = ['o','d']
+        mat = pandas_ndim_furness(seed_mat, [cols,rows, mat_targ], tol=e-4)
+        passing = True
+        max_rmse = 0
+        for seg, val in results.items():
+            val *= adj
+            rmse = calc_rmse(
+                triple_inputs[seg].col_targets,
+                val,
+                triple_inputs[seg].row_targets
+            )
+            if rmse > tol * 1e3:
+                passing = False
+            if rmse > max_rmse:
+                max_rmse = rmse
+        if passing:
+            print(f"Process converged in {iter_num + 1} iterations with a max "
+                  f"rmse of {max_rmse}.")
+            return {i: pd.DataFrame(j, index=range(1,mat_size[0]+1), columns=range(1, mat_size[1] + 1)) for i, j in results.items()}
+        elif max_rmse > prev_rmse:
+            print(f"RMSE has stopped improving at rmse:{max_rmse} after {iter_num} iters")
+            return {i: pd.DataFrame(j, index=range(1,mat_size[0]+1), columns=range(1, mat_size[1] + 1)) for i, j in results.items()}
+        else:
+            print(f"iter: {iter_num + 1}, rmse: {max_rmse}")
+            prev_rmse = max_rmse
+    warnings.warn(
+        f"The process has failed to converge after the max number of iterations. "
+        f"Results are being returned as they are."
+    )
+    return {i: pd.DataFrame(j, index=range(1,mat_size[0]+1), columns=range(1, mat_size[1] + 1)) for i, j in results.items()}
+
+
+def pandas_ndim_furness(
+    seed_mat: pd.DataFrame,
+    targets: list[pd.Series],
+    max_iters: int = 10000,
+    tol: float = 1e-9,
+):
+    # Infer fixed and non-fixed dimensions from index and column names
+    mat = seed_mat.copy()
+    rmse = np.inf
+    targ_dict = {}
+    for iter in range(max_iters):
+        # adjust to match each target
+        for targ in targets:
+            comp_mat = mat.groupby(targ.index.names).sum()
+            adj = (targ / comp_mat).fillna(0)
+            mat = mat * adj
+        # calc rmse
+        diff = 0
+        for targ in targets:
+            diff += ((mat.groupby(targ.index.names).sum() - targ) ** 2).values.sum() / len(targ)
+        prev_rmse = rmse
+        rmse = (diff) ** 0.5
+        if rmse < tol:
+            return mat, rmse
+        if prev_rmse - rmse < tol:
+            return mat, rmse
+    return mat, rmse

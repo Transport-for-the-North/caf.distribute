@@ -907,18 +907,6 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
 
         return achieved_residuals
 
-    def segmentation_gravity(self,
-                             init_params: dict[str, list[float]],
-                             cost_distributions: dict[str, MultiCostDistribution],
-                             furness_tol: float,
-                             running_log_path: os.PathLike,
-                             params_len: int,
-                             diff_step: int = 0,
-                             **_,
-                             ):
-
-        
-
     # pylint:enable=too-many-locals
     def run(
         self,
