@@ -293,8 +293,9 @@ def doubly_constrained_furness(
 
 def dist_match(props: dict[int, PropsInput], mat: np.ndarray, return_checkers=False):
     checkers = {}
+    inner_mat = deepcopy(mat)
     for area, distro in props.items():
-        to_alter = mat[distro.zones]
+        to_alter = inner_mat[distro.zones]
         checker = {}
         for i in distro.prop_vals:
             tot_demand = to_alter[distro.props == i].sum()
@@ -310,11 +311,11 @@ def dist_match(props: dict[int, PropsInput], mat: np.ndarray, return_checkers=Fa
 
         for i in checker_df.index:
             to_alter[distro.props == i] *= checker_df.loc[i, "adj"]
-        mat[distro.zones] = to_alter
+        inner_mat[distro.zones] = to_alter
         checkers[area] = checker_df
     if return_checkers:
-        return pd.concat(checkers), mat
-    return mat
+        return pd.concat(checkers), inner_mat
+    return inner_mat
 
 
 def triply_constrained_furness(
@@ -533,6 +534,7 @@ def segmentation_furness(
     triple_inputs: dict[int, SegInput],
     sum_mat: np.ndarray,
     mat_size: tuple[int, int],
+    seed_mat: xr.DataArray=None,
     max_iters: int = 5000,
     outer_max_iters: int = 500,
     tol: float = 1e-5,
@@ -576,15 +578,18 @@ def segmentation_furness(
     mat_targ = xr.DataArray(sum_mat, dims=["o", "d"])
     targets = [cols, rows, mat_targ]
     # Initial matrices are just the overall target matrix
-    results = xr.DataArray(
-        [np.ones(sum_mat.shape)] * len(triple_inputs),
-        dims=["seg", "o", "d"],
-        coords={
-            "seg": list(triple_inputs.keys()),
-            "o": np.arange(mat_size[0]),
-            "d": np.arange(mat_size[1]),
-        },
-    )
+    if seed_mat is None:
+        results = xr.DataArray(
+            [np.ones(sum_mat.shape)] * len(triple_inputs),
+            dims=["seg", "o", "d"],
+            coords={
+                "seg": list(triple_inputs.keys()),
+                "o": np.arange(mat_size[0]),
+                "d": np.arange(mat_size[1]),
+            },
+        )
+    else:
+        results=seed_mat
     prev_rmse = np.inf
     iter_num = 1
     while True:
@@ -609,7 +614,7 @@ def segmentation_furness(
                 f"improving after {iter_num} iterations, with an rmse of {rmse}. Furnessing to "
                 f"just trip ends and matrix sum to reach convergence."
             )
-            for i in range(max_iters):
+            for i in range(1,max_iters):
                 results, rmse = seg_inner(targets, results)
                 if rmse < tol:
                     LOG.info(
@@ -617,7 +622,7 @@ def segmentation_furness(
                         f"iterations with an rmse of {rmse}."
                     )
                     break
-                if prev_rmse - rmse < tol:
+                if (prev_rmse - rmse < tol) & (i > 10):
                     break
                 prev_rmse = rmse
             if rmse > tol:
@@ -652,8 +657,10 @@ def segmentation_furness(
     for seg, val in triple_inputs.items():
         checks, alt_mat = dist_match(val.props, results.sel(seg=seg).values, True)
         checkers[seg] = checks
+    max_diff = np.abs(results.sum(dim='seg').to_numpy() - sum_mat).max()
+    LOG.info(f"Max difference between achieved dist and sum mat is {max_diff}")
     return (
-        results.to_dataframe(name="trips").squeeze().unstack(level="d"),
+        results.to_series().unstack(level="d"),
         rmse,
         pd.concat(checkers),
     )
