@@ -110,7 +110,7 @@ class GravityModelResults:
 
         if truncate_last_bin:
             top_min_bin = min_bin_edge.max()
-            ax.set_xlim(0, top_min_bin[-1] * 1.2)
+            ax.set_xlim(0, top_min_bin * 1.2)
             fig.text(0.8, 0.025, f"final bin edge cut from {max_bin_edge.max()}", ha="center")
 
         ax.set_xlabel("Cost")

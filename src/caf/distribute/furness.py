@@ -77,14 +77,11 @@ class SectoralConstraintInputs:
     target_mat: pd.DataFrame
         The matrix at sectoral level which should be adjusted to. Zone names
         here should match those in the translation vector.
-    zonal_zones: Optional[collections.Collection] = None
-        Zone names of the lower zone system. These must be in the correct order,
-        and must match translation vector(s). If None is provided, this will
-        to numbers from 1 to the length of the matrix
-    outer_max_iters:
-        Passed as max_iters when doubly_constrained_furness is called.
-    furness_inputs: FurnessInputs
-        Inputs for a doubly constrained furness.
+    normalise: bool
+        When True (default), the total number of trips in the matrix is unchanged
+    factor_cap: float
+        The maximum difference from 1 the factor can be. E.g if 0.1 (default) the
+        adjustment factors are capped between 0.9 and 1.1
     """
 
     trans_vector: pd.DataFrame
@@ -92,9 +89,8 @@ class SectoralConstraintInputs:
     to_col: str
     factor_col: str
     target_mat: pd.DataFrame
-    outer_max_iters: int = 10
-    zonal_zones: Optional[np.ndarray] = None
-    furness_inputs: Optional[FurnessInputs] = None
+    normalise: bool = True
+    factor_cap: float = 0.1
 
 
 @dataclass
@@ -397,95 +393,95 @@ def triply_constrained_furness(
     return furnessed_mat
 
 
-def sectoral_constraint(inputs: SectoralConstraintInputs):
+def sectoral_constraint(
+    matrix: pd.DataFrame,
+    inputs: SectoralConstraintInputs,
+    furness_inputs: FurnessInputs | None = None,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
-    Furness with an extra constraint to match a matrix at a more aggregate zoning.
+        Furness with an extra constraint to match a matrix at a more aggregate zoning.
 
-    Parameters
-    ----------
-    inputs: SectoralConstraintInputs
-        See docstring of input class.
-    Returns
-    -------
-    furnessed_matrix:
-        The final furnessed matrix. This matrix will match 'sectoral_targets'
-        precisely.
-
+        Parameters
+        ----------
+        inputs: SectoralConstraintInputs
+            See docstring of input class.
+        Returns
+        -------
+        furnessed_matrix:
+            The final furnessed matrix. This matrix will match 'sectoral_targets'
+            precisely.
     completed_iters:
-        The number of completed outer iterations - each iteration is a 2-d
-         furness then an adjustment to the sectoral targets before exiting.
+            The number of completed outer iterations - each iteration is a 2-d
+             furness then an adjustment to the sectoral targets before exiting.
 
-    achieved_rmse:
-        The Root Mean Squared Error difference achieved before exiting to
-        row and column targets.
+        achieved_rmse:
+            The Root Mean Squared Error difference achieved before exiting to
+            row and column targets.
     """
-    finputs = inputs.furness_inputs
-    if finputs is None:
-        raise ValueError("Furness inputs must be provided.")
-    iter = 1
-    seed_vals_inner = finputs.seed_vals.copy()
-    # seed_vals_inner[np.where(inputs.target_mat == 0)] = 0
-    zonal_excl = [i for i in inputs.zonal_zones if i not in inputs.trans_vector[inputs.to_col]]
-    sectoral_excl = [
-        i for i in inputs.trans_vector[inputs.to_col] if i not in inputs.zonal_zones
-    ]
-    n_vals = len(finputs.row_targets)
-    if (inputs.trans_vector[inputs.factor_col] != 1).all():
+
+    aggregated = translation.pandas_matrix_zone_translation(
+        matrix, inputs.trans_vector, inputs.from_col, inputs.to_col, inputs.factor_col
+    )
+
+    if (not aggregated.index.equals(inputs.target_mat.index)) or (
+        not aggregated.columns.equals(inputs.target_mat.columns)
+    ):
         raise ValueError(
-            "This process is designed to work with zones that nest "
-            "perfectly within sectors. The translation vector provided "
-            "implies this isn't the case. Either fix the translation "
-            "or reconsider using this function."
+            "The aggregated matrix columns or index does not match the target matrix. "
+            "Ensure the translation vector is correct and that the "
+            "target matrix is at the sectoral level."
         )
 
-    if inputs.zonal_zones is None:
-        inputs.zonal_zones = range(1, len(finputs.seed_vals) + 1)
-    while True:
+    if inputs.normalise:
+        target_mat = inputs.target_mat * (
+            aggregated.sum().sum() / inputs.target_mat.sum().sum()
+        )
+    else:
+        target_mat = inputs.target_mat
+
+    def _cap(x: float) -> float:
+        lower_lim, upper_lim = (1 - inputs.factor_cap), (1 + inputs.factor_cap)
+        if x >= lower_lim:
+            if x <= upper_lim:
+                return x
+            else:
+                return upper_lim
+        else:
+            return lower_lim
+
+    sectoral_factors = (target_mat.div(aggregated)).map(_cap)
+
+    if (sectoral_factors.isna().sum().sum() > 0) or (
+        sectoral_factors.isin([np.inf, -np.inf]).sum().sum() > 0
+    ):
+        raise warnings.warn(
+            f"The sectoral factors contain null values or infinite values. "
+            "This may indicate a problem with the translation vector or the target matrix."
+        )
+
+    sectoral_factors = sectoral_factors.fillna(1).replace(to_replace={np.inf: 1, -np.inf: 1})
+
+    zonal_factors = translation.pandas_matrix_zone_translation(
+        sectoral_factors,
+        inputs.trans_vector,
+        inputs.to_col,
+        inputs.from_col,
+        inputs.factor_col,
+        check_totals=False,
+    )
+    adjusted = matrix * zonal_factors
+
+    if furness_inputs is not None:
+
         furnessed, _, _ = doubly_constrained_furness(
-            seed_vals_inner,
-            finputs.row_targets,
-            finputs.col_targets,
-            finputs.tol,
-            finputs.max_iters,
-            finputs.warning,
+            adjusted.to_numpy(),
+            furness_inputs.row_targets,
+            furness_inputs.col_targets,
+            furness_inputs.tol,
+            furness_inputs.max_iters,
+            furness_inputs.warning,
         )
-        trans_mat = pd.DataFrame(
-            furnessed, index=inputs.zonal_zones, columns=inputs.zonal_zones
-        )
-        aggregated = translation.pandas_matrix_zone_translation(
-            trans_mat, inputs.trans_vector, inputs.from_col, inputs.to_col, inputs.factor_col
-        )
-        # row_diff = aggregated.sum(axis=1) / inputs.target_mat.sum(axis=1) - 1
-        # col_diff = aggregated.sum(axis=0) / inputs.target_mat.sum(axis=0) - 1
-        # if (np.absolute(row_diff).max() > 0.01) | (np.absolute(col_diff).max() > 0.01):
-        #     raise ValueError("The furnessed matrix aggregated up to sectoral level "
-        #                      "does not match the target matrix. Check your translation, "
-        #                      "zonal trip ends and target matrix.")
 
-        # This is for factors, so everything is multiplied by one to match
-        # sectoral factors to zones
-        adjustment_mat = translation.pandas_matrix_zone_translation(
-            pd.DataFrame(inputs.target_mat, index=aggregated.index, columns=aggregated.columns)
-            .div(aggregated)
-            .fillna(1)
-            .replace(to_replace={np.inf: 1}),
-            inputs.trans_vector,
-            inputs.to_col,
-            inputs.from_col,
-            inputs.factor_col,
-            check_totals=False,
-        )
-        adjusted = furnessed * adjustment_mat
-        # Check rmse compared to zonal targets after sectoral adjustment
-        rmse = calc_rmse(finputs.col_targets, adjusted.values, finputs.row_targets, n_vals)
-        if rmse < finputs.tol:
-            return adjusted.to_numpy(), iter, rmse
-        seed_vals_inner = adjusted.to_numpy()
-        iter += 1
-        if iter > finputs.max_iters:
-            warnings.warn(
-                "Process has reached the max number of iterations "
-                f"without converging. The RMSE is {rmse}. Returning "
-                f"the matrix as it currently is"
-            )
-            return adjusted.to_numpy(), iter, rmse
+        return furnessed, sectoral_factors
+
+    return adjusted, sectoral_factors

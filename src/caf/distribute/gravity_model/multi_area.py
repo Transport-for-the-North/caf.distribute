@@ -596,8 +596,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         distributions: MultiCostDistribution,
         running_log_path: Path,
         gm_params: GMCalibParams,
-        return_distributions: bool = False,
-        four_d_inputs: furness.SectoralConstraintInputs | None = None,
+        return_distributions: bool = False,      
         verbose: int = 0,
         **kwargs,
     ) -> dict[str | int, GravityModelResults]:
@@ -642,7 +641,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
 
         params_len = len(distributions[0].function_params)
         ordered_init_params = []
-
+        
         for dist in distributions:
             self.cost_function.validate_params(dist.function_params)
             params = self._order_cost_params(dist.function_params)
@@ -681,7 +680,6 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             "params_len": params_len,
             "furness_jac": gm_params.furness_jac,
             "furness_tol": gm_params.furness_tol,
-            "four_d_inputs": four_d_inputs,
         }
         optimise_cost_params = functools.partial(
             optimize.least_squares,
@@ -696,7 +694,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             ftol=gm_params.ftol,
             xtol=gm_params.xtol,
             max_nfev=gm_params.grav_max_iters,
-            kwargs=gravity_kwargs | kwargs,
+            kwargs=gravity_kwargs|kwargs,
         )
         result = optimise_cost_params(x0=ordered_init_params)
 
@@ -837,23 +835,14 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         running_log_path: os.PathLike,
         params_len: int,
         diff_step: int = 0,
-        four_d_inputs: Optional[furness.SectoralConstraintInputs] = None,
+    
         **_,
     ):
         del diff_step
 
         base_mat = self._create_seed_matrix(cost_distributions, init_params, params_len)
-        if four_d_inputs is not None:
-            furness_inputs = furness.FurnessInputs(
-                seed_vals=base_mat,
-                row_targets=self.row_targets,
-                col_targets=self.col_targets,
-                tol=furness_tol,
-            )
-            four_d_inputs.furness_inputs = furness_inputs
-            matrix, iters, rmse = furness.sectoral_constraint(four_d_inputs)
-        else:
-            matrix, iters, rmse = furness.doubly_constrained_furness(
+
+        matrix, iters, rmse = furness.doubly_constrained_furness(
                 seed_vals=base_mat,
                 row_targets=self.row_targets,
                 col_targets=self.col_targets,
@@ -880,9 +869,9 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             j = 0
             # TODO(kf) Fix this to reflect TLD class
             for name in dist.function_params.keys():
-                log_costs[f"{name}_{i}"] = init_params[params_len * i + j]
+                log_costs[f"{name}_{dist.name}"] = init_params[params_len * i + j]
                 j += 1
-            log_costs[f"convergence_{i}"] = convergences[dist.name]
+            log_costs[f"convergence_{dist.name}"] = convergences[dist.name]
 
         end_time = timing.current_milli_time()
         self._log_iteration(
@@ -1095,7 +1084,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         calibrate: bool = False,
         calib_params: GMCalibParams | None = None,
         furness_tol: float = 1e-6,
-        return_distributions: bool = False,
+        **calib_kwargs
     ):
         """
         Full run using a sectoral constraint, either with or without first
@@ -1113,7 +1102,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
                 distributions,
                 running_log_path,
                 calib_params,
-                return_distributions=return_distributions,
+                **calib_kwargs
             )
 
         return self.run(distributions, running_log_path, furness_tol, four_d_inputs)
