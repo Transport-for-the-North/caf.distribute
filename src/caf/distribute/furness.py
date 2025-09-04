@@ -162,6 +162,7 @@ def doubly_constrained_furness(
     return furnessed_mat, iter_num + 1, cur_rmse
 
 
+# pylint: disable=too-many-arguments, too-many-locals
 def furness_pandas_wrapper(
     seed_values: pd.DataFrame,
     row_targets: pd.DataFrame,
@@ -177,7 +178,7 @@ def furness_pandas_wrapper(
     unique_zones_join_fn: callable = operator.and_,
 ) -> tuple[pd.DataFrame, int, float]:
     """
-    Wrapper around doubly_constrained_furness() to handle pandas in/out
+    Create wrapper around doubly_constrained_furness() to handle pandas in/out.
 
     Internally checks and converts the pandas inputs into numpy in order to
     run doubly_constrained_furness(). Converts the output back into pandas
@@ -313,41 +314,7 @@ def furness_pandas_wrapper(
     return furnessed_mat, n_iters, achieved_rmse
 
 
-def pandas_ndim_furness(
-    seed_mat: pd.DataFrame,
-    targets: pd.DataFrame,
-    dummy_name: str,
-    max_iters: int = 10000,
-    tol: float = 1e-9,
-):
-    # Infer fixed and non-fixed dimensions from index and column names
-    furness_dims = targets.columns
-    stat_dims = [dim for dim in seed_mat.index.names if dim not in furness_dims]
-    targets.index = targets.index.reorder_levels(stat_dims + [dummy_name])
-    mat = seed_mat.unstack(level=stat_dims)
-    rmse = np.inf
-    targ_dict = {}
-    for dim in furness_dims:
-        targ = targets[dim]
-        targ.index.names = stat_dims + [dim]
-        targ_dict[dim] = targ.unstack(stat_dims)
-    for iter in range(max_iters):
-        # adjust to match each target
-        for dim in furness_dims:
-            comp_mat = mat.groupby(dim).sum()
-            adj = (targ_dict[dim] / comp_mat).fillna(0)
-            mat = mat * adj
-        # calc rmse
-        diff = 0
-        for dim in furness_dims:
-            diff += ((mat.groupby(dim).sum() - targ_dict[dim]) ** 2).values.sum()
-        prev_rmse = rmse
-        rmse = (diff / len(targets)) ** 0.5
-        if rmse < tol:
-            return mat
-        if prev_rmse - rmse < tol:
-            return mat
-    return mat
+# pylint: enable=too-many-arguments, too-many-locals
 
 
 def numpy_ndim_furness(
@@ -396,11 +363,6 @@ def numpy_ndim_furness(
         mat = seed_mat.to_xarray()
     else:
         mat = seed_mat.copy()
-    if isinstance(targets, pd.DataFrame):
-        raise NotImplementedError("Will do later")
-    elif isinstance(targets, list):
-        if not isinstance(targets[0], xr.DataArray):
-            raise NotImplementedError("Will do later")
     rmse = np.inf
     for iter_num in range(max_iters):
         for targ in targets:
@@ -420,8 +382,12 @@ def numpy_ndim_furness(
         if rmse < tol:
             return mat, rmse, iter_num
         if prev_rmse - rmse < tol:
-            warnings.warn(f"RMSE has stopped improving at {rmse} after {iter_num} iterations. Exiting.")
+            warnings.warn(
+                f"RMSE has stopped improving at {rmse} after {iter_num} iterations. Exiting."
+            )
             return mat, rmse, iter_num
-    warnings.warn(f"Max iters reached in {iter_num} iterations without converging. "
-                  f"Exiting with {rmse} rmse.")
+    warnings.warn(
+        f"Max iters reached in {iter_num} iterations without converging. "
+        f"Exiting with {rmse} rmse."
+    )
     return mat, rmse, iter_num
