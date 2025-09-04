@@ -67,7 +67,7 @@ where = ["src"]
 # Linters
 [tool.black]
 line-length = 95
-target-version = ['py10']
+target-version = ['py311']
 extend-exclude = '''
 (
   _version\.py
