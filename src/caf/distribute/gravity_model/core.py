@@ -46,7 +46,7 @@ class GravityModelResults:
     """
     cost_function: cost_functions.CostFunction
     """The cost function used in the gravity model run."""
-    cost_params: dict[str | int, Any]
+    cost_params: dict[str, Any]
     """The final/used cost parameters used by the cost function."""
 
     def plot_distributions(self, truncate_last_bin: bool = False) -> figure.Figure:
@@ -172,8 +172,8 @@ class GravityModelBase(abc.ABC):
         self.initial_cost_params: dict[str, Any] = dict()
         self.optimal_cost_params: dict[str, Any] = dict()
         self.initial_convergence: float = 0
-        self.achieved_convergence: float = 0
-        self.achieved_cost_dist: Optional[cost_utils.CostDistribution] = None
+        self.achieved_convergence: float | dict[str, float] | dict[int, float] = 0
+        self.achieved_cost_dist: cost_utils.CostDistribution | list[cost_utils.CostDistribution] | None = None
         self.achieved_distribution: np.ndarray = np.zeros_like(cost_matrix)
 
     @staticmethod
@@ -187,8 +187,9 @@ class GravityModelBase(abc.ABC):
     @property
     def achieved_band_share(self) -> np.ndarray:
         """The achieved band share values during the last run."""
-        if self.achieved_cost_dist is None:
+        if not isinstance(self.achieved_cost_dist, cost_utils.CostDistribution):
             raise ValueError("Gravity model has not been run. achieved_band_share is not set.")
+
         return self.achieved_cost_dist.band_share_vals
 
     @staticmethod

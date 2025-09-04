@@ -825,7 +825,9 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             col_targets=self.col_targets,
             tol=furness_tol,
         )
-        convergences, distributions, residuals = {}, [], []
+        convergences = {}
+        distributions = []
+        residuals = []
         for dist in cost_distributions:
             (
                 single_cost_distribution,
@@ -837,7 +839,10 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
                 target_cost_distribution=dist.cost_distribution,
             )
             convergences[dist.name] = single_convergence
-            distributions.append(single_cost_distribution)
+            if isinstance(single_cost_distribution, cost_utils.CostDistribution):
+                distributions.append(single_cost_distribution)
+            else:
+                raise TypeError("Should be a CostDistribution here, something broken.")
             residuals.append(single_achieved_residuals)
 
         log_costs = {}
@@ -858,14 +863,14 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             cost_kwargs=log_costs,
             furness_iters=iters,
             furness_rmse=rmse,
-            convergence=np.mean(list(convergences.values())),
+            convergence=float(np.mean(list(convergences.values()))),
         )
 
         self._loop_num += 1
         self._loop_start_time = timing.current_milli_time()
 
         self.achieved_cost_dist: list[cost_utils.CostDistribution] = distributions
-        self.achieved_convergence: dict[str | int, float] = convergences
+        self.achieved_convergence: dict[str, float] = convergences
         self.achieved_distribution = matrix
 
         achieved_residuals = np.concatenate(residuals)

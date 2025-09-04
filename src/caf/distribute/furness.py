@@ -4,6 +4,7 @@
 import logging
 import operator
 import warnings
+from typing import Callable
 
 # Third Party
 import numpy as np
@@ -174,8 +175,8 @@ def furness_pandas_wrapper(
     idx_col: str = "model_zone_id",
     unique_col: str = "trips",
     round_dp: int = 8,
-    unique_zones: list[int] = None,
-    unique_zones_join_fn: callable = operator.and_,
+    unique_zones: list[int] | None = None,
+    unique_zones_join_fn: Callable = operator.and_,
 ) -> tuple[pd.DataFrame, int, float]:
     """
     Create wrapper around doubly_constrained_furness() to handle pandas in/out.
@@ -372,7 +373,7 @@ def numpy_ndim_furness(
             check_mat = mat.sum(dim=check_dim)
             adj = (targ / check_mat).fillna(1)
             mat *= adj
-        diff = 0
+        diff = 0.0
         for targ in targets:
             check_dim = set(mat.dims).difference(set(targ.dims))
             check_mat = mat.sum(dim=check_dim)
