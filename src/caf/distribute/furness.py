@@ -20,7 +20,6 @@ from numpy.testing import assert_approx_equal
 LOG = logging.getLogger(__name__)
 
 # # # CLASSES # # #
-# TODO(BT): Add 3D Furness from NorMITs Demand
 
 
 # # # FUNCTIONS # # #
@@ -352,16 +351,46 @@ def pandas_ndim_furness(
 
 
 def numpy_ndim_furness(
-    seed_mat: xr.DataArray,
+    seed_mat: xr.DataArray | pd.Series,
     targets: list[xr.DataArray],
     targ_len: int,
-    normalise: bool = False,
-    norm_dims: list = None,
     max_iters: int = 10000,
     tol: float = 1e-9,
-):
+) -> tuple[xr.DataArray, float, int]:
     """
-    Furness an n dimensional numpy array
+    Furness an n dimensional numpy array.
+
+    This process works by iteratively summing the target matrix to match dimensions
+    of a target matrix, then adjusting to match that target. One iteration of the
+    process matches to each target in turn and then measures convergence to all.
+    Once convergence has been met or max_iters have occurred the process will exit
+    and return the matrix as an xarray, the achieved convergence score and the
+    number of iterations it took.
+
+    Parameters
+    ----------
+    seed_mat: xr.DataArray
+        The seed matrix for the furness. If this is a Series the indices must match
+        the targets, and if an xarray the dimensions must match.
+    targets: list[xr.DataArray]
+        A list of xarray targets for the furness. Every target must have dimensions
+        which are a subset of the seed mat.
+    targ_len: int
+        The length of the targets. This is only used for calculating convergence.
+    max_iters: int = 10000
+        The maximum number of iterations before the process will exit.
+    tol: float = 1e-9
+        Target for convergence. This is roughly an rmse measure from the achieved
+        matrix to the targets.
+
+    Returns
+    -------
+    mat: xr.DataArray
+        The furnessed matrix.
+    rmse: float
+        The achieved convergence score.
+    iter_num: int
+        The number of iterations the process took.
     """
     if isinstance(seed_mat, pd.Series):
         mat = seed_mat.to_xarray()
@@ -373,7 +402,7 @@ def numpy_ndim_furness(
         if not isinstance(targets[0], xr.DataArray):
             raise NotImplementedError("Will do later")
     rmse = np.inf
-    for iter in range(max_iters):
+    for iter_num in range(max_iters):
         for targ in targets:
             check_dim = set(mat.dims).difference(set(targ.dims))
             if len(check_dim) != 1:
@@ -388,12 +417,11 @@ def numpy_ndim_furness(
             diff += float(((check_mat - targ) ** 2).sum())
         prev_rmse = rmse
         rmse = (diff / targ_len) ** 0.5
-        print(f"Current rmse = {rmse} after {iter} iterations.")
         if rmse < tol:
-            print(f"exiting after {iter} iterations with rmse of {rmse}")
-            return mat, rmse, iter
+            return mat, rmse, iter_num
         if prev_rmse - rmse < tol:
-            print(f"RMSE has stopped improving at {rmse} after {iter} iterations. Exiting.")
-            return mat, rmse, iter
-    print(f"Max iters reached. Exiting with {rmse} rmse.")
-    return mat, rmse, iter
+            warnings.warn(f"RMSE has stopped improving at {rmse} after {iter_num} iterations. Exiting.")
+            return mat, rmse, iter_num
+    warnings.warn(f"Max iters reached in {iter_num} iterations without converging. "
+                  f"Exiting with {rmse} rmse.")
+    return mat, rmse, iter_num
