@@ -373,7 +373,7 @@ class MGMCostDistribution:
     # matrix_id_lookup: np.ndarray
     # function_params: dict[id, dict[str,float]]
 
-    name: str | int
+    name: str
     cost_distribution: cost_utils.CostDistribution
     zones: np.ndarray
     function_params: dict[str, float]
@@ -384,7 +384,7 @@ class MGMCostDistribution:
     @classmethod
     def from_pandas(
         cls,
-        category: str | int,
+        category: str,
         ordered_zones: pd.Series,
         tld: pd.DataFrame,
         cat_zone_correspondence: pd.DataFrame,
@@ -586,7 +586,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         gm_params: GMCalibParams,
         verbose: int = 0,
         **kwargs,
-    ) -> dict[str | int, GravityModelResults]:
+    ) -> dict[str, GravityModelResults]:
         """Find the optimal parameters for self.cost_function.
 
         Optimal parameters are found using `scipy.optimize.least_squares`
@@ -883,7 +883,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         distributions: MultiCostDistribution,
         running_log_path: Path,
         furness_tol: float = 1e-6,
-    ) -> dict[int | str, GravityModelResults]:
+    ) -> dict[str, GravityModelResults]:
         """
         Run the gravity_model without calibrating.
 
