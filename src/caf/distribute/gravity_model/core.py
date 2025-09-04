@@ -173,7 +173,9 @@ class GravityModelBase(abc.ABC):
         self.optimal_cost_params: dict[str, Any] = dict()
         self.initial_convergence: float = 0
         self.achieved_convergence: float | dict[str, float] | dict[int, float] = 0
-        self.achieved_cost_dist: cost_utils.CostDistribution | list[cost_utils.CostDistribution] | None = None
+        self.achieved_cost_dist: (
+            cost_utils.CostDistribution | list[cost_utils.CostDistribution] | None
+        ) = None
         self.achieved_distribution: np.ndarray = np.zeros_like(cost_matrix)
 
     @staticmethod
