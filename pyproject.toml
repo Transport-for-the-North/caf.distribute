@@ -32,7 +32,7 @@ dependencies = [
 
 [project.optional-dependencies]
 sparse = [
-    "sparse>=0.13.0",
+    "sparse>=0.13.0, <16",
     "numba>=0.60.0"
 ]
 

@@ -8,6 +8,6 @@ matplotlib>=3.8.2
 xarray>=2024
 
 # Ipf requirements
-sparse>=0.13.0
+sparse>=0.13.0, <16
 numba>=0.60.0
 
