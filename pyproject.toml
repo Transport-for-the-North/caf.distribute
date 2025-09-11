@@ -58,6 +58,8 @@ disable = [
     "use-dict-literal",
     "use-list-literal",
     "wrong-import-position", # Compatibility with isort
+    "wrong-import-order", # Compatibility with isort
+    "ungrouped-imports", # Compatibility with Isort
 ]
 
 [tool.isort]
