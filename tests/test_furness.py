@@ -6,6 +6,7 @@ from typing import Any
 
 # Third Party
 import numpy as np
+import pandas as pd
 import pytest
 
 # Local Imports
@@ -53,13 +54,16 @@ class DoubleFurnessResults:
         furness_mat: np.ndarray,
         iter_num: int,
         rmse: float,
+        almost_equal_precision: float = 5,
         ignore_rmse: bool = False,
     ):
         """Assert the returned results"""
-        np.testing.assert_almost_equal(furness_mat, self.furness_mat)
+        np.testing.assert_almost_equal(
+            furness_mat, self.furness_mat, decimal=almost_equal_precision
+        )
         np.testing.assert_equal(iter_num, self.iter_num)
         if not ignore_rmse:
-            np.testing.assert_almost_equal(rmse, self.rmse)
+            np.testing.assert_almost_equal(rmse, self.rmse, decimal=almost_equal_precision)
 
 
 # # # FIXTURES # # #
@@ -213,15 +217,13 @@ def fixture_nan_target():
 class TestDoublyConstrainedFurness:
     """Tests for the doubly_constrained_furness function"""
 
-    @pytest.mark.parametrize(
-        "fixture_str",
-        ["no_furness", "no_furness_int", "simple_furness"],
-    )
-    def test_correct(self, fixture_str: str, request):
+    @pytest.mark.parametrize("fixture_str", ["no_furness", "no_furness_int", "simple_furness"])
+    @pytest.mark.parametrize("precision", [1, 4, 7])
+    def test_correct(self, fixture_str: str, precision: float, request):
         """Check the correct results are achieved"""
         furness_results = request.getfixturevalue(fixture_str)
         results = furness.doubly_constrained_furness(**furness_results.input_kwargs())
-        furness_results.check_results(*results)
+        furness_results.check_results(*results, almost_equal_precision=precision)
 
     @pytest.mark.parametrize(
         "fixture_str",
@@ -262,3 +264,26 @@ class TestDoublyConstrainedFurness:
         msg = "np.nan found in the targets"
         with pytest.raises(ValueError, match=msg):
             furness.doubly_constrained_furness(**nan_target.input_kwargs())
+
+
+class TestFurnessWrapper:
+    """Tests for the doubly_constrained_furness pandas wrapper function"""
+
+    @pytest.mark.parametrize("fixture_str", ["no_furness", "simple_furness"])
+    def test_correct(self, fixture_str: str, request):
+        """Check the correct results are achieved"""
+        furness_results = request.getfixturevalue(fixture_str)
+        row_series = pd.DataFrame(furness_results.input_kwargs()["row_targets"]).reset_index()
+        row_series.columns = ["model_zone_id", "trips"]
+        col_series = pd.DataFrame(furness_results.input_kwargs()["col_targets"]).reset_index()
+        col_series.columns = ["model_zone_id", "trips"]
+        seed = pd.DataFrame(
+            furness_results.input_kwargs()["seed_vals"],
+            index=row_series.model_zone_id,
+            columns=col_series.model_zone_id,
+        )
+        results = furness.furness_pandas_wrapper(seed, row_series, col_series)
+        pd.testing.assert_frame_equal(
+            results[0],
+            pd.DataFrame(furness_results.furness_mat, index=seed.index, columns=seed.columns),
+        )
