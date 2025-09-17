@@ -168,6 +168,7 @@ def furness_pandas_wrapper(
     seed_values: pd.DataFrame,
     row_targets: pd.DataFrame,
     col_targets: pd.DataFrame,
+    *,
     max_iters: int = 2000,
     seed_infill: float = 1e-3,
     normalise_seeds: bool = True,
