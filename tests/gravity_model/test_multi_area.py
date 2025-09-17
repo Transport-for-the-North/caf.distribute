@@ -255,5 +255,5 @@ class TestResults:
     @pytest.mark.parametrize("precision", [0.1, 1e-4, 1e-8])
     def test_cellular(self, cal_furness, area, precision, data_dir):
         cal_results = cal_furness[area].value_distribution
-        check = pd.read_csv(data_dir / "results" / f"{area}.csv", index_col=0).values
+        check = pd.read_csv(data_dir / "results" / f"{area.lower()}.csv", index_col=0).values
         np.testing.assert_allclose(check, cal_results, rtol=precision)
