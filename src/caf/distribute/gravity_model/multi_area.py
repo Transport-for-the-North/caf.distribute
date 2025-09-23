@@ -402,7 +402,7 @@ class MGMCostDistribution:
 
         Parameters
         ----------
-        category : str | int
+        category : str
             distribution category, used to label gravity model run
         ordered_zones : pd.Series
             zones ordered in the same way as other inputs
@@ -609,7 +609,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
 
         Returns
         -------
-        dict[str | int, GravityModelResults]:
+        dict[str, GravityModelResults]:
             containings the achieved distributions for each tld category. To access
             the combined distribution use self.achieved_distribution
 
@@ -902,7 +902,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
 
         Returns
         -------
-        dict[int | str, GravityModelResults]
+        dict[str, GravityModelResults]
             The results of the gravity model run for each distribution
         """
         params_len = len(distributions[0].function_params)

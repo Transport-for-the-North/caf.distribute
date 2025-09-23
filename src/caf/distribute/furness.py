@@ -294,9 +294,9 @@ def furness_pandas_wrapper(
         seed_values = seed_values.where(mask, 0)
 
     # ## CONVERT TO NUMPY AND FURNESS ## #
-    row_targets = row_targets.values.flatten()
-    col_targets = col_targets.values.flatten()
-    seed_values = seed_values.values
+    row_targets = row_targets.to_numpy().flatten()
+    col_targets = col_targets.to_numpy().flatten()
+    seed_values = seed_values.to_numpy()
 
     furnessed_mat, n_iters, achieved_rmse = doubly_constrained_furness(
         seed_vals=seed_values,

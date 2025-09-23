@@ -189,9 +189,13 @@ class GravityModelBase(abc.ABC):
     @property
     def achieved_band_share(self) -> np.ndarray:
         """The achieved band share values during the last run."""
+        if self.achieved_cost_dist is None:
+            raise ValueError("Gravity model has not been run. Achieved_band_share is not set.")
         if not isinstance(self.achieved_cost_dist, cost_utils.CostDistribution):
-            raise ValueError("Gravity model has not been run. achieved_band_share is not set.")
-
+            raise TypeError(
+                "Achieved_band_share can only be called on an instance of "
+                f"CostDistribution. Current type is {type(self.achieved_cost_dist)}"
+            )
         return self.achieved_cost_dist.band_share_vals
 
     @staticmethod
