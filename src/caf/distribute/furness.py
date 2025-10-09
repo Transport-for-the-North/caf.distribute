@@ -2,6 +2,7 @@
 """Furness functions for distributing vectors to matrices."""
 # Built-Ins
 import logging
+import operator
 import warnings
 from typing import Optional, Callable
 from dataclasses import dataclass
