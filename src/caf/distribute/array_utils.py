@@ -246,9 +246,11 @@ def _flatten_some_sparse_axis_with_transpose(
     # Transpose and get the flat coordinates out
     array = array.transpose(axis_swap)
     get_vals = list(range(len(flatten_axis)))
-    flat_coord = np.ravel_multi_index(
-        np.take(array.coords, get_vals, axis=0),
-        np.take(array.shape, get_vals),
+    flat_coord = np.array(
+        np.ravel_multi_index(
+            tuple(np.take(array.coords, get_vals, axis=0)),
+            tuple(np.take(array.shape, get_vals)),
+        )
     )
     flat_coord.sort()
     return flat_coord, array, axis_swap_reverse
@@ -262,10 +264,13 @@ def _flatten_some_sparse_axis_without_transpose(
 
     Will only work when flat axis are sequential and in order
     """
-    flat_coord = np.ravel_multi_index(
-        np.take(array.coords, flatten_axis, axis=0),
-        np.take(array.shape, flatten_axis),
+    flat_coord = np.array(
+        np.ravel_multi_index(
+            tuple(np.take(array.coords, flatten_axis, axis=0)),
+            tuple(np.take(array.shape, flatten_axis)),
+        )
     )
+
     flat_coord.sort()
     return flat_coord
 

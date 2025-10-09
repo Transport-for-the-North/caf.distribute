@@ -25,7 +25,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.9", "3.10", "3.11"]
+        python-version: ["3.11", "3.12", "3.13"]
 
     steps:
       - uses: actions/checkout@v3
@@ -53,4 +53,4 @@ jobs:
       - name: Import
         run: |
           cd ..
-          python -c "import caf.toolkit; caf.toolkit.__version__;"
+          python -c "import caf.distribute; caf.distribute.__version__;"

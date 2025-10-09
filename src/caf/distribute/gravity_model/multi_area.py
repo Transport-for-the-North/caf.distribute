@@ -21,7 +21,7 @@ from scipy import optimize
 # Local Imports
 from caf.distribute import cost_functions, furness
 from caf.distribute.gravity_model import core
-from caf.distribute.gravity_model.core import GravityModelCalibrateResults
+from caf.distribute.gravity_model.core import GravityModelResults
 
 # # # CONSTANTS # # #
 LOG = logging.getLogger(__name__)
@@ -380,7 +380,7 @@ class MGMCostDistribution:
     # matrix_id_lookup: np.ndarray
     # function_params: dict[id, dict[str,float]]
 
-    name: str | int
+    name: str
     cost_distribution: cost_utils.CostDistribution
     zones: np.ndarray
     function_params: dict[str, float]
@@ -391,7 +391,7 @@ class MGMCostDistribution:
     @classmethod
     def from_pandas(
         cls,
-        category: str | int,
+        category: str,
         ordered_zones: pd.Series,
         tld: pd.DataFrame,
         cat_zone_correspondence: pd.DataFrame,
@@ -409,7 +409,7 @@ class MGMCostDistribution:
 
         Parameters
         ----------
-        category : str | int
+        category : str
             distribution category, used to label gravity model run
         ordered_zones : pd.Series
             zones ordered in the same way as other inputs
@@ -469,7 +469,11 @@ class MGMCostDistribution:
         cat_tld = tld[tld[tld_cat_col] == category]
 
         cat_cost_distribution = cost_utils.CostDistribution(
-            cat_tld, tld_min_col, tld_max_col, tld_avg_col, tld_trips_col, tld_avg_col
+            cat_tld,
+            min_col=tld_min_col,
+            max_col=tld_max_col,
+            avg_col=tld_avg_col,
+            trips_col=tld_trips_col,
         )
 
         return cls(category, cat_cost_distribution, cat_zone_indices, func_params)
@@ -592,10 +596,10 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         distributions: MultiCostDistribution,
         running_log_path: Path,
         gm_params: GMCalibParams,
-        return_distributions: bool = False,
+        return_distributions: bool = False,      
         verbose: int = 0,
         **kwargs,
-    ) -> dict[str | int, GravityModelCalibrateResults]:
+    ) -> dict[str, GravityModelResults]:
         """Find the optimal parameters for self.cost_function.
 
         Optimal parameters are found using `scipy.optimize.least_squares`
@@ -621,7 +625,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
 
         Returns
         -------
-        dict[str | int, GravityModelCalibrateResults]:
+        dict[str, GravityModelResults]:
             containings the achieved distributions for each tld category. To access
             the combined distribution use self.achieved_distribution
 
@@ -637,7 +641,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
 
         params_len = len(distributions[0].function_params)
         ordered_init_params = []
-
+        
         for dist in distributions:
             self.cost_function.validate_params(dist.function_params)
             params = self._order_cost_params(dist.function_params)
@@ -690,7 +694,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             ftol=gm_params.ftol,
             xtol=gm_params.xtol,
             max_nfev=gm_params.grav_max_iters,
-            kwargs=gravity_kwargs | kwargs,
+            kwargs=gravity_kwargs|kwargs,
         )
         result = optimise_cost_params(x0=ordered_init_params)
 
@@ -736,7 +740,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         assert self.achieved_cost_dist is not None
         results = {}
         for i, dist in enumerate(distributions):
-            result_i = GravityModelCalibrateResults(
+            result_i = GravityModelResults(
                 cost_distribution=self.achieved_cost_dist[dist.name],
                 cost_convergence=self.achieved_convergence[dist.name],
                 value_distribution=self.achieved_distribution[dist.zones],
@@ -831,29 +835,22 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         running_log_path: os.PathLike,
         params_len: int,
         diff_step: int = 0,
-        four_d_inputs: Optional[furness.SectoralConstraintInputs] = None,
+    
         **_,
     ):
         del diff_step
 
         base_mat = self._create_seed_matrix(cost_distributions, init_params, params_len)
-        if four_d_inputs is not None:
-            furness_inputs = furness.FurnessInputs(
-                seed_vals=base_mat,
-                row_targets=self.row_targets,
-                col_targets=self.col_targets,
-                tol=furness_tol,
-            )
-            four_d_inputs.furness_inputs = furness_inputs
-            matrix, iters, rmse = furness.sectoral_constraint(four_d_inputs)
-        else:
-            matrix, iters, rmse = furness.doubly_constrained_furness(
-                seed_vals=base_mat,
-                row_targets=self.row_targets,
-                col_targets=self.col_targets,
-                tol=furness_tol,
-            )
-        convergences, distributions, residuals = {}, {}, []
+
+        matrix, iters, rmse = furness.doubly_constrained_furness(
+            seed_vals=base_mat,
+            row_targets=self.row_targets,
+            col_targets=self.col_targets,
+            tol=furness_tol,
+        )
+        convergences = {}
+        distributions = {}
+        residuals = []
         for dist in cost_distributions:
             (
                 single_cost_distribution,
@@ -865,7 +862,10 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
                 target_cost_distribution=dist.cost_distribution,
             )
             convergences[dist.name] = single_convergence
-            distributions[dist.name] = single_cost_distribution
+            if isinstance(single_cost_distribution, cost_utils.CostDistribution):
+                distributions[dist.name] = single_cost_distribution
+            else:
+                raise TypeError("Should be a CostDistribution here, something broken.")
             residuals.append(single_achieved_residuals)
 
         log_costs = {}
@@ -874,9 +874,9 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             j = 0
             # TODO(kf) Fix this to reflect TLD class
             for name in dist.function_params.keys():
-                log_costs[f"{name}_{i}"] = init_params[params_len * i + j]
+                log_costs[f"{name}_{dist.name}"] = init_params[params_len * i + j]
                 j += 1
-            log_costs[f"convergence_{i}"] = convergences[dist.name]
+            log_costs[f"convergence_{dist.name}"] = convergences[dist.name]
 
         end_time = timing.current_milli_time()
         self._log_iteration(
@@ -887,13 +887,13 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             cost_kwargs=log_costs,
             furness_iters=iters,
             furness_rmse=rmse,
-            convergence=np.mean(list(convergences.values())),
+            convergence=float(np.mean(list(convergences.values()))),
         )
 
         self._loop_num += 1
         self._loop_start_time = timing.current_milli_time()
 
-        self.achieved_cost_dist: list[cost_utils.CostDistribution] = distributions
+        self.achieved_cost_dist: dict[str | int, cost_utils.CostDistribution] = distributions
         self.achieved_convergence: dict[str | int, float] = convergences
         self.achieved_distribution = matrix
 
@@ -907,7 +907,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         distributions: MultiCostDistribution,
         running_log_path: Path,
         furness_tol: float = 1e-6,
-    ) -> dict[int | str, GravityModelCalibrateResults]:
+    ) -> dict[str, GravityModelResults]:
         """
         Run the gravity_model without calibrating.
 
@@ -930,8 +930,8 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
 
         Returns
         -------
-        results: dict[str, GravityModelCalibrationResults]
-            Results from the run. See return class for more info.
+        dict[str, GravityModelResults]
+            The results of the gravity model run for each distribution
         """
         params_len = len(distributions[0].function_params)
         cost_args = []
@@ -950,11 +950,11 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         assert self.achieved_cost_dist is not None
         results = {}
         for i, dist in enumerate(distributions):
-            result_i = GravityModelCalibrateResults(
+            result_i = GravityModelResults(
                 cost_distribution=self.achieved_cost_dist[dist.name],
                 cost_convergence=self.achieved_convergence[dist.name],
-                value_distribution=self.achieved_distribution[dist.zones],
                 target_cost_distribution=dist.cost_distribution,
+                value_distribution=self.achieved_distribution[dist.zones],
                 cost_function=self.cost_function,
                 cost_params=self._cost_params_to_kwargs(
                     cost_args[i * params_len : i * params_len + params_len]
@@ -964,11 +964,13 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
 
         return results
 
-    def triple_run(self,
-                   distributions: MultiCostDistribution,
-                   running_log_path: Path,
-                   furness_tol: float = 1e-6,
-                   xamax: int = 2):
+    def triple_run(
+        self,
+        distributions: MultiCostDistribution,
+        running_log_path: Path,
+        furness_tol: float = 1e-6,
+        xamax: int = 2,
+    ):
         """
         Run the gravity_model without calibrating.
 
@@ -992,7 +994,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             cost_distributions=distributions,
             running_log_path=running_log_path,
             params_len=params_len,
-            furness_tol=furness_tol
+            furness_tol=furness_tol,
         )
         results = {}
 
@@ -1003,28 +1005,24 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             achieved = self.achieved_cost_dist[i].df.copy()
             target = dist.cost_distribution.df.copy().reset_index()
             achieved["normalised"] = (
-                    achieved[self.achieved_cost_dist[i].trips_col]
-                    / achieved[self.achieved_cost_dist[i].trips_col].sum()
+                achieved[self.achieved_cost_dist[dist.name].trips_col]
+                / achieved[self.achieved_cost_dist[dist.name].trips_col].sum()
             )
             target["normalised"] = (
-                    target[dist.cost_distribution.trips_col]
-                    / target[dist.cost_distribution.trips_col].sum()
+                target[dist.cost_distribution.trips_col]
+                / target[dist.cost_distribution.trips_col].sum()
             )
-            target.loc[
-                target["normalised"] > achieved["normalised"] * xamax, "normalised"
-            ] = (
-                    achieved.loc[
-                        target["normalised"] > achieved["normalised"] * xamax, "normalised"
-                    ]
-                    * xamax
+            target.loc[target["normalised"] > achieved["normalised"] * xamax, "normalised"] = (
+                achieved.loc[
+                    target["normalised"] > achieved["normalised"] * xamax, "normalised"
+                ]
+                * xamax
             )
-            target.loc[
-                target["normalised"] < achieved["normalised"] / xamax, "normalised"
-            ] = (
-                    achieved.loc[
-                        target["normalised"] < achieved["normalised"] / xamax, "normalised"
-                    ]
-                    / xamax
+            target.loc[target["normalised"] < achieved["normalised"] / xamax, "normalised"] = (
+                achieved.loc[
+                    target["normalised"] < achieved["normalised"] / xamax, "normalised"
+                ]
+                / xamax
             )
             # Re-normalise after adjustment
             target["normalised"] /= target["normalised"].sum()
@@ -1067,30 +1065,31 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
 
             self.achieved_distribution[dist.zones] = new_mat[dist.zones]
 
-            gresult = GravityModelCalibrateResults(
+            gresult = GravityModelResults(
                 cost_distribution=single_cost_distribution,
                 cost_convergence=single_convergence,
                 value_distribution=new_mat[dist.zones],
                 target_cost_distribution=dist.cost_distribution,
                 cost_function=self.cost_function,
                 cost_params=self._cost_params_to_kwargs(
-                    cost_args[i * params_len: i * params_len + params_len]
+                    cost_args[i * params_len : i * params_len + params_len]
                 ),
             )
             gresult.save(self.out_path / dist.name)
 
             results[dist.name] = gresult
-            
+
         return results
 
     def sectoral_run(
         self,
         distributions: MultiCostDistribution,
-        four_d_inputs: [furness.SectoralConstraintInputs],
+        four_d_inputs: furness.SectoralConstraintInputs,
         running_log_path: Path,
         calibrate: bool = False,
         calib_params: GMCalibParams | None = None,
         furness_tol: float = 1e-6,
+        **calib_kwargs
     ):
         """
         Full run using a sectoral constraint, either with or without first
@@ -1104,8 +1103,11 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         if calibrate:
             if calib_params is None:
                 calib_params = GMCalibParams
-            calibrated, distributions = self.calibrate(
-                distributions, running_log_path, calib_params, return_distributions=True
+            self.calibrate(
+                distributions,
+                running_log_path,
+                calib_params,
+                **calib_kwargs
             )
 
         return self.run(distributions, running_log_path, furness_tol, four_d_inputs)
