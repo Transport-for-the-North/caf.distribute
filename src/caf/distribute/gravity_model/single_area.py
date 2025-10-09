@@ -114,9 +114,9 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
         self._loop_start_time = timing.current_milli_time()
 
         # Update performance params
-        self.achieved_cost_dist = cost_distribution
-        self.achieved_convergence = convergence
-        self.achieved_distribution = matrix
+        self.achieved_cost_dist: cost_utils.CostDistribution = cost_distribution
+        self.achieved_convergence: float = convergence
+        self.achieved_distribution: np.ndarray = matrix
 
         # Store the initial values to log later
         if self.initial_cost_params is None:  # type: ignore
@@ -696,6 +696,7 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
         )
 
         assert self.achieved_cost_dist is not None
+        assert target_cost_distribution is not None
         return GravityModelResults(
             cost_distribution=self.achieved_cost_dist,
             cost_convergence=self.achieved_convergence,

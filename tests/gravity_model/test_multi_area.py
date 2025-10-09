@@ -250,3 +250,10 @@ class TestResults:
             assert isinstance(result, GravityModelResults)
             assert isinstance(result.summary, pd.Series)
             assert isinstance(result.plot_distributions(), plt.Figure)
+
+    @pytest.mark.parametrize("area", ["City", "Town", "External", "Village"])
+    @pytest.mark.parametrize("precision", [0.1, 1e-4])
+    def test_cellular(self, cal_furness, area, precision, data_dir):
+        cal_results = cal_furness[area].value_distribution
+        check = pd.read_csv(data_dir / "results" / f"{area.lower()}.csv", index_col=0).values
+        np.testing.assert_allclose(check, cal_results, rtol=precision)
