@@ -87,3 +87,44 @@ def validate_zones(
             "so if that is not the case that may be why this "
             "error has been raised."
         )
+
+
+def generate_cost_matrix(
+        df:pd.DataFrame,
+        sigma: int=100,
+        fill_value=0):
+    """
+    Creates a full cost matrix using pivot_table
+
+    Parameters:
+        df : pd.DataFrame
+        sigma : Gaussian Parameter
+        fill_value : value to fill missing cells (default = 0)
+
+    Returns:
+        pd.DataFrame -> cost matrix
+    """
+
+    from_col, to_col, value_col = df.columns.tolist()
+
+    # Pivot the matrix
+    mat = df.pivot_table(
+        index=from_col,
+        columns=to_col,
+        values=value_col,
+        aggfunc='sum',
+        observed=True
+    )
+    # Applying Gaussian Function
+    mat = np.exp(- (mat ** 2) / (2 * sigma ** 2))
+
+    # Get full list of zones
+    all_labels = sorted(set(df[from_col]).union(df[to_col]))
+
+    # Reindex columns
+    mat = mat.reindex(columns=all_labels)
+
+    # Fill missing values
+    mat = mat.fillna(fill_value)
+
+    return mat
