@@ -122,7 +122,10 @@ def generate_cost_matrix(
     all_labels = sorted(set(df[from_col]).union(df[to_col]))
 
     # Reindex columns
-    mat = mat.reindex(columns=all_labels)
+    mat = mat.reindex(index=all_labels, columns=all_labels)
+
+    # Making Cost Matrix symmetric
+    mat = mat.combine_first(mat.T)
 
     # Fill missing values
     mat = mat.fillna(fill_value)
