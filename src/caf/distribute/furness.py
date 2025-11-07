@@ -163,7 +163,7 @@ def doubly_constrained_furness(
     return furnessed_mat, iter_num + 1, cur_rmse
 
 def partial_constrained_furness(
-    seed_vals: np.ndarray,
+    seed_vals: pd.DataFrame,
     row_targets: np.ndarray,
     col_targets: np.ndarray,
     constrained_zones: np.ndarray,
@@ -219,12 +219,7 @@ def partial_constrained_furness(
     # pylint: disable=too-many-locals
     # TODO(MB) Incorporate Nhan's furnessing optimisations
     # Error check
-    if seed_vals.shape != (len(row_targets), len(col_targets)):
-        raise ValueError(
-            f"The shape of the seed values given does not match the row and "
-            f"col targets. Seed_vals are shape {str(seed_vals.shape)}. "
-            f"Expected shape ({len(row_targets):d}, {len(col_targets):d})."
-        )
+
 
     if np.any(np.isnan(row_targets)) or np.any(np.isnan(col_targets)):
         raise ValueError("np.nan found in the targets. Cannot run.")
@@ -249,7 +244,7 @@ def partial_constrained_furness(
 
     # Need to ensure furnessed mat is floating to avoid numpy casting
     # errors in loop
-    furnessed_mat = seed_vals.copy()
+    furnessed_mat = seed_vals.to_numpy(dtype=float)
     if np.issubdtype(furnessed_mat.dtype, np.integer):
         furnessed_mat = furnessed_mat.astype(float)
 
@@ -272,32 +267,32 @@ def partial_constrained_furness(
             col_ach = np.sum(furnessed_mat, axis=0)
             diff_factor = np.divide(
                 col_targets,
-                col_ach,
-                where=col_ach != 0,
+                col_ach[airport_cols],
+                # where=col_ach != 0,
                 out=np.ones_like(col_targets, dtype=float),
             )
 
             # adjust cols
-            #furnessed_mat *= diff_factor
-            furnessed_mat[:, airport_cols] *= diff_factor[airport_cols]
+            # furnessed_mat *= diff_factor
+            furnessed_mat[:, airport_cols] *= diff_factor
 
             # ## ROW CONSTRAIN ## #
             # Calculate difference factor
             row_ach = np.sum(furnessed_mat, axis=1)
             diff_factor = np.divide(
                 row_targets,
-                row_ach,
-                where=row_ach != 0,
+                row_ach[airport_rows],
+                # where=row_ach != 0,
                 out=np.ones_like(row_targets, dtype=float),
             )
 
             # adjust rows
-            #furnessed_mat *= np.atleast_2d(diff_factor).T
-            furnessed_mat[airport_rows, :] *= diff_factor[airport_rows][:, None]
+            # furnessed_mat *= np.atleast_2d(diff_factor).T
+            furnessed_mat[airport_rows, :] *= diff_factor[:, None]
 
             # Calculate the diff - leave early if met
-            row_diff = (row_targets - np.sum(furnessed_mat, axis=1)) ** 2
-            col_diff = (col_targets - np.sum(furnessed_mat, axis=0)) ** 2
+            row_diff = (row_targets - np.sum(furnessed_mat[airport_rows, :], axis=1)) ** 2
+            col_diff = (col_targets - np.sum(furnessed_mat[:, airport_cols], axis=0)) ** 2
             cur_rmse = ((np.sum(row_diff) + np.sum(col_diff)) / n_vals) ** 0.5
             if cur_rmse < tol:
                 early_exit = True
