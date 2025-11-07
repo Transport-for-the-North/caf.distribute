@@ -94,7 +94,7 @@ def generate_cost_matrix(
         sigma: int=100,
         fill_value=0):
     """
-    Creates a full cost matrix using pivot_table
+    Creates a full cost matrix
 
     Parameters:
         df : pd.DataFrame
