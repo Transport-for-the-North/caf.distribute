@@ -309,7 +309,7 @@ def partial_constrained_furness(
     # Warn the user if we exhausted our number of loops
     if not early_exit and warning:
         warnings.warn(
-            f"The doubly constrained furness exhausted its max "
+            f"The Partially constrained furness exhausted its max "
             f"number of loops ({max_iters:d}), while achieving an RMSE "
             f"difference of {cur_rmse:f}. The values returned may not be "
             f"accurate."
