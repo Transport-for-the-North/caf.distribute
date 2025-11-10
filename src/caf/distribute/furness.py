@@ -162,7 +162,7 @@ def doubly_constrained_furness(
 
     return furnessed_mat, iter_num + 1, cur_rmse
 
-def partial_constrained_furness(
+def partial_doubly_constrained_furness(
     seed_vals: pd.DataFrame,
     row_targets: np.ndarray,
     col_targets: np.ndarray,

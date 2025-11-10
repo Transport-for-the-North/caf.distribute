@@ -28,6 +28,7 @@ class BuiltInCostFunction(enum.Enum):
 
     TANNER = "tanner"
     LOG_NORMAL = "log_normal"
+    GAUSSIAN = "gaussian"
 
     def get_cost_function(self) -> CostFunction:
         """Get the Class defining this cost function."""
@@ -45,6 +46,14 @@ class BuiltInCostFunction(enum.Enum):
                 params={"sigma": (0, 5), "mu": (0, 10)},
                 default_params={"sigma": 1, "mu": 2},
                 function=log_normal,
+            )
+
+        if self == BuiltInCostFunction.GAUSSIAN:
+            return CostFunction(
+                name = self.name,
+                params={"sigma": (0, 250), "power": (2, 4)},
+                default_params={"sigma": 50, "power": 2},
+                function=gaussian,
             )
 
         raise ValueError(f"No definition exists for {self} built in cost function")
@@ -309,3 +318,58 @@ def log_normal(
     exp = np.exp(-exp_numerator / exp_denominator)
 
     return np.maximum(frac * exp, min_return_val)
+
+def gaussian(
+    base_cost: np.ndarray,
+    sigma: float,
+    power: float,
+    min_return_val: float = 1e-150,
+) -> np.ndarray:
+    """
+    Apply a Gaussian cost decay function.
+
+    Parameters
+    ----------
+    base_cost : np.ndarray
+        Array of base costs.
+
+    sigma : float
+        Dispersion parameter controlling the width of the Gaussian decay.
+
+    power : float
+        Power applied to the cost before evaluating the Gaussian.
+
+    min_return_val : float, optional
+        Minimum allowed value in the output array.
+
+    Returns
+    -------
+    gaussian_costs : np.ndarray
+        Gaussian-decayed cost values with the same shape as `base_cost`.
+
+    """
+    # Validate numeric inputs
+    math_utils.check_numeric({"sigma": sigma, "power": power})
+
+    sigma = float(sigma)
+    power = float(power)
+
+    # Avoid sigma = 0
+    if sigma == 0:
+        raise ValueError("sigma must be non-zero for Gaussian decay.")
+
+    # Compute cost^power safely
+    # base_cost may contain zeros or negative values
+    cost_power = np.power(
+        base_cost,
+        power,
+        where=base_cost != 0,
+        out=np.zeros_like(base_cost, dtype=float),
+    )
+
+    # Compute exponential safely
+    exp_denominator = 2 * sigma**2
+    exp_term = np.exp(-cost_power / exp_denominator)
+
+    return np.maximum(exp_term, min_return_val)
+
