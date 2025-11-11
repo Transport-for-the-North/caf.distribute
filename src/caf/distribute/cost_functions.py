@@ -320,7 +320,7 @@ def log_normal(
 
     return np.maximum(frac * exp, min_return_val)
 
-def gaussian_df(
+def gaussian(
     base_cost: pd.DataFrame,
     sigma: float,
     power: float,
