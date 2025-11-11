@@ -54,6 +54,7 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
         col_targets: np.ndarray,
         cost_function: cost_functions.CostFunction,
         cost_matrix: np.ndarray,
+        constrained_zones:  np.ndarray
     ):
         super().__init__(
             cost_function=cost_function,
@@ -63,6 +64,7 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
         # Set attributes
         self.row_targets = row_targets
         self.col_targets = col_targets
+        self.constrained_zones = constrained_zones
 
     def _gravity_function(
         self,
@@ -86,6 +88,7 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
             seed_vals=self.cost_function.calculate(cost_matrix, **cost_kwargs),
             row_targets=self.row_targets,
             col_targets=self.col_targets,
+            constrained_zones = self.constrained_zones
             **kwargs,
         )
 
