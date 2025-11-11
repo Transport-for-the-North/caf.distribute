@@ -10,6 +10,7 @@ from typing import Any, Optional
 
 # Third Party
 import numpy as np
+import pandas as pd
 from caf.toolkit import cost_utils, timing, toolbox
 from scipy import optimize
 
@@ -53,7 +54,7 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
         row_targets: np.ndarray,
         col_targets: np.ndarray,
         cost_function: cost_functions.CostFunction,
-        cost_matrix: np.ndarray,
+        cost_matrix: pd.DataFrame,
         constrained_zones:  np.ndarray
     ):
         super().__init__(
