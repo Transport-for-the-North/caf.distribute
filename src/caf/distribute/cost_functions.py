@@ -11,6 +11,7 @@ from typing import Any, Callable, Mapping, Optional
 
 # Third Party
 import numpy as np
+import pandas as pd
 
 # pylint: disable=import-error,wrong-import-position
 from caf.toolkit import math_utils
@@ -319,57 +320,61 @@ def log_normal(
 
     return np.maximum(frac * exp, min_return_val)
 
-def gaussian(
-    base_cost: np.ndarray,
+def gaussian_df(
+    base_cost: pd.DataFrame,
     sigma: float,
     power: float,
     min_return_val: float = 1e-150,
-) -> np.ndarray:
+) -> pd.DataFrame:
     """
-    Apply a Gaussian cost decay function.
+    Apply a Gaussian cost decay function to a pandas DataFrame.
 
     Parameters
     ----------
-    base_cost : np.ndarray
-        Array of base costs.
+    base_cost : pd.DataFrame
+        DataFrame containing base costs.
 
     sigma : float
-        Dispersion parameter controlling the width of the Gaussian decay.
+        Dispersion parameter controlling Gaussian width.
 
     power : float
-        Power applied to the cost before evaluating the Gaussian.
+        Exponent applied to cost before the exponential term.
 
     min_return_val : float, optional
-        Minimum allowed value in the output array.
+        Minimum allowed return value.
 
     Returns
     -------
-    gaussian_costs : np.ndarray
-        Gaussian-decayed cost values with the same shape as `base_cost`.
-
+    pd.DataFrame
+        DataFrame of Gaussian-decayed cost values.
     """
+
     # Validate numeric inputs
     math_utils.check_numeric({"sigma": sigma, "power": power})
 
     sigma = float(sigma)
     power = float(power)
 
-    # Avoid sigma = 0
     if sigma == 0:
         raise ValueError("sigma must be non-zero for Gaussian decay.")
 
-    # Compute cost^power safely
-    # base_cost may contain zeros or negative values
+    # Convert to NumPy array for calculation
+    base_arr = base_cost.to_numpy(dtype=float)
+
+    # cost^power but safe for zeros
     cost_power = np.power(
-        base_cost,
+        base_arr,
         power,
-        where=base_cost != 0,
-        out=np.zeros_like(base_cost, dtype=float),
+        where=base_arr != 0,
+        out=np.zeros_like(base_arr, dtype=float),
     )
 
-    # Compute exponential safely
-    exp_denominator = 2 * sigma**2
-    exp_term = np.exp(-cost_power / exp_denominator)
+    # Gaussian exponential
+    exp_term = np.exp(-cost_power / (2 * sigma**2))
 
-    return np.maximum(exp_term, min_return_val)
+    # Apply minimum threshold
+    exp_term = np.maximum(exp_term, min_return_val)
+
+    # Return as DataFrame with same structure
+    return pd.DataFrame(exp_term, index=base_cost.index, columns=base_cost.columns)
 
