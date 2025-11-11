@@ -163,7 +163,7 @@ class CostFunction:
             return_val[name] = random.uniform(self.param_min[name], self.param_max[name])
         return return_val
 
-    def calculate(self, base_cost: np.ndarray, **kwargs) -> np.ndarray:
+    def calculate(self, base_cost: pd.DataFrame, **kwargs) -> pd.DataFrame:
         """Calculate the actual cost using self.function.
 
         Before calling the cost function the given cost function params will
