@@ -922,6 +922,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         distributions: MultiCostDistribution,
         running_log_path: Path,
         furness_tol: float = 1e-6,
+        four_d_inputs: Optional[furness.SectoralConstraintInputs] = None,
     ) -> dict[int | str, GravityModelCalibrateResults]:
         """
         Run the gravity_model without calibrating.
@@ -960,6 +961,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             running_log_path=running_log_path,
             params_len=params_len,
             furness_tol=furness_tol,
+            four_d_inputs=four_d_inputs
         )
 
         assert self.achieved_cost_dist is not None
