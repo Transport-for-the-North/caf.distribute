@@ -55,7 +55,7 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
         col_targets: np.ndarray,
         cost_function: cost_functions.CostFunction,
         cost_matrix: pd.DataFrame,
-        constrained_zones:  np.ndarray
+        constrained_zones: np.ndarray,
     ):
         super().__init__(
             cost_function=cost_function,
@@ -66,6 +66,24 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
         self.row_targets = row_targets
         self.col_targets = col_targets
         self.constrained_zones = constrained_zones
+
+        cz = pd.Series(self.constrained_zones)
+        index_dtype = cost_matrix.index.dtype
+        col_type = cost_matrix.columns.dtype
+        cz_dtype = cz.dtype
+        if (index_dtype != cz_dtype) or (col_type != cz_dtype):
+            print(
+                f"Zone ID type mismatch detected: "
+                f"index is {index_dtype}, and columns is {col_type}, constrained_zones is {cz_dtype}. "
+                f"Auto-correcting..."
+            )
+
+            cost_matrix.index = cost_matrix.index.astype(int)
+            cost_matrix.columns = cost_matrix.columns.astype(int)
+            self.constrained_zones = cz.dropna().astype(int).values
+
+        self.airport_rows = cost_matrix.index.isin(self.constrained_zones)
+        self.airport_cols = cost_matrix.columns.isin(self.constrained_zones)
 
     def _gravity_function(
         self,
@@ -89,7 +107,7 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
             seed_vals=self.cost_function.calculate(cost_matrix, **cost_kwargs),
             row_targets=self.row_targets,
             col_targets=self.col_targets,
-            constrained_zones = self.constrained_zones
+            constrained_zones=self.constrained_zones,
             **kwargs,
         )
 
@@ -156,8 +174,8 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
         # Initialise running params
         cost_kwargs = self._cost_params_to_kwargs(cost_args)
         cost_matrix = self._apply_perceived_factors(self.cost_matrix)
-        row_targets = self.achieved_distribution.sum(axis=1)
-        col_targets = self.achieved_distribution.sum(axis=0)
+        row_targets = self.achieved_distribution[self.airport_rows].sum(axis=1)
+        col_targets = self.achieved_distribution[:, self.airport_cols].sum(axis=0)
 
         # Estimate what the furness does to the matrix
         base_matrix = self.cost_function.calculate(cost_matrix, **cost_kwargs)
@@ -179,7 +197,7 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
 
             # Estimate the impact of the furness
             adj_distribution = adj_base_mat * furness_factor
-            if adj_distribution.sum() == 0:
+            if adj_distribution.to_numpy().sum() == 0:
                 raise ValueError("estimated furness matrix total is 0")
 
             # Convert to weights to estimate impact on output
@@ -187,10 +205,11 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
             adj_final = self.achieved_distribution.sum() * adj_weights
 
             # Finesse to match row / col targets
-            adj_final, *_ = furness.doubly_constrained_furness(
+            adj_final, *_ = furness.partial_doubly_constrained_furness(
                 seed_vals=adj_final,
                 row_targets=row_targets,
                 col_targets=col_targets,
+                constrained_zones=self.constrained_zones,
                 tol=1e-6,
                 max_iters=20,
                 warning=False,

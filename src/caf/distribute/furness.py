@@ -162,6 +162,7 @@ def doubly_constrained_furness(
 
     return furnessed_mat, iter_num + 1, cur_rmse
 
+
 def partial_doubly_constrained_furness(
     seed_vals: pd.DataFrame,
     row_targets: np.ndarray,
@@ -220,19 +221,21 @@ def partial_doubly_constrained_furness(
     # TODO(MB) Incorporate Nhan's furnessing optimisations
     # Error check
 
-
     if np.any(np.isnan(row_targets)) or np.any(np.isnan(col_targets)):
         raise ValueError("np.nan found in the targets. Cannot run.")
 
     # Zone ID Type Check & Auto-Correction
     cz = pd.Series(constrained_zones)
     index_dtype = seed_vals.index.dtype
+    col_type = seed_vals.columns.dtype
     cz_dtype = cz.dtype
 
-    if index_dtype != cz_dtype:
-        print(f"Zone ID type mismatch detected: "
-              f"index is {index_dtype}, constrained_zones is {cz_dtype}. "
-              f"Auto-correcting...")
+    if (index_dtype != cz_dtype) or (col_type != cz_dtype):
+        print(
+            f"Zone ID type mismatch detected: "
+            f"index is {index_dtype}, and columns is {col_type}, constrained_zones is {cz_dtype}. "
+            f"Auto-correcting..."
+        )
 
         seed_vals.index = seed_vals.index.astype(int)
         seed_vals.columns = seed_vals.columns.astype(int)

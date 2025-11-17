@@ -89,10 +89,7 @@ def validate_zones(
         )
 
 
-def generate_cost_matrix(
-        df:pd.DataFrame,
-        sigma: int=100,
-        fill_value=0):
+def generate_cost_matrix(df: pd.DataFrame, sigma: int = 100, fill_value=0):
     """
     Creates a full cost matrix
 
@@ -109,14 +106,10 @@ def generate_cost_matrix(
 
     # Pivot the matrix
     mat = df.pivot_table(
-        index=from_col,
-        columns=to_col,
-        values=value_col,
-        aggfunc='sum',
-        observed=True
+        index=from_col, columns=to_col, values=value_col, aggfunc="sum", observed=True
     )
     # Applying Gaussian Function
-    mat = np.exp(- (mat ** 2) / (2 * sigma ** 2))
+    mat = np.exp(-(mat**2) / (2 * sigma**2))
 
     # Get full list of zones
     all_labels = sorted(set(df[from_col]).union(df[to_col]))

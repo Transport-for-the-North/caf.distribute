@@ -51,9 +51,9 @@ class BuiltInCostFunction(enum.Enum):
 
         if self == BuiltInCostFunction.GAUSSIAN:
             return CostFunction(
-                name = self.name,
-                params={"sigma": (0, 250), "power": (2, 4)},
-                default_params={"sigma": 50, "power": 2},
+                name=self.name,
+                params={"sigma": (0, 4), "power": (1, 4)},
+                default_params={"sigma": 0.5, "power": 2},
                 function=gaussian,
             )
 
@@ -96,7 +96,7 @@ class CostFunction:
 
         # Validate the params and cost function
         try:
-            self.function(np.array(1e-2), **self.param_max)
+            self.function(pd.DataFrame([[1e-2]]), **self.param_max)
         except TypeError as exc:
             raise ValueError(
                 f"Received a TypeError while testing the given params "
@@ -320,6 +320,7 @@ def log_normal(
 
     return np.maximum(frac * exp, min_return_val)
 
+
 def gaussian(
     base_cost: pd.DataFrame,
     sigma: float,
@@ -352,6 +353,8 @@ def gaussian(
     # Validate numeric inputs
     math_utils.check_numeric({"sigma": sigma, "power": power})
 
+    sigma = 100 * sigma
+
     sigma = float(sigma)
     power = float(power)
 
@@ -375,6 +378,7 @@ def gaussian(
     # Apply minimum threshold
     exp_term = np.maximum(exp_term, min_return_val)
 
+    exp_term[base_arr == 0] = 0
+
     # Return as DataFrame with same structure
     return pd.DataFrame(exp_term, index=base_cost.index, columns=base_cost.columns)
-
