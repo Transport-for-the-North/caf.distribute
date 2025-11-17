@@ -2,14 +2,20 @@
 """Furness functions for distributing vectors to matrices."""
 # Built-Ins
 import logging
+import operator
 import warnings
 from typing import Optional
 from dataclasses import dataclass
+from typing import Callable
 
 # Third Party
 import numpy as np
 import pandas as pd
 from caf.toolkit import translation
+import pandas as pd
+import xarray as xr
+from caf.toolkit import pandas_utils as pd_utils
+from numpy.testing import assert_approx_equal
 
 # pylint: disable=import-error,wrong-import-position
 
@@ -485,3 +491,235 @@ def sectoral_constraint(inputs: SectoralConstraintInputs):
                 f"the matrix as it currently is"
             )
             return adjusted.to_numpy(), iter, rmse
+
+
+# pylint: disable=too-many-arguments, too-many-locals
+def furness_pandas_wrapper(
+    seed_values: pd.DataFrame,
+    row_targets: pd.DataFrame,
+    col_targets: pd.DataFrame,
+    *,
+    max_iters: int = 2000,
+    seed_infill: float = 1e-3,
+    normalise_seeds: bool = True,
+    tol: float = 1e-9,
+    idx_col: str = "model_zone_id",
+    unique_col: str = "trips",
+    round_dp: int = 8,
+    unique_zones: list[int] | None = None,
+    unique_zones_join_fn: Callable = operator.and_,
+) -> tuple[pd.DataFrame, int, float]:
+    """
+    Create wrapper around doubly_constrained_furness() to handle pandas in/out.
+
+    Internally checks and converts the pandas inputs into numpy in order to
+    run doubly_constrained_furness(). Converts the output back into pandas
+    at the end
+
+    Parameters
+    ----------
+    seed_values:
+        The seed values to use for the furness. The index and columns must
+        match the idx_col of row_targets and col_targets.
+
+    row_targets:
+        The target values for the sum of each row. In production/attraction
+        furnessing, this would be the productions. The idx_col must match
+        the idx_col of col_targets.
+
+    col_targets:
+        The target values for the sum of each column. In production/attraction
+        furnessing, this would be the attractions. The idx_col must match
+        the idx_col of row_targets.
+
+    max_iters:
+        The maximum number of iterations to complete before exiting.
+
+    tol:
+        The maximum difference between the achieved and the target values
+        to tolerate before exiting early. R^2 is used to calculate the
+        difference.
+
+    seed_infill:
+        The value to infill any seed values that are 0.
+
+    normalise_seeds:
+        Whether to normalise the seeds so they total to one before
+        sending them to the furness.
+
+    idx_col:
+        Name of the columns in row_targets and col_targets that contain the
+        index data that matches seed_values index/columns
+
+    unique_col:
+        Name of the columns in row_targets and col_targets that contain the
+        values to target during the furness.
+
+    round_dp:
+        The number of decimal places to round the output values of the
+        furness to. Uses 4 by default.
+
+    unique_zones:
+        A list of unique zones to keep in the seed matrix when starting the
+        furness. The given productions and attractions will also be limited
+        to these zones as well.
+
+    unique_zones_join_fn:
+        The function to call on the column and index masks to join them for
+        the seed matrices. By default, a bitwise and is used. See pythons
+        builtin operator library for more options.
+
+    Returns
+    -------
+    furnessed_matrix:
+        The final furnessed matrix, in the same format as seed_values
+
+    completed_iters:
+        The number of completed iterations before exiting
+
+    achieved_rmse:
+        The Root Mean Squared Error difference achieved before exiting
+    """
+    # Init
+    row_targets = row_targets.copy()
+    col_targets = col_targets.copy()
+    seed_values = seed_values.copy()
+
+    row_targets = row_targets.reindex(columns=[idx_col, unique_col])
+    col_targets = col_targets.reindex(columns=[idx_col, unique_col])
+    row_targets = row_targets.set_index(idx_col)
+    col_targets = col_targets.set_index(idx_col)
+
+    # ## VALIDATE INPUTS ## #
+    ref_index = row_targets.index
+    if len(ref_index.difference(col_targets.index)) > 0:
+        raise ValueError("Row and Column target indexes do not match.")
+
+    if len(ref_index.difference(seed_values.index)) > 0:
+        raise ValueError("Row and Column target indexes do not match seed index.")
+
+    if len(ref_index.difference(seed_values.columns)) > 0:
+        raise ValueError("Row and Column target indexes do not match seed columns.")
+
+    assert_approx_equal(
+        row_targets[unique_col].sum(),
+        col_targets[unique_col].sum(),
+        err_msg="Row and Column target totals do not match. Cannot Furness.",
+    )
+
+    # ## TIDY AND INFILL SEED ## #
+    # Infill the 0 zones
+    seed_values = seed_values.mask(seed_values <= 0, seed_infill)
+    if normalise_seeds:
+        seed_values /= seed_values.sum().fillna(0)
+
+    # If we were given certain zones, make sure everything else is 0
+    if unique_zones is not None:
+        # Get the mask and extract the data
+        mask = pd_utils.get_wide_mask(
+            df=seed_values,
+            select=unique_zones,
+            join_fn=unique_zones_join_fn,
+        )
+        seed_values = seed_values.where(mask, 0)
+
+    # ## CONVERT TO NUMPY AND FURNESS ## #
+    row_targets = row_targets.to_numpy().flatten()
+    col_targets = col_targets.to_numpy().flatten()
+    seed_values = seed_values.to_numpy()
+
+    furnessed_mat, n_iters, achieved_rmse = doubly_constrained_furness(
+        seed_vals=seed_values,
+        row_targets=row_targets,
+        col_targets=col_targets,
+        tol=tol,
+        max_iters=max_iters,
+    )
+
+    furnessed_mat = np.round(furnessed_mat, round_dp)
+
+    # ## STICK BACK INTO PANDAS ## #
+    furnessed_mat = pd.DataFrame(index=ref_index, columns=ref_index, data=furnessed_mat).round(
+        round_dp
+    )
+
+    return furnessed_mat, n_iters, achieved_rmse
+
+
+# pylint: enable=too-many-arguments, too-many-locals
+
+
+def numpy_ndim_furness(
+    seed_mat: xr.DataArray | pd.Series,
+    targets: list[xr.DataArray],
+    targ_len: int,
+    max_iters: int = 10000,
+    tol: float = 1e-9,
+) -> tuple[xr.DataArray, float, int]:
+    """
+    Furness an n dimensional numpy array.
+
+    This process works by iteratively summing the target matrix to match dimensions
+    of a target matrix, then adjusting to match that target. One iteration of the
+    process matches to each target in turn and then measures convergence to all.
+    Once convergence has been met or max_iters have occurred the process will exit
+    and return the matrix as an xarray, the achieved convergence score and the
+    number of iterations it took.
+
+    Parameters
+    ----------
+    seed_mat: xr.DataArray
+        The seed matrix for the furness. If this is a Series the indices must match
+        the targets, and if an xarray the dimensions must match.
+    targets: list[xr.DataArray]
+        A list of xarray targets for the furness. Every target must have dimensions
+        which are a subset of the seed mat.
+    targ_len: int
+        The length of the targets. This is only used for calculating convergence.
+    max_iters: int = 10000
+        The maximum number of iterations before the process will exit.
+    tol: float = 1e-9
+        Target for convergence. This is roughly an rmse measure from the achieved
+        matrix to the targets.
+
+    Returns
+    -------
+    mat: xr.DataArray
+        The furnessed matrix.
+    rmse: float
+        The achieved convergence score.
+    iter_num: int
+        The number of iterations the process took.
+    """
+    if isinstance(seed_mat, pd.Series):
+        mat = seed_mat.to_xarray()
+    else:
+        mat = seed_mat.copy()
+    rmse = np.inf
+    for iter_num in range(max_iters):
+        for targ in targets:
+            check_dim = set(mat.dims).difference(set(targ.dims))
+            if len(check_dim) != 1:
+                raise ValueError("All targets must have 1 fewer dimensions than seed_mat.")
+            check_mat = mat.sum(dim=check_dim)
+            adj = (targ / check_mat).fillna(1)
+            mat *= adj
+        diff = 0.0
+        for targ in targets:
+            check_dim = set(mat.dims).difference(set(targ.dims))
+            check_mat = mat.sum(dim=check_dim)
+            diff += float(((check_mat - targ) ** 2).sum())
+        prev_rmse = rmse
+        rmse = (diff / targ_len) ** 0.5
+        if rmse < tol:
+            return mat, rmse, iter_num
+        if prev_rmse - rmse < tol:
+            warnings.warn(
+                f"RMSE has stopped improving at {rmse} after {iter_num} iterations. Exiting."
+            )
+            return mat, rmse, iter_num
+    warnings.warn(
+        f"Max iters reached in {iter_num} iterations without converging. "
+        f"Exiting with {rmse} rmse."
+    )
+    return mat, rmse, iter_num

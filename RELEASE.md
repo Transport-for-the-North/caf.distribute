@@ -20,4 +20,6 @@ there.
 Below, a brief summary of patches made since the previous version can be found.
 
 ### Next Release Notes
-- Multi-TLD gravity model added
+- Removed gravity_model.GravityModelRunResults and gravity_model.GravityModelCalibrateResults.
+GravityModelResults contains their functionality has been/should be used in leu of the removed classes.
+
