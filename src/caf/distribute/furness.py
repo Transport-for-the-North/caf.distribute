@@ -406,7 +406,7 @@ def partial_single_constrained_furness(
     early_exit = False
     cur_rmse = np.inf
     iter_num = 0
-    n_vals = len(row_targets)
+    n_vals = len(col_targets)
 
     # Can return early if all 0 - probably shouldn't happen!
     if col_targets.sum() == 0:
