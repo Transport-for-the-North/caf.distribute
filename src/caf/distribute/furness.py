@@ -320,6 +320,141 @@ def partial_doubly_constrained_furness(
 
     return furnessed_mat, iter_num + 1, cur_rmse
 
+def partial_single_constrained_furness(
+    seed_vals: pd.DataFrame,
+    col_targets: np.ndarray,
+    constrained_zones: np.ndarray,
+    tol: float = 1e-9,
+    max_iters: int = 5000,
+    warning: bool = True,
+) -> tuple[np.ndarray, int, float]:
+    """
+    Perform a doubly constrained furness for max_iters or until tol is met.
+
+    Controls numpy warnings to warn of any overflow errors encountered
+
+    Parameters
+    ----------
+    seed_vals:
+        Initial values for the furness. Must be of shape
+        (len(n_rows), len(n_cols)).
+
+    col_targets:
+        The target values for the sum of each column
+        i.e np.sum(matrix, axis=0)
+
+    constrained_zones:
+        The target zones
+
+    tol:
+        The maximum difference between the achieved and the target values
+        to tolerate before exiting early. R^2 is used to calculate the
+        difference.
+
+    max_iters:
+        The maximum number of iterations to complete before exiting.
+
+    warning:
+        Whether to print a warning or not when the tol cannot be met before
+        max_iters.
+
+    Returns
+    -------
+    furnessed_matrix:
+        The final furnessed matrix
+
+    completed_iters:
+        The number of completed iterations before exiting
+
+    achieved_rmse:
+        The Root Mean Squared Error difference achieved before exiting
+    """
+    # pylint: disable=too-many-locals
+    # TODO(MB) Incorporate Nhan's furnessing optimisations
+    # Error check
+
+    if  np.any(np.isnan(col_targets)):
+        raise ValueError("np.nan found in the targets. Cannot run.")
+
+    # Zone ID Type Check & Auto-Correction
+    cz = pd.Series(constrained_zones)
+    index_dtype = seed_vals.index.dtype
+    col_type = seed_vals.columns.dtype
+    cz_dtype = cz.dtype
+
+    if (index_dtype != cz_dtype) or (col_type != cz_dtype):
+        print(
+            f"Zone ID type mismatch detected: "
+            f"index is {index_dtype}, and columns is {col_type}, constrained_zones is {cz_dtype}. "
+            f"Auto-correcting..."
+        )
+
+        seed_vals.index = seed_vals.index.astype(int)
+        seed_vals.columns = seed_vals.columns.astype(int)
+        constrained_zones = cz.dropna().astype(int).values
+
+    # Creating a boolean mask over constarined zones
+    airport_cols = seed_vals.columns.isin(constrained_zones)
+
+    # Need to ensure furnessed mat is floating to avoid numpy casting
+    # errors in loop
+    furnessed_mat = seed_vals.to_numpy(dtype=float)
+    if np.issubdtype(furnessed_mat.dtype, np.integer):
+        furnessed_mat = furnessed_mat.astype(float)
+
+    # Init loop
+    early_exit = False
+    cur_rmse = np.inf
+    iter_num = 0
+    n_vals = len(row_targets)
+
+    # Can return early if all 0 - probably shouldn't happen!
+    if col_targets.sum() == 0:
+        warnings.warn("Furness given targets of 0. Returning all 0's")
+        return np.zeros_like(seed_vals), iter_num, np.inf
+
+    # Set up numpy overflow errors
+    with np.errstate(over="raise"):
+        for iter_num in range(max_iters):
+            # ## COL CONSTRAIN ## #
+            # Calculate difference factor
+            col_ach = np.sum(furnessed_mat, axis=0)
+            diff_factor = np.divide(
+                col_targets,
+                col_ach[airport_cols],
+                # where=col_ach != 0,
+                out=np.ones_like(col_targets, dtype=float),
+            )
+
+            # adjust cols
+            # furnessed_mat *= diff_factor
+            furnessed_mat[:, airport_cols] *= diff_factor
+
+            # Calculate the diff - leave early if met
+            col_diff = (col_targets - np.sum(furnessed_mat[:, airport_cols], axis=0)) ** 2
+            cur_rmse = ((np.sum(row_diff) + np.sum(col_diff)) / n_vals) ** 0.5
+            if cur_rmse < tol:
+                early_exit = True
+                break
+
+            # We got a NaN! Make sure to point out we didn't converge
+            if np.isnan(cur_rmse):
+                warnings.warn(
+                    "np.nan value found in the rmse calculation. It must have "
+                    "been introduced during the furness process."
+                )
+                return np.zeros(furnessed_mat.shape), iter_num, np.inf
+
+    # Warn the user if we exhausted our number of loops
+    if not early_exit and warning:
+        warnings.warn(
+            f"The Partially constrained furness exhausted its max "
+            f"number of loops ({max_iters:d}), while achieving an RMSE "
+            f"difference of {cur_rmse:f}. The values returned may not be "
+            f"accurate."
+        )
+
+    return furnessed_mat, iter_num + 1, cur_rmse
 
 # pylint: disable=too-many-arguments, too-many-locals
 def furness_pandas_wrapper(
