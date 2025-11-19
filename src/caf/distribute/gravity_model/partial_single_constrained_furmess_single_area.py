@@ -174,7 +174,6 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
         # Initialise running params
         cost_kwargs = self._cost_params_to_kwargs(cost_args)
         cost_matrix = self._apply_perceived_factors(self.cost_matrix)
-        row_targets = self.achieved_distribution[self.airport_rows].sum(axis=1)
         col_targets = self.achieved_distribution[:, self.airport_cols].sum(axis=0)
 
         # Estimate what the furness does to the matrix
