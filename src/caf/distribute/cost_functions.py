@@ -325,6 +325,7 @@ def gaussian(
     base_cost: pd.DataFrame,
     sigma: float,
     power: float,
+    weights: pd.DataFrame,
     min_return_val: float = 1e-150,
 ) -> pd.DataFrame:
     """
@@ -340,6 +341,9 @@ def gaussian(
 
     power : float
         Exponent applied to cost before the exponential term.
+
+    weights : pd.DataFrame
+        Base on production trip ends
 
     min_return_val : float, optional
         Minimum allowed return value.
@@ -380,5 +384,9 @@ def gaussian(
 
     exp_term[base_arr == 0] = 0
 
+    cost_mat = pd.DataFrame(exp_term, index=base_cost.index, columns=base_cost.columns)
+
+    cost_mat = cost_mat.mul(weights.squeeze(), axis=0)
+
     # Return as DataFrame with same structure
-    return pd.DataFrame(exp_term, index=base_cost.index, columns=base_cost.columns)
+    return cost_mat
