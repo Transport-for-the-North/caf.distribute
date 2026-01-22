@@ -511,6 +511,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         # This is to stop MyPy moaning
         self.achieved_distribution: np.ndarray
         self._loop_start_time: float
+        self._run_start_time: str
 
         if row_targets.sum() != col_targets.sum():
             warnings.warn(
@@ -857,6 +858,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         end_time = timing.current_milli_time()
         self._log_iteration(
             log_path=running_log_path,
+            run_start_time=self._run_start_time,
             attempt_id=self._attempt_id,
             loop_num=self._loop_num,
             loop_time=(end_time - self._loop_start_time) / 1000,
@@ -864,6 +866,8 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             furness_iters=iters,
             furness_rmse=rmse,
             convergence=float(np.mean(list(convergences.values()))),
+            min_con=float(min(list(convergences.values()))),
+            max_con=float(max(list(convergences.values())))
         )
 
         self._loop_num += 1

@@ -220,6 +220,7 @@ class GravityModelBase(abc.ABC):
         self._attempt_id = 1
         self._loop_num = 1
         self._loop_start_time = timing.current_milli_time()
+        self._run_start_time = timing.get_datetime()
         self.initial_cost_params = dict()
         self.initial_convergence = 0
         self._perceived_factors = np.ones_like(self.cost_matrix)
@@ -318,6 +319,7 @@ class GravityModelBase(abc.ABC):
     @staticmethod
     def _log_iteration(
         log_path: os.PathLike,
+        run_start_time: str,
         attempt_id: int,
         loop_num: int,
         loop_time: float,
@@ -325,6 +327,8 @@ class GravityModelBase(abc.ABC):
         furness_iters: int,
         furness_rmse: float,
         convergence: float,
+        min_con: float,
+        max_con: float
     ) -> None:
         """Write data from an iteration to a log file.
 
@@ -332,6 +336,10 @@ class GravityModelBase(abc.ABC):
         ----------
         log_path:
             Path to the file to write the log to. Should be a csv file.
+        
+        run_start_time:
+            The datetime string when the run started. Helps identify which run
+            the record belongs to as multiple runs could be appended to the same file.
 
         attempt_id:
             Identifier indicating which section of a run / calibration the
@@ -356,12 +364,19 @@ class GravityModelBase(abc.ABC):
         convergence:
             The achieved convergence values of the curve produced in this
             iteration.
+        
+        min_con:
+            The minimum convergence value across all area types.
+        
+        max_con:
+            The maximum convergence value across all area types.
 
         Returns
         -------
         None
         """
         log_dict = {
+            "run_start_time": str(run_start_time),
             "attempt_id": str(attempt_id),
             "loop_number": str(loop_num),
             "runtime (s)": loop_time / 1000,
@@ -372,6 +387,8 @@ class GravityModelBase(abc.ABC):
                 "furness_iters": furness_iters,
                 "furness_rmse": np.round(furness_rmse, 6),
                 "bs_con": np.round(convergence, 4),
+                "min_con": np.round(min_con, 4),
+                "max_con": np.round(max_con, 4)
             }
         )
 
