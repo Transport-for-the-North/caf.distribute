@@ -723,8 +723,12 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         )
 
         best_convergence = self.achieved_convergence
-        best_params = result.x
-
+        best_params = []
+        log = pd.read_csv(running_log_path)
+        for i in range(len(self.achieved_convergence)):
+            for param in self.cost_function.param_names:
+                best_params.append(log.loc[log[f"convergence_{i}"] == log[f"convergence_{i}"].max(), f"{param}_{i}"].iloc[-1])
+        best_params = np.array(best_params)
         if (
             not all(self.achieved_convergence) >= gm_params.failure_tol
         ) and gm_params.default_retry:
@@ -872,7 +876,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
                 col_targets=self.col_targets,
                 tol=furness_tol,
             )
-        convergences, distributions, residuals = {}, {}, []
+        convergences, distributions, residuals = {}, [], []
         for dist in cost_distributions:
             (
                 single_cost_distribution,
@@ -987,6 +991,33 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             results[dist.name] = result_i
 
         return results
+    
+
+    def multi_props(self, distributions: MultiCostDistribution):
+        props_dict, starts_dict, ends_dict = {}, {}, {}
+        for dist in distributions:
+            # Limit how much the achieved distribution can be adjusted to xamax
+            target = pd.DataFrame({'min': dist.cost_distribution.min_vals,
+                                   'max': dist.cost_distribution.max_vals,
+                                   'prop': dist.cost_distribution.trip_vals})
+            target["prop"] /= target["prop"].sum()
+            starts, ends = furness.cost_to_prop(
+                self.cost_matrix[dist.zones],
+                target,
+                'prop',
+                return_bands=True
+            )
+            target['prop'] *= self.row_targets[dist.zones].sum()
+            starts_dict[dist.name] = pd.DataFrame(starts, index=dist.zones).stack()
+            ends_dict[dist.name] = pd.DataFrame(ends, index=dist.zones).stack()
+            props_dict[dist.name] = target.set_index(['min', 'max']).squeeze()
+        starts = pd.concat(starts_dict)
+        starts.name = 'band_start'
+        starts.index.names = ['area','o_zon', 'd_zon']
+        ends = pd.concat(ends_dict)
+        ends.name = 'band_end'
+        ends.index.names = ['area','o_zon', 'd_zon']
+        return pd.concat(props_dict), starts.to_frame().join(ends)
 
     def triple_run(self,
                    distributions: MultiCostDistribution,

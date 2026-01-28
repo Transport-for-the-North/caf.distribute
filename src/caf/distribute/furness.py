@@ -123,7 +123,7 @@ class PropsInput:
     prop_vals: np.ndarray
 
 
-def cost_to_prop(costs: np.ndarray, bands: pd.DataFrame, val_col: str):
+def cost_to_prop(costs: np.ndarray, bands: pd.DataFrame, val_col: str, return_bands: bool = False):
     """
     Convert a cost matrix and cost bands into proportions expected.
     Parameters
@@ -139,11 +139,22 @@ def cost_to_prop(costs: np.ndarray, bands: pd.DataFrame, val_col: str):
     bands_sum = bands[val_col].sum()
     bands.loc[:, val_col] /= bands_sum
     bands_array = bands.values
-    band_indices = np.zeros_like(costs, dtype=float)
+    if return_bands:
+        band_starts = np.zeros_like(costs, dtype=float)
+        band_ends = np.zeros_like(costs, dtype=float)
+    else:
+        band_indices = np.zeros_like(costs, dtype=float)
     for band_start, band_end, prop in bands_array:
         band_mask = (costs >= band_start) & (costs <= band_end)
-        band_indices[band_mask] = prop
-
+        if return_bands:
+            band_starts[band_mask] = band_start
+            band_ends[band_mask] = band_end
+        else: 
+            band_indices[band_mask] = prop
+    if return_bands:
+        band_starts[band_ends==0] = bands['min'].max()
+        band_ends[band_ends==0] = bands['max'].max()
+        return band_starts, band_ends
     band_indices[band_indices == 0] = bands[val_col].min() * 0.5
     return band_indices, bands[val_col].values
 
@@ -699,15 +710,105 @@ def numpy_ndim_furness(
     for iter_num in range(max_iters):
         for targ in targets:
             check_dim = set(mat.dims).difference(set(targ.dims))
-            if len(check_dim) != 1:
-                raise ValueError("All targets must have 1 fewer dimensions than seed_mat.")
+            # if len(check_dim) != 1:
+            #     raise ValueError("All targets must have 1 fewer dimensions than seed_mat.")
             check_mat = mat.sum(dim=check_dim)
             adj = (targ / check_mat).fillna(1)
-            mat *= adj
+            mat = mat * adj
         diff = 0.0
         for targ in targets:
             check_dim = set(mat.dims).difference(set(targ.dims))
             check_mat = mat.sum(dim=check_dim)
+            diff += float(((check_mat - targ) ** 2).sum())
+        prev_rmse = rmse
+        rmse = (diff / targ_len) ** 0.5
+        if rmse < tol:
+            return mat, rmse, iter_num
+        if prev_rmse - rmse < tol:
+            warnings.warn(
+                f"RMSE has stopped improving at {rmse} after {iter_num} iterations. Exiting."
+            )
+            return mat, rmse, iter_num
+    warnings.warn(
+        f"Max iters reached in {iter_num} iterations without converging. "
+        f"Exiting with {rmse} rmse."
+    )
+    return mat, rmse, iter_num
+
+def adjust(mat: pd.Series,
+            targets: dict[bool, pd.Series],
+            factor_cap: int):
+    factors = []
+    for inc_intras, targ in targets.items():
+        check_dim = list(set(mat.index.names).intersection(targ.index.names))
+        if not inc_intras:
+            df_mat = mat.reset_index(level=['o_zone', 'd_zon'])
+            inters = df_mat[df_mat['o_zon'] != df_mat['d_zon']].set_index(['o_zone', 'd_zon'], append=True)
+            intras = df_mat[df_mat['o_zon'] != df_mat['d_zon']].set_index(['o_zone', 'd_zon'], append=True)
+            check_intras = intras.groupby(check_dim).sum()
+            check_mat = mat.groupby(check_dim).sum() - check_intras
+            targ_inters = targ = check_intras
+            adj = targ_inters / check_mat
+            
+        check_mat = mat.groupby(check_dim).sum()
+        adj = (targ / check_mat).fillna(1)
+        factors.append(adj)
+        adj[adj > factor_cap] = factor_cap
+        adj[adj < factor_cap ** -1] = factor_cap ** -1
+        mat = mat * adj
+    return mat, factors
+
+
+def pandas_ndim_furness(
+    seed_mat: pd.Series,
+    targets: list[pd.Series],
+    targ_len: int,
+    max_iters: int = 10000,
+    tol: float = 1e-9,
+) -> tuple[xr.DataArray, float, int]:
+    """
+    Furness an n dimensional numpy array.
+
+    This process works by iteratively summing the target matrix to match dimensions
+    of a target matrix, then adjusting to match that target. One iteration of the
+    process matches to each target in turn and then measures convergence to all.
+    Once convergence has been met or max_iters have occurred the process will exit
+    and return the matrix as an xarray, the achieved convergence score and the
+    number of iterations it took.
+
+    Parameters
+    ----------
+    seed_mat: xr.DataArray
+        The seed matrix for the furness. If this is a Series the indices must match
+        the targets, and if an xarray the dimensions must match.
+    targets: list[xr.DataArray]
+        A list of xarray targets for the furness. Every target must have dimensions
+        which are a subset of the seed mat.
+    targ_len: int
+        The length of the targets. This is only used for calculating convergence.
+    max_iters: int = 10000
+        The maximum number of iterations before the process will exit.
+    tol: float = 1e-9
+        Target for convergence. This is roughly an rmse measure from the achieved
+        matrix to the targets.
+
+    Returns
+    -------
+    mat: xr.DataArray
+        The furnessed matrix.
+    rmse: float
+        The achieved convergence score.
+    iter_num: int
+        The number of iterations the process took.
+    """
+    mat = seed_mat.copy()
+    rmse = np.inf
+    for iter_num in range(max_iters):
+        mat = adjust(mat, targets)
+        diff = 0.0
+        for targ in targets:
+            check_dim = list(set(mat.index.names).intersection(targ.index.names))
+            check_mat = mat.groupby(check_dim).sum()
             diff += float(((check_mat - targ) ** 2).sum())
         prev_rmse = rmse
         rmse = (diff / targ_len) ** 0.5
