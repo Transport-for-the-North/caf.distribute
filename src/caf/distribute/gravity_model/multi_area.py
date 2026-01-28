@@ -860,9 +860,9 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         for i, dist in enumerate(cost_distributions):
             j = 0
             for name in dist.function_params.keys():
-                log_costs[f"{name}_{i}"] = init_params[params_len * i + j]
+                log_costs[f"{name}_{dist.name}"] = init_params[params_len * i + j]
                 j += 1
-            log_costs[f"convergence_{i}"] = convergences[dist.name]
+            log_costs[f"convergence_{dist.name}"] = convergences[dist.name]
 
         end_time = timing.current_milli_time()
         self._log_iteration(
