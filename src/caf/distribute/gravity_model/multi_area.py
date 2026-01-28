@@ -584,6 +584,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         self,
         distributions: MultiCostDistribution,
         running_log_path: Path,
+        output_path: Path,
         gm_params: GMCalibParams,
         verbose: int = 0,
         **kwargs,
@@ -603,6 +604,8 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             distributions to use for the calibrations
         running_log_path: os.PathLike,
             path to a csv to log the model iterations and results
+        output_path: Path,
+            path to save the GM results, the folder gets created but throws an error if it exists
         gm_params: GMCalibParams
             defines the detailed parameters, see `GMCalibParams` documentation for more info
         *args,
@@ -622,6 +625,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         """
 
         self._validate_running_log(running_log_path)
+        self._validate_output_path(output_path)
         self._initialise_internal_params()
 
         params_len = len(distributions[0].function_params)
@@ -737,6 +741,11 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             )
 
             results[dist.name] = result_i
+            # save results
+            save_path = os.path.join(output_path, dist.name)
+            # create each subfolder
+            os.makedirs(save_path)
+            result_i.save_gm_results(save_path=save_path)
         return results
 
     def _jacobian_function(

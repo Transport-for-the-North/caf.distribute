@@ -136,21 +136,18 @@ class GravityModelResults:
         output_params["convergence"] = self.cost_convergence
         return pd.Series(output_params)
     
-    @staticmethod
     def save_gm_results(
-            results: dict[str, Any],
-            output_path: os.PathLike
+            self,
+            save_path: os.PathLike
             ) -> None:
         """Save the gravity model results to a provided location.
 
         Parameters
         ----------
-        results: dict[str, Any]
+        self: dict[str, Any]
             Dictionary of GravityModelResults, one per area type/category
-
-        output_path: os.PathLike
+        save_path: os.PathLike
             the path to save the results to
-
         Returns
         -------
         Saves the results to CSV and PNG files in the provided location.
@@ -158,88 +155,57 @@ class GravityModelResults:
         Raises
         ------
         ValueError
-            when no output path is provided or no results are given
-
-        FileExistsError
-            when the output path already exists
-
+            when no results are given
         Exception
             when there is an error extracting results for a given area type from results
         """
-        if output_path is None: 
-            raise ValueError("An output path must be provided to save results.")
         
-        if not results:
+        if not self:
             raise ValueError("No results provided to save.")
+
+        # extract data from the GravityModelResults object
+        cost_outputs = pd.DataFrame({
+            'lower_bin_bound': self.cost_distribution.min_vals,
+            'upper_bin_bound': self.cost_distribution.max_vals,
+            'achieved_cost_distribution': self.cost_distribution.band_share_vals,
+            'target_cost_distribution': self.target_cost_distribution.band_share_vals
+            })
         
-        # check on the output folder
-        if os.path.exists(output_path):
-            raise FileExistsError(
-                f"Cannot save results: path '{output_path}' already exists. "
-                "Please choose a different location."
-            )
-        os.makedirs(output_path)
+        #TODO (JH): need to add the zone numbers relating to the key - how?
+        value_dist_output = pd.DataFrame(self.value_distribution)
 
-        # save each area type results separately
-        for key in results:
-            try:
-                _key_path = os.path.join(output_path, key)
-                # create each subfolder
-                os.makedirs(_key_path)
+        # pull the summary output
+        summary_output = self.summary.to_frame(name='Value')
 
-                # extract data from the GravityModelResults object
-                lower_bound_output = results[key].cost_distribution.min_vals
-                upper_bound_output = results[key].cost_distribution.max_vals
-                cost_dist_output = results[key].cost_distribution.band_share_vals
-                target_cost_dist_output = results[key].target_cost_distribution.band_share_vals
-                cost_outputs = pd.DataFrame({
-                    'lower_bin_bound': lower_bound_output,
-                    'upper_bin_bound': upper_bound_output,
-                    'achieved_cost_distribution': cost_dist_output,
-                    'target_cost_distribution': target_cost_dist_output
-                    })
-                
-                #TODO (JH): need to add the zone numbers relating to the key - how?
-                value_dist_output = pd.DataFrame(results[key].value_distribution)
+        # create the comparison plot - there is error handling inside the method
+        tld_plot = self.plot_distributions()
 
-                # pull the summary output
-                summary_output = results[key].summary.to_frame(name='Value')
-
-                # create the comparison plot - there is error handling inside the method
-                tld_plot = results[key].plot_distributions()
-
-                # save the outputs to CSV
-                io.safe_dataframe_to_csv(
-                    cost_outputs,
-                    os.path.join(_key_path, 'cost_distribution.csv'),
-                    mode="w",
-                    header=True,
-                    index=False,
-                )
-                io.safe_dataframe_to_csv(
-                    value_dist_output,
-                    os.path.join(_key_path, 'value_distribution.csv'),
-                    mode="w",
-                    header=False,
-                    index=False,
-                )
-                io.safe_dataframe_to_csv(
-                    summary_output,
-                    os.path.join(_key_path, 'summary.csv'),
-                    mode="w",
-                    header=True,
-                    index=True,
-                )
-                
-                # save the comparison plot
-                tld_plot.savefig(os.path.join(_key_path, 'tld_plot.png'))
-                plt.close(tld_plot)
-
-            except Exception as e:
-                LOG.error(f"Failed to extract results for area type '{key}': {e}")
-                continue
-
-            
+        # save the outputs to CSV
+        io.safe_dataframe_to_csv(
+            cost_outputs,
+            os.path.join(save_path, 'cost_distribution.csv'),
+            mode="w",
+            header=True,
+            index=False,
+        )
+        io.safe_dataframe_to_csv(
+            value_dist_output,
+            os.path.join(save_path, 'value_distribution.csv'),
+            mode="w",
+            header=False,
+            index=False,
+        )
+        io.safe_dataframe_to_csv(
+            summary_output,
+            os.path.join(save_path, 'summary.csv'),
+            mode="w",
+            header=True,
+            index=True,
+        )
+        
+        # save the comparison plot
+        tld_plot.savefig(os.path.join(save_path, 'tld_plot.png'))
+        plt.close(tld_plot)          
 
 
 
@@ -320,6 +286,18 @@ class GravityModelBase(abc.ABC):
                     f"Logs will be appended to the end of the file at: "
                     f"{running_log_path}"
                 )
+    
+    @staticmethod
+    def _validate_output_path(output_path: os.PathLike) -> None:
+        if output_path is None: 
+            raise ValueError("An output path must be provided to save results.")
+        # check on the output folder
+        if os.path.exists(output_path):
+            raise FileExistsError(
+                f"Cannot save results: path '{output_path}' already exists. "
+                "Please choose a different location."
+            )
+        os.makedirs(output_path)
 
     def _initialise_internal_params(self) -> None:
         """Set running params to their default values for a run."""
