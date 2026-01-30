@@ -14,6 +14,7 @@ from caf.distribute import cost_functions
 from caf.distribute import gravity_model as gm
 from caf.distribute import utils
 from caf.distribute.gravity_model import GravityModelResults
+from caf.toolkit import timing
 
 
 @pytest.fixture(name="cost_from_code", scope="session")
@@ -189,6 +190,7 @@ def fixture_cal_no_furness(infilled, multi_tld, trip_ends, mock_dir):
     results = model.calibrate(
         multi_tld,
         running_log_path=mock_dir / "temp_log.csv",
+        output_path=mock_dir / f"temp_output_{timing.current_milli_time()}",
         gm_params=gm.GMCalibParams(furness_jac=False),
     )
     return results
@@ -207,6 +209,7 @@ def fixture_cal_furness(infilled, multi_tld, trip_ends, mock_dir):
     results = model.calibrate(
         multi_tld,
         running_log_path=mock_dir / "temp_log.csv",
+        output_path=mock_dir / f"temp_output_{timing.current_milli_time()}",
         gm_params=gm.GMCalibParams(furness_jac=True),
     )
     return results
