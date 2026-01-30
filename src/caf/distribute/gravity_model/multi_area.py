@@ -179,7 +179,7 @@ class MultiCostDistribution:
     @classmethod
     def from_pandas(
         cls,
-        ordered_zones: pd.Series,
+        # ordered_zones: pd.Series,
         tld: pd.DataFrame,
         cat_zone_correspondence: pd.DataFrame,
         func_params: dict[int | str, dict[str, float]],
@@ -237,6 +237,8 @@ class MultiCostDistribution:
         `validate`
         """
         # pylint: disable=too-many-arguments
+        # order the TLD lookup by zone to ensure consistent ordering and indexing
+        cat_zone_correspondence = cat_zone_correspondence.sort_values(by=lookup_zone_col).reset_index(drop=True)
 
         distributions: list[MGMCostDistribution] = []
 
@@ -246,7 +248,7 @@ class MultiCostDistribution:
             distributions.append(
                 MGMCostDistribution.from_pandas(
                     category,
-                    pd.Series(ordered_zones),
+                    # pd.Series(ordered_zones),
                     tld,
                     cat_zone_correspondence,
                     func_params[category],
@@ -375,7 +377,7 @@ class MGMCostDistribution:
 
     name: str
     cost_distribution: cost_utils.CostDistribution
-    zones: np.ndarray
+    zones: pd.DataFrame #np.ndarray
     function_params: dict[str, float]
 
     # TODO(kf) validate params
@@ -385,7 +387,7 @@ class MGMCostDistribution:
     def from_pandas(
         cls,
         category: str,
-        ordered_zones: pd.Series,
+        # ordered_zones: pd.Series,
         tld: pd.DataFrame,
         cat_zone_correspondence: pd.DataFrame,
         func_params: dict[str, float],
@@ -443,20 +445,22 @@ class MGMCostDistribution:
 
         # get a list of zones that use this category of TLD
         cat_zones = cat_zone_correspondence.loc[
-            cat_zone_correspondence[lookup_cat_col] == category, lookup_zone_col
-        ].to_numpy()
+            cat_zone_correspondence[lookup_cat_col] == category, [lookup_zone_col]
+        ]
 
-        zones = ordered_zones.to_numpy()
+        # zones = ordered_zones.to_numpy()
+        zones = pd.DataFrame({'zone_id': cat_zone_correspondence[lookup_zone_col]})
 
         # tell user if we have zones in cat->lookup that arent in zones
-        if not np.all(np.isin(cat_zones, zones)):
-            missing_values = cat_zones[~np.isin(cat_zones, zones)]
+        if not np.all(np.isin(cat_zones[lookup_zone_col], zones['zone_id'])):
+            missing_values = cat_zones[~np.isin(cat_zones[lookup_zone_col], zones['zone_id'])]
             raise ValueError(
                 f"The following values from cat->zone lookup are not present in the tld zones: {missing_values}"
             )
 
         # get the indices
-        cat_zone_indices = np.where(np.isin(zones, cat_zones))[0]
+        # cat_zone_indices = np.where(np.isin(zones, cat_zones))[0]
+        # cat_zones_indices = cat_zones.index.to_numpy()
 
         # get tld for cat
         cat_tld = tld[tld[tld_cat_col] == category]
@@ -469,7 +473,7 @@ class MGMCostDistribution:
             trips_col=tld_trips_col,
         )
 
-        return cls(category, cat_cost_distribution, cat_zone_indices, func_params)
+        return cls(category, cat_cost_distribution, cat_zones, func_params)
 
 
 class MultiAreaGravityModelCalibrator(core.GravityModelBase):
@@ -574,9 +578,9 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             init_params = cost_args[i * params_len : i * params_len + params_len]
             init_params_kwargs = self._cost_params_to_kwargs(init_params)
             mat_slice = self.cost_function.calculate(
-                self.cost_matrix[dist.zones], **init_params_kwargs
+                self.cost_matrix[dist.zones.index.to_numpy()], **init_params_kwargs
             )
-            base_mat[dist.zones] = mat_slice
+            base_mat[dist.zones.index.to_numpy()] = mat_slice
         return base_mat
 
     # pylint: disable=too-many-locals
@@ -640,8 +644,8 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             max_binning = dist.cost_distribution.max_vals.max()
             min_binning = dist.cost_distribution.min_vals.min()
 
-            max_cost = self.cost_matrix[dist.zones, :].max()
-            min_cost = self.cost_matrix[dist.zones, :].min()
+            max_cost = self.cost_matrix[dist.zones.index.to_numpy(), :].max()
+            min_cost = self.cost_matrix[dist.zones.index.to_numpy(), :].min()
 
             if max_cost > max_binning:
                 warnings.warn(
@@ -732,7 +736,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             result_i = GravityModelResults(
                 cost_distribution=self.achieved_cost_dist[i],
                 cost_convergence=self.achieved_convergence[dist.name],
-                value_distribution=self.achieved_distribution[dist.zones],
+                value_distribution=self.achieved_distribution[dist.zones.index.to_numpy()],
                 target_cost_distribution=dist.cost_distribution,
                 cost_function=self.cost_function,
                 cost_params=self._cost_params_to_kwargs(
@@ -783,10 +787,10 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
                 adj_cost_kwargs = init_params_kwargs.copy()
                 adj_cost_kwargs[cost_param] += cost_step
                 adj_mat_slice = self.cost_function.calculate(
-                    self.cost_matrix[dist.zones], **adj_cost_kwargs
+                    self.cost_matrix[dist.zones.index.to_numpy()], **adj_cost_kwargs
                 )
                 adj_mat = base_mat.copy()
-                adj_mat[dist.zones] = adj_mat_slice
+                adj_mat[dist.zones.index.to_numpy()] = adj_mat_slice
                 adj_dist = adj_mat * furness_factor
                 if furness_jac:
                     adj_dist, *_ = furness.doubly_constrained_furness(
@@ -800,13 +804,13 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
                 test_res = []
                 for inner_dist in inner_dists:
                     adj_cost_dist = cost_utils.CostDistribution.from_data(
-                        matrix=adj_dist[inner_dist.zones],
-                        cost_matrix=self.cost_matrix[inner_dist.zones],
+                        matrix=adj_dist[inner_dist.zones.index.to_numpy()],
+                        cost_matrix=self.cost_matrix[inner_dist.zones.index.to_numpy()],
                         bin_edges=inner_dist.cost_distribution.bin_edges,
                     )
                     act_cost_dist = cost_utils.CostDistribution.from_data(
-                        matrix=self.achieved_distribution[inner_dist.zones],
-                        cost_matrix=self.cost_matrix[inner_dist.zones],
+                        matrix=self.achieved_distribution[inner_dist.zones.index.to_numpy()],
+                        cost_matrix=self.cost_matrix[inner_dist.zones.index.to_numpy()],
                         bin_edges=inner_dist.cost_distribution.bin_edges,
                     )
                     test_res.append(
@@ -844,8 +848,8 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
                 single_achieved_residuals,
                 single_convergence,
             ) = core.cost_distribution_stats(
-                achieved_trip_distribution=matrix[dist.zones],
-                cost_matrix=self.cost_matrix[dist.zones],
+                achieved_trip_distribution=matrix[dist.zones.index.to_numpy()],
+                cost_matrix=self.cost_matrix[dist.zones.index.to_numpy()],
                 target_cost_distribution=dist.cost_distribution,
             )
             convergences[dist.name] = single_convergence
@@ -939,7 +943,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
                 cost_distribution=self.achieved_cost_dist[i],
                 cost_convergence=self.achieved_convergence[dist.name],
                 target_cost_distribution=dist.cost_distribution,
-                value_distribution=self.achieved_distribution[dist.zones],
+                value_distribution=self.achieved_distribution[dist.zones.index.to_numpy()],
                 cost_function=self.cost_function,
                 cost_params=self._cost_params_to_kwargs(
                     cost_args[i * params_len : i * params_len + params_len]
