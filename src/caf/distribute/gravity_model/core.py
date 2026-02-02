@@ -40,7 +40,7 @@ class GravityModelResults:
         This will be the same as calculating the convergence of
         `cost_distribution` and `target_cost_distribution`.
     """
-    value_distribution: np.ndarray
+    value_distribution: pd.DataFrame
     """The achieved distribution of the given values (usually trip values
         between different places).
     """
@@ -172,7 +172,7 @@ class GravityModelResults:
             })
         
         #TODO (JH): need to add the zone numbers relating to the key - how?
-        value_dist_output = pd.DataFrame(self.value_distribution)
+        value_dist_output = self.value_distribution
 
         # pull the summary output
         summary_output = self.summary.to_frame(name='Value')
@@ -192,8 +192,8 @@ class GravityModelResults:
             value_dist_output,
             os.path.join(save_path, 'value_distribution.csv'),
             mode="w",
-            header=False,
-            index=False,
+            header=True,
+            index=True,
         )
         io.safe_dataframe_to_csv(
             summary_output,
