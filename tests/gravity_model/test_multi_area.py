@@ -162,7 +162,7 @@ def _multi_tld(data_dir, mock_dir):
         func_parameters[cat] = {"mu": 1, "sigma": 2}
 
     multitld = gm.MultiCostDistribution.from_pandas(
-        ordered_zones,
+        # ordered_zones,
         pd.read_csv(data_dir / "distributions.csv"),
         tld_lookup,
         func_parameters,
@@ -178,9 +178,19 @@ def _multi_tld(data_dir, mock_dir):
 
 
 @pytest.fixture(name="cal_no_furness", scope="session")
-def fixture_cal_no_furness(infilled, multi_tld, trip_ends, mock_dir):
+def fixture_cal_no_furness(infilled, multi_tld, trip_ends, mock_dir, data_dir):
     row_targets = trip_ends["origin"].values
     col_targets = trip_ends["destination"].values
+
+    # Convert the infilled array into a pd.DataFrame to be passed to the gravity model
+    if infilled.shape[0] != infilled.shape[1]:
+        infilled = np.delete(infilled, obj=0, axis=1)
+    
+    infilled = pd.DataFrame(infilled)
+    tld_lookup = pd.read_csv(data_dir / "distributions_lookup.csv")
+    infilled.index = tld_lookup["zone"].to_list()
+    infilled.columns = tld_lookup["zone"].to_list()
+    
     model = gm.MultiAreaGravityModelCalibrator(
         row_targets=row_targets,
         col_targets=col_targets,
@@ -197,9 +207,19 @@ def fixture_cal_no_furness(infilled, multi_tld, trip_ends, mock_dir):
 
 
 @pytest.fixture(name="cal_furness", scope="session")
-def fixture_cal_furness(infilled, multi_tld, trip_ends, mock_dir):
+def fixture_cal_furness(infilled, multi_tld, trip_ends, mock_dir, data_dir):
     row_targets = trip_ends["origin"].values
     col_targets = trip_ends["destination"].values
+
+    # Convert the infilled array into a pd.DataFrame to be passed to the gravity model
+    if infilled.shape[0] != infilled.shape[1]:
+        infilled = np.delete(infilled, obj=0, axis=1)
+    
+    infilled = pd.DataFrame(infilled)
+    tld_lookup = pd.read_csv(data_dir / "distributions_lookup.csv")
+    infilled.index = tld_lookup["zone"].to_list()
+    infilled.columns = tld_lookup["zone"].to_list()
+
     model = gm.MultiAreaGravityModelCalibrator(
         row_targets=row_targets,
         col_targets=col_targets,
