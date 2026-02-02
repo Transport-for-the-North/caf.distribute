@@ -512,6 +512,9 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
     ):
         super().__init__(cost_function=cost_function, cost_matrix=cost_matrix.to_numpy())
 
+        # Store DataFrame version for zone indexing
+        self.cost_matrix_df = cost_matrix
+        
         # This is to stop MyPy moaning
         self.achieved_distribution: np.ndarray
         self._loop_start_time: float
@@ -596,7 +599,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             init_params = cost_args[i * params_len : i * params_len + params_len]
             init_params_kwargs = self._cost_params_to_kwargs(init_params)
             mat_slice = self.cost_function.calculate(
-                self.cost_matrix.to_numpy()[dist.zones.index], **init_params_kwargs
+                self.cost_matrix[dist.zones.index], **init_params_kwargs
             )
             base_mat[dist.zones.index] = mat_slice
         return base_mat
@@ -662,8 +665,8 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             max_binning = dist.cost_distribution.max_vals.max()
             min_binning = dist.cost_distribution.min_vals.min()
 
-            max_cost = self.cost_matrix.to_numpy()[dist.zones.index, :].max()
-            min_cost = self.cost_matrix.to_numpy()[dist.zones.index, :].min()
+            max_cost = self.cost_matrix[dist.zones.index, :].max()
+            min_cost = self.cost_matrix[dist.zones.index, :].min()
 
             if max_cost > max_binning:
                 warnings.warn(
@@ -754,7 +757,12 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             result_i = GravityModelResults(
                 cost_distribution=self.achieved_cost_dist[i],
                 cost_convergence=self.achieved_convergence[dist.name],
-                value_distribution=self.achieved_distribution[dist.zones.index],
+                # value_distribution=self.achieved_distribution[dist.zones.index],
+                value_distribution=pd.DataFrame(
+                    self.achieved_distribution[dist.zones.index],
+                    index=self.cost_matrix_df.index[dist.zones.index],
+                    columns=self.cost_matrix_df.columns
+                ),
                 target_cost_distribution=dist.cost_distribution,
                 cost_function=self.cost_function,
                 cost_params=self._cost_params_to_kwargs(
@@ -805,7 +813,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
                 adj_cost_kwargs = init_params_kwargs.copy()
                 adj_cost_kwargs[cost_param] += cost_step
                 adj_mat_slice = self.cost_function.calculate(
-                    self.cost_matrix.to_numpy()[dist.zones.index], **adj_cost_kwargs
+                    self.cost_matrix[dist.zones.index], **adj_cost_kwargs
                 )
                 adj_mat = base_mat.copy()
                 adj_mat[dist.zones.index] = adj_mat_slice
@@ -823,12 +831,12 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
                 for inner_dist in inner_dists:
                     adj_cost_dist = cost_utils.CostDistribution.from_data(
                         matrix=adj_dist[inner_dist.zones.index],
-                        cost_matrix=self.cost_matrix.to_numpy()[inner_dist.zones.index],
+                        cost_matrix=self.cost_matrix[inner_dist.zones.index],
                         bin_edges=inner_dist.cost_distribution.bin_edges,
                     )
                     act_cost_dist = cost_utils.CostDistribution.from_data(
                         matrix=self.achieved_distribution[inner_dist.zones.index],
-                        cost_matrix=self.cost_matrix.to_numpy()[inner_dist.zones.index],
+                        cost_matrix=self.cost_matrix[inner_dist.zones.index],
                         bin_edges=inner_dist.cost_distribution.bin_edges,
                     )
                     test_res.append(
@@ -867,7 +875,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
                 single_convergence,
             ) = core.cost_distribution_stats(
                 achieved_trip_distribution=matrix[dist.zones.index],
-                cost_matrix=self.cost_matrix.to_numpy()[dist.zones.index],
+                cost_matrix=self.cost_matrix[dist.zones.index],
                 target_cost_distribution=dist.cost_distribution,
             )
             convergences[dist.name] = single_convergence
