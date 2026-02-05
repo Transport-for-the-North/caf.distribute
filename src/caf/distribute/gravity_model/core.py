@@ -171,7 +171,9 @@ class GravityModelResults:
             'target_cost_distribution': self.target_cost_distribution.band_share_vals
             })
         
-        #TODO (JH): need to add the zone numbers relating to the key - how?
+        # extract value distribution - this gets turned into a DataFrame
+        # with the filtered index (origins) and the same columns (destinations) as 
+        # the cost matrix for ease of use in comparison to the cost distribution
         value_dist_output = self.value_distribution
 
         # pull the summary output
@@ -224,7 +226,7 @@ class GravityModelBase(abc.ABC):
     def __init__(
         self,
         cost_function: cost_functions.CostFunction,
-        cost_matrix: pd.DataFrame, # np.ndarray,
+        cost_matrix: pd.DataFrame,
         cost_min_max_buf: float = 0.1,
         unique_id: str = "",
     ):
@@ -238,7 +240,11 @@ class GravityModelBase(abc.ABC):
         self._attempt_id: int = -1
         self._loop_num: int = -1
         self._loop_start_time: float = -1.0
-        self._perceived_factors: np.ndarray = np.ones_like(self.cost_matrix)
+        self._perceived_factors: pd.DataFrame = pd.DataFrame(
+            np.ones(cost_matrix.shape), 
+            index=cost_matrix.index, 
+            columns=cost_matrix.columns
+        )
 
         # Additional attributes
         self.initial_cost_params: dict[str, Any] = dict()
@@ -248,7 +254,11 @@ class GravityModelBase(abc.ABC):
         self.achieved_cost_dist: (
             cost_utils.CostDistribution | list[cost_utils.CostDistribution] | None
         ) = None
-        self.achieved_distribution: np.ndarray = np.zeros_like(cost_matrix)
+        self.achieved_distribution: pd.DataFrame = pd.DataFrame(
+            np.zeros(cost_matrix.shape),
+            index=cost_matrix.index,
+            columns=cost_matrix.columns
+        )
 
     @staticmethod
     def _tidy_unique_id(unique_id: str) -> str:
@@ -315,7 +325,11 @@ class GravityModelBase(abc.ABC):
         self._run_start_time = timing.get_datetime()
         self.initial_cost_params = dict()
         self.initial_convergence = 0
-        self._perceived_factors = np.ones_like(self.cost_matrix)
+        self._perceived_factors = pd.DataFrame(
+            np.ones(self.cost_matrix.shape),
+            index=self.cost_matrix.index,
+            columns=self.cost_matrix.columns
+        )
 
     def _cost_params_to_kwargs(self, args: list[Any]) -> dict[str, Any]:
         """Convert a list of args into kwargs that self.cost_function expects."""
@@ -522,24 +536,35 @@ class GravityModelBase(abc.ABC):
         perc_factors = np.clip(perc_factors, 0.5, 2)
 
         # Initialise loop
-        perc_factors_mat = np.ones_like(self.cost_matrix)
+        perc_factors_mat = pd.DataFrame(
+            np.ones(self.cost_matrix.shape),
+            index=self.cost_matrix.index,
+            columns=self.cost_matrix.columns
+        )
         min_vals = target_cost_distribution.min_vals
         max_vals = target_cost_distribution.max_vals
 
         # Convert factors to matrix resembling the cost matrix
         for min_val, max_val, factor in zip(min_vals, max_vals, perc_factors):
             distance_mask = (self.cost_matrix >= min_val) & (self.cost_matrix < max_val)
-            perc_factors_mat = np.multiply(
-                perc_factors_mat,
-                factor,
-                where=distance_mask,
-                out=perc_factors_mat,
-            )
+            perc_factors_mat = perc_factors_mat.where(distance_mask, perc_factors_mat * factor)
 
         # Assign to class attribute
         self._perceived_factors = perc_factors_mat
 
-    def _apply_perceived_factors(self, cost_matrix: np.ndarray) -> np.ndarray:
+    def _apply_perceived_factors(self, cost_matrix: pd.DataFrame) -> pd.DataFrame:
+        """Apply perceived factors to cost matrix.
+        
+        Parameters
+        ----------
+        cost_matrix : pd.DataFrame
+            Cost matrix to apply factors to
+            
+        Returns
+        -------
+        pd.DataFrame
+            Cost matrix with perceived factors applied
+        """
         return cost_matrix * self._perceived_factors
 
     def _guess_init_params(
