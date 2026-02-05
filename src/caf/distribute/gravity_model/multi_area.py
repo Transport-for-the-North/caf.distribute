@@ -529,31 +529,13 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         array_checks = {
             "row targets": row_targets,
             "column targets": col_targets,
-        }
-
-        df_checks = {
-            "cost matrix": cost_matrix
+            "cost matrix": self.cost_matrix_df.to_numpy()
         }
 
         for name, data in array_checks.items():
             if np.isnan(data).any():
                 raise ValueError(f"There are NaNs in {name}")
             if np.isinf(data).any():
-                raise ValueError(f"There are Infs in {name}")
-
-            num_zeros = (data == 0).sum()  # casting bool as 1, 0
-
-            LOG.info(
-                "There are %s 0s in %s (%s percent)",
-                num_zeros,
-                name,
-                (num_zeros / data.size) * 100,
-            )
-        
-        for name, data in df_checks.items():
-            if np.isnan(data).any().any():
-                raise ValueError(f"There are NaNs in {name}")
-            if np.isinf(data).any().any():
                 raise ValueError(f"There are Infs in {name}")
 
             num_zeros = (data == 0).sum()  # casting bool as 1, 0
