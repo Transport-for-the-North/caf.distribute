@@ -200,7 +200,7 @@ def fixture_cal_no_furness(infilled, multi_tld, trip_ends, mock_dir, data_dir):
     results = model.calibrate(
         multi_tld,
         running_log_path=mock_dir / "temp_log.csv",
-        output_path=mock_dir / f"temp_output_{timing.current_milli_time()}",
+        output_path=mock_dir / f"no_furness_{timing.current_milli_time()}",
         gm_params=gm.GMCalibParams(furness_jac=False),
     )
     return results
@@ -229,7 +229,7 @@ def fixture_cal_furness(infilled, multi_tld, trip_ends, mock_dir, data_dir):
     results = model.calibrate(
         multi_tld,
         running_log_path=mock_dir / "temp_log.csv",
-        output_path=mock_dir / f"temp_output_{timing.current_milli_time()}",
+        output_path=mock_dir / f"furness_{timing.current_milli_time()}",
         gm_params=gm.GMCalibParams(furness_jac=True),
     )
     return results
