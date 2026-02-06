@@ -468,13 +468,6 @@ def sectoral_constraint(inputs: SectoralConstraintInputs):
         aggregated = translation.pandas_matrix_zone_translation(
             trans_mat, inputs.trans_vector, inputs.from_col, inputs.to_col, inputs.factor_col
         )
-        # row_diff = aggregated.sum(axis=1) / inputs.target_mat.sum(axis=1) - 1
-        # col_diff = aggregated.sum(axis=0) / inputs.target_mat.sum(axis=0) - 1
-        # if (np.absolute(row_diff).max() > 0.01) | (np.absolute(col_diff).max() > 0.01):
-        #     raise ValueError("The furnessed matrix aggregated up to sectoral level "
-        #                      "does not match the target matrix. Check your translation, "
-        #                      "zonal trip ends and target matrix.")
-
         # This is for factors, so everything is multiplied by one to match
         # sectoral factors to zones
         adjustment_mat = translation.pandas_matrix_zone_translation(
