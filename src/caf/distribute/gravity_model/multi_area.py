@@ -362,9 +362,10 @@ class MGMCostDistribution:
         A cost distribution in a CostDistribution class from toolkit. This
         will often be a trip-length distribution but cost can be in any units
         as long as they match the cost matrix
-    zones: np.ndarray
-        The zones this distribution applies to. This is NOT zone number, or zone
-        ID but the indices of the relevant zones in your cost matrix/target_rows
+    zones: pd.DataFrame
+        The zones this distribution applies to. This is zone number, or zone
+        ID which is take from cost_matrix. The zones.index can be used for 
+        array indexing
     function_params: dict[str,str]
         Initial parameters for your cost function to start guessing at. There
         is a method included for choosing these which hasn't yet been
@@ -377,7 +378,7 @@ class MGMCostDistribution:
 
     name: str
     cost_distribution: cost_utils.CostDistribution
-    zones: pd.DataFrame #np.ndarray
+    zones: pd.DataFrame
     function_params: dict[str, float]
 
     # TODO(kf) validate params
@@ -741,12 +742,12 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         results = {}
         for i, dist in enumerate(distributions):
             current_zones = dist.zones.to_numpy().flatten()
-            current_zones_index = dist.zones.index.to_numpy().flatten()
+            current_zones_index = self.cost_matrix.index.get_indexer(current_zones)
             result_i = GravityModelResults(
                 cost_distribution=self.achieved_cost_dist[i],
                 cost_convergence=self.achieved_convergence[dist.name],
                 value_distribution=pd.DataFrame(
-                    self.achieved_distribution[current_zones_index],
+                    self.achieved_distribution[current_zones_index, :],
                     index=current_zones,
                     columns=self.cost_matrix.columns.to_numpy().flatten(),
                 ),
@@ -782,12 +783,13 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         jacobian = np.zeros((jac_length, jac_width))
         # Build seed matrix
         base_mat = self._create_seed_matrix(cost_distributions, init_params, params_len)
+        base_mat_values = base_mat.to_numpy()
         # Calculate net effect of furnessing (saves a lot of time on furnessing here)
         furness_factor = np.divide(
             self.achieved_distribution,
-            base_mat.to_numpy(),
-            where=base_mat.to_numpy() != 0,
-            out=np.zeros_like(base_mat.to_numpy()),
+            base_mat_values,
+            where=base_mat_values != 0,
+            out=np.zeros_like(base_mat_values),
         )
         # Allows iteration of cost_distributions within a loop of cost_distributions
         inner_dists = cost_distributions.copy()
@@ -805,8 +807,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
                 )
                 adj_mat = base_mat.copy()
                 adj_mat.loc[current_zones, :] = adj_mat_slice
-                adj_dist = adj_mat * furness_factor
-                adj_dist_values = adj_dist.to_numpy()
+                adj_dist_values = adj_mat.to_numpy() * furness_factor
                 if furness_jac:
                     adj_dist_values, *_ = furness.doubly_constrained_furness(
                         seed_vals=adj_dist_values,
@@ -819,14 +820,14 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
                 test_res = []
                 for inner_dist in inner_dists:
                     current_zones = inner_dist.zones.to_numpy().flatten()
-                    current_zones_index = inner_dist.zones.index.to_numpy().flatten()
+                    current_zones_index = self.cost_matrix.index.get_indexer(current_zones)
                     adj_cost_dist = cost_utils.CostDistribution.from_data(
-                        matrix=adj_dist_values[current_zones_index],
+                        matrix=adj_dist_values[current_zones_index, :],
                         cost_matrix=self.cost_matrix.loc[current_zones, :].to_numpy(),
                         bin_edges=inner_dist.cost_distribution.bin_edges,
                     )
                     act_cost_dist = cost_utils.CostDistribution.from_data(
-                        matrix=self.achieved_distribution[current_zones_index],
+                        matrix=self.achieved_distribution[current_zones_index, :],
                         cost_matrix=self.cost_matrix.loc[current_zones, :].to_numpy(),
                         bin_edges=inner_dist.cost_distribution.bin_edges,
                     )
@@ -861,13 +862,13 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         residuals = []
         for dist in cost_distributions:
             current_zones = dist.zones.to_numpy().flatten()
-            current_zones_index = dist.zones.index.to_numpy().flatten()
+            current_zones_index = self.cost_matrix.index.get_indexer(current_zones)
             (
                 single_cost_distribution,
                 single_achieved_residuals,
                 single_convergence,
             ) = core.cost_distribution_stats(
-                achieved_trip_distribution=matrix_values[current_zones_index],
+                achieved_trip_distribution=matrix_values[current_zones_index, :],
                 cost_matrix=self.cost_matrix.loc[current_zones, :].to_numpy(),
                 target_cost_distribution=dist.cost_distribution,
             )
@@ -967,13 +968,13 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         results = {}
         for i, dist in enumerate(distributions):
             current_zones = dist.zones.to_numpy().flatten()
-            current_zones_index = dist.zones.index.to_numpy().flatten()
+            current_zones_index = self.cost_matrix.index.get_indexer(current_zones)
             result_i = GravityModelResults(
                 cost_distribution=self.achieved_cost_dist[i],
                 cost_convergence=self.achieved_convergence[dist.name],
                 target_cost_distribution=dist.cost_distribution,
                 value_distribution=pd.DataFrame(
-                    self.achieved_distribution[current_zones_index],
+                    self.achieved_distribution[current_zones_index, :],
                     index=current_zones,
                     columns=self.cost_matrix.columns.to_numpy().flatten()
                 ),

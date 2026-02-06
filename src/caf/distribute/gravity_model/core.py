@@ -254,11 +254,7 @@ class GravityModelBase(abc.ABC):
         self.achieved_cost_dist: (
             cost_utils.CostDistribution | list[cost_utils.CostDistribution] | None
         ) = None
-        self.achieved_distribution: pd.DataFrame = pd.DataFrame(
-            np.zeros(cost_matrix.shape),
-            index=cost_matrix.index,
-            columns=cost_matrix.columns
-        )
+        self.achieved_distribution: np.ndarray = np.zeros(cost_matrix.shape)
 
     @staticmethod
     def _tidy_unique_id(unique_id: str) -> str:
@@ -547,7 +543,7 @@ class GravityModelBase(abc.ABC):
         # Convert factors to matrix resembling the cost matrix
         for min_val, max_val, factor in zip(min_vals, max_vals, perc_factors):
             distance_mask = (self.cost_matrix >= min_val) & (self.cost_matrix < max_val)
-            perc_factors_mat = perc_factors_mat.where(distance_mask, perc_factors_mat * factor)
+            perc_factors_mat = perc_factors_mat.where(~distance_mask, perc_factors_mat * factor)
 
         # Assign to class attribute
         self._perceived_factors = perc_factors_mat
