@@ -10,6 +10,7 @@ from typing import Any, Optional
 
 # Third Party
 import numpy as np
+import pandas as pd
 from caf.toolkit import cost_utils, timing, toolbox
 from scipy import optimize
 
@@ -64,6 +65,8 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
         self.row_targets = row_targets
         self.col_targets = col_targets
 
+        self._run_start_time: str
+
     def _gravity_function(
         self,
         cost_args: list[float],
@@ -100,6 +103,7 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
         end_time = timing.current_milli_time()
         self._log_iteration(
             log_path=running_log_path,
+            run_start_time=self._run_start_time,
             attempt_id=self._attempt_id,  # type: ignore
             loop_num=self._loop_num,
             loop_time=(end_time - self._loop_start_time) / 1000,  # type: ignore
@@ -107,6 +111,8 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
             furness_iters=iters,
             furness_rmse=rmse,
             convergence=convergence,
+            min_con=convergence,
+            max_con=convergence
         )
 
         # Update loop params and return the achieved band shares
@@ -208,6 +214,7 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
         self,
         init_params: dict[str, Any],
         running_log_path: os.PathLike,
+        output_path: os.PathLike,
         target_cost_distribution: cost_utils.CostDistribution,
         diff_step: float = 1e-8,
         ftol: float = 1e-4,
@@ -233,6 +240,10 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
         running_log_path:
             Path to output the running log to. This log will detail the
             performance of the run and is written in .csv format.
+        
+        output_path: os.PathLike,
+            path to save the GM results, the folder gets created but throws 
+            an error if it exists
 
         target_cost_distribution:
             The cost distribution to calibrate towards during the calibration
@@ -396,19 +407,25 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
 
         # Populate internal arguments with optimal run results.
         assert self.achieved_cost_dist is not None
-        return GravityModelResults(
+
+        results = GravityModelResults(
             cost_distribution=self.achieved_cost_dist,
             cost_convergence=self.achieved_convergence,
-            value_distribution=self.achieved_distribution,
+            value_distribution=pd.DataFrame(self.achieved_distribution),
             target_cost_distribution=target_cost_distribution,
             cost_function=self.cost_function,
             cost_params=self.optimal_cost_params,
         )
 
+        results.save_gm_results(save_path=output_path)
+
+        return results
+
     def calibrate(
         self,
         init_params: dict[str, Any],
         running_log_path: os.PathLike,
+        output_path: os.PathLike,
         *args,
         **kwargs,
     ) -> GravityModelResults:
@@ -426,6 +443,10 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
         running_log_path:
             Path to output the running log to. This log will detail the
             performance of the run and is written in .csv format.
+        
+        output_path: os.PathLike,
+            path to save the GM results, the folder gets created but throws 
+            an error if it exists
 
         target_cost_distribution:
             The cost distribution to calibrate towards during the calibration
@@ -499,18 +520,26 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
         """
         self.cost_function.validate_params(init_params)
         self._validate_running_log(running_log_path)
+        self._validate_output_path(output_path)
         self._initialise_internal_params()
-        return self._calibrate(  # type: ignore
+
+        single_area_gm_output = self._calibrate(  # type: ignore
             *args,
             init_params=init_params,
             running_log_path=running_log_path,
+            output_path=output_path,
             **kwargs,
         )
+
+        single_area_gm_output.save_gm_results(save_path=output_path)
+
+        return single_area_gm_output
 
     def calibrate_with_perceived_factors(
         self,
         init_params: dict[str, Any],
         running_log_path: os.PathLike,
+        output_path: os.PathLike,
         target_cost_distribution: cost_utils.CostDistribution,
         *args,
         failure_tol: float = 0.5,
@@ -530,6 +559,10 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
         running_log_path:
             Path to output the running log to. This log will detail the
             performance of the run and is written in .csv format.
+                    
+        output_path: os.PathLike,
+            path to save the GM results, the folder gets created but throws 
+            an error if it exists
 
         target_cost_distribution:
             The cost distribution to calibrate towards during the calibration
@@ -607,6 +640,7 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
         """
         self.cost_function.validate_params(init_params)
         self._validate_running_log(running_log_path)
+        self._validate_output_path(output_path)
         self._initialise_internal_params()
 
         # Run as normal first
@@ -614,6 +648,7 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
             *args,
             init_params=init_params,
             running_log_path=running_log_path,
+            output_path=output_path,
             failure_tol=failure_tol,
             target_cost_distribution=target_cost_distribution,
             **kwargs,
@@ -634,16 +669,21 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
                 *args,
                 init_params=results.cost_params,
                 running_log_path=running_log_path,
+                output_path=output_path,
                 failure_tol=failure_tol,
                 target_cost_distribution=target_cost_distribution,
                 **kwargs,
             )
+        
+        results.save_gm_results(save_path=output_path)
+
         return results
 
     def run(
         self,
         cost_params: dict[str, Any],
         running_log_path: os.PathLike,
+        output_path: os.PathLike,
         target_cost_distribution: Optional[cost_utils.CostDistribution] = None,
         **kwargs,
     ) -> GravityModelResults:
@@ -660,6 +700,10 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
         running_log_path:
             Path to output the running log to. This log will detail the
             performance of the run and is written in .csv format.
+                                
+        output_path: os.PathLike,
+            path to save the GM results, the folder gets created but throws 
+            an error if it exists
 
         target_cost_distribution:
             If given, this is used to calculate the residuals in the return.
@@ -686,6 +730,7 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
         """
         # Init
         self._validate_running_log(running_log_path)
+        self._validate_output_path(output_path)
         self._initialise_internal_params()
 
         self._gravity_function(
@@ -697,19 +742,25 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
 
         assert self.achieved_cost_dist is not None
         assert target_cost_distribution is not None
-        return GravityModelResults(
+
+        results = GravityModelResults(
             cost_distribution=self.achieved_cost_dist,
             cost_convergence=self.achieved_convergence,
-            value_distribution=self.achieved_distribution,
+            value_distribution=pd.DataFrame(self.achieved_distribution),
             target_cost_distribution=target_cost_distribution,
             cost_function=self.cost_function,
             cost_params=cost_params,
         )
 
+        results.save_gm_results(save_path=output_path)
+
+        return results
+
     def run_with_perceived_factors(
         self,
         cost_params: dict[str, Any],
         running_log_path: os.PathLike,
+        output_path: os.PathLike,
         target_cost_distribution: cost_utils.CostDistribution,
         target_cost_convergence: float = 0.9,
         **kwargs,
@@ -738,6 +789,10 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
         running_log_path:
             Path to output the running log to. This log will detail the
             performance of the run and is written in .csv format.
+                                
+        output_path: os.PathLike,
+            path to save the GM results, the folder gets created but throws 
+            an error if it exists
 
         target_cost_convergence:
             A value between 0 and 1. Ignored unless `use_perceived_factors`
@@ -764,6 +819,7 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
         """
         # Init
         self._validate_running_log(running_log_path)
+        self._validate_output_path(output_path)
         self._initialise_internal_params()
 
         self._gravity_function(
@@ -791,14 +847,19 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
             )
 
         assert self.achieved_cost_dist is not None
-        return GravityModelResults(
+        
+        results = GravityModelResults(
             cost_distribution=self.achieved_cost_dist,
             cost_convergence=self.achieved_convergence,
-            value_distribution=self.achieved_distribution,
+            value_distribution=pd.DataFrame(self.achieved_distribution),
             target_cost_distribution=target_cost_distribution,
             cost_function=self.cost_function,
             cost_params=cost_params,
         )
+
+        results.save_gm_results(save_path=output_path)
+
+        return results
 
 
 # # # FUNCTIONS # # #
