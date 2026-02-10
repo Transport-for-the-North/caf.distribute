@@ -15,7 +15,7 @@ from typing import Any, Iterator, Optional
 # Third Party
 import numpy as np
 import pandas as pd
-from caf.toolkit import BaseConfig, cost_utils, timing
+from caf.toolkit import BaseConfig, cost_utils, timing, math_utils
 from scipy import optimize
 
 # Local Imports
@@ -520,7 +520,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         self._loop_start_time: float
         self._run_start_time: str
 
-        if row_targets.sum() != col_targets.sum():
+        if math_utils.is_almost_equal(row_targets.sum(), col_targets.sum()):
             warnings.warn(
                 "row and column target totals do not match. This is likely to cause Furnessing to fail."
                 f" Difference (row targets - col targets) = {round(row_targets.sum() - col_targets.sum(),2)}"
