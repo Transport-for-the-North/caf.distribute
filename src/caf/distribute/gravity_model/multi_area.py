@@ -179,7 +179,6 @@ class MultiCostDistribution:
     @classmethod
     def from_pandas(
         cls,
-        # ordered_zones: pd.Series,
         tld: pd.DataFrame,
         cat_zone_correspondence: pd.DataFrame,
         func_params: dict[int | str, dict[str, float]],
@@ -196,8 +195,6 @@ class MultiCostDistribution:
 
         Parameters
         ----------
-        ordered_zones : pd.Series
-            list of zones in the same order as other inputs
         tld : pd.DataFrame
             tld data - should contain the tlds for each distribution
             labeled by the `tld_cat_col`
@@ -230,7 +227,7 @@ class MultiCostDistribution:
         Raises
         ------
         KeyError
-            when a category value is not founf in the function parameter keys
+            when a category value is not found in the function parameter keys
 
         See Also
         --------
@@ -248,7 +245,6 @@ class MultiCostDistribution:
             distributions.append(
                 MGMCostDistribution.from_pandas(
                     category,
-                    # pd.Series(ordered_zones),
                     tld,
                     cat_zone_correspondence,
                     func_params[category],
@@ -387,7 +383,6 @@ class MGMCostDistribution:
     def from_pandas(
         cls,
         category: str,
-        # ordered_zones: pd.Series,
         tld: pd.DataFrame,
         cat_zone_correspondence: pd.DataFrame,
         func_params: dict[str, float],
@@ -406,8 +401,6 @@ class MGMCostDistribution:
         ----------
         category : str
             distribution category, used to label gravity model run
-        ordered_zones : pd.Series
-            zones ordered in the same way as other inputs
         tld : pd.DataFrame
             tld data - should contain the tlds for each distribution
             labeled by the `tld_cat_col`
@@ -457,10 +450,6 @@ class MGMCostDistribution:
                 f"The following values from cat->zone lookup are not present in the tld zones: {missing_values}"
             )
 
-        # get the indices
-        # cat_zone_indices = np.where(np.isin(zones, cat_zones))[0]
-        # cat_zones_indices = cat_zones.index.to_numpy()
-
         # get tld for cat
         cat_tld = tld[tld[tld_cat_col] == category]
 
@@ -491,7 +480,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         aiming to match. This can alternatively be thought of as the
         columns that wish to be distributed.
 
-    cost_matrix: np.ndarray
+    cost_matrix: pd.DataFrame
         A matrix detailing the cost between each and every zone. This
         matrix must be the same size as
         `(len(row_targets), len(col_targets))`.
@@ -506,7 +495,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         self,
         row_targets: np.ndarray,
         col_targets: np.ndarray,
-        cost_matrix: pd.DataFrame, # np.ndarray,
+        cost_matrix: pd.DataFrame,
         cost_function: cost_functions.CostFunction,
     ):
         super().__init__(cost_function=cost_function, cost_matrix=cost_matrix.to_numpy())
@@ -756,7 +745,6 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             result_i = GravityModelResults(
                 cost_distribution=self.achieved_cost_dist[i],
                 cost_convergence=self.achieved_convergence[dist.name],
-                # value_distribution=self.achieved_distribution[dist.zones.index],
                 value_distribution=pd.DataFrame(
                     self.achieved_distribution[dist.zones.index],
                     index=self.cost_matrix_df.index[dist.zones.index],

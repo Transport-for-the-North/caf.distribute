@@ -198,7 +198,7 @@ class GravityModelResults:
             'target_cost_distribution': self.target_cost_distribution.band_share_vals
             })
         
-        #TODO (JH): need to add the zone numbers relating to the key - how?
+        # output matrix for area type, includes origin/destination information
         value_dist_output = self.value_distribution
 
         # pull the summary output
