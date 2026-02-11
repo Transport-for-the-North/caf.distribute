@@ -138,7 +138,8 @@ class GravityModelResults:
     
     @staticmethod
     def save_overall_matrix(
-            matrix: pd.DataFrame,
+            matrix: np.ndarray,
+            cost_matrix: pd.DataFrame,
             save_path: os.PathLike
             ) -> None:
         """Save the overall achieved distribution matrix to a provided location.
@@ -153,10 +154,15 @@ class GravityModelResults:
         -------
         Saves the overall achieved distribution matrix to a CSV file in the provided location.
         """
+        overall_matrix = pd.DataFrame(
+            matrix,
+            index=cost_matrix.index,
+            columns=cost_matrix.columns
+        )
         
         # Save the overall achieved distribution matrix to CSV
         io.safe_dataframe_to_csv(
-            matrix,
+            overall_matrix,
             os.path.join(save_path, 'overall_matrix.csv'),
             mode="w",
             header=True,
