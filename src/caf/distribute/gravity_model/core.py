@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """Core abstract functionality for gravity model classes to build on."""
+
 from __future__ import annotations
 
 # Built-Ins
@@ -135,13 +136,11 @@ class GravityModelResults:
         output_params = self.cost_params.copy()
         output_params["convergence"] = self.cost_convergence
         return pd.Series(output_params)
-    
+
     @staticmethod
     def save_overall_matrix(
-            matrix: np.ndarray,
-            cost_matrix: pd.DataFrame,
-            save_path: os.PathLike
-            ) -> None:
+        matrix: np.ndarray, cost_matrix: pd.DataFrame, save_path: os.PathLike
+    ) -> None:
         """Save the overall achieved distribution matrix to a provided location.
 
         Parameters
@@ -155,24 +154,19 @@ class GravityModelResults:
         Saves the overall achieved distribution matrix to a CSV file in the provided location.
         """
         overall_matrix = pd.DataFrame(
-            matrix,
-            index=cost_matrix.index,
-            columns=cost_matrix.columns
+            matrix, index=cost_matrix.index, columns=cost_matrix.columns
         )
-        
+
         # Save the overall achieved distribution matrix to CSV
         io.safe_dataframe_to_csv(
             overall_matrix,
-            os.path.join(save_path, 'overall_matrix.csv'),
+            os.path.join(save_path, "overall_matrix.csv"),
             mode="w",
             header=True,
             index=True,
         )
-    
-    def save_gm_results(
-            self,
-            save_path: os.PathLike
-            ) -> None:
+
+    def save_gm_results(self, save_path: os.PathLike) -> None:
         """Save the gravity model results to a provided location.
 
         Parameters
@@ -192,23 +186,25 @@ class GravityModelResults:
         Exception
             when there is an error extracting results for a given area type from results
         """
-        
+
         if not self:
             raise ValueError("No results provided to save.")
 
         # extract data from the GravityModelResults object
-        cost_outputs = pd.DataFrame({
-            'lower_bin_bound': self.cost_distribution.min_vals,
-            'upper_bin_bound': self.cost_distribution.max_vals,
-            'achieved_cost_distribution': self.cost_distribution.band_share_vals,
-            'target_cost_distribution': self.target_cost_distribution.band_share_vals
-            })
-        
+        cost_outputs = pd.DataFrame(
+            {
+                "lower_bin_bound": self.cost_distribution.min_vals,
+                "upper_bin_bound": self.cost_distribution.max_vals,
+                "achieved_cost_distribution": self.cost_distribution.band_share_vals,
+                "target_cost_distribution": self.target_cost_distribution.band_share_vals,
+            }
+        )
+
         # output matrix for area type, includes origin/destination information
         value_dist_output = self.value_distribution
 
         # pull the summary output
-        summary_output = self.summary.to_frame(name='Value')
+        summary_output = self.summary.to_frame(name="Value")
 
         # create the comparison plot - there is error handling inside the method
         tld_plot = self.plot_distributions()
@@ -216,30 +212,29 @@ class GravityModelResults:
         # save the outputs to CSV
         io.safe_dataframe_to_csv(
             cost_outputs,
-            os.path.join(save_path, 'cost_distribution.csv'),
+            os.path.join(save_path, "cost_distribution.csv"),
             mode="w",
             header=True,
             index=False,
         )
         io.safe_dataframe_to_csv(
             value_dist_output,
-            os.path.join(save_path, 'value_distribution.csv'),
+            os.path.join(save_path, "value_distribution.csv"),
             mode="w",
             header=True,
             index=True,
         )
         io.safe_dataframe_to_csv(
             summary_output,
-            os.path.join(save_path, 'summary.csv'),
+            os.path.join(save_path, "summary.csv"),
             mode="w",
             header=True,
             index=True,
         )
-        
-        # save the comparison plot
-        tld_plot.savefig(os.path.join(save_path, 'tld_plot.png'))
-        plt.close(tld_plot)          
 
+        # save the comparison plot
+        tld_plot.savefig(os.path.join(save_path, "tld_plot.png"))
+        plt.close(tld_plot)
 
 
 class GravityModelBase(abc.ABC):
@@ -319,10 +314,10 @@ class GravityModelBase(abc.ABC):
                     f"Logs will be appended to the end of the file at: "
                     f"{running_log_path}"
                 )
-    
+
     @staticmethod
     def _validate_output_path(output_path: os.PathLike) -> None:
-        if output_path is None: 
+        if output_path is None:
             raise ValueError("An output path must be provided to save results.")
         # check on the output folder
         if os.path.exists(output_path):
@@ -445,7 +440,7 @@ class GravityModelBase(abc.ABC):
         furness_rmse: float,
         convergence: float,
         min_con: float,
-        max_con: float
+        max_con: float,
     ) -> None:
         """Write data from an iteration to a log file.
 
@@ -453,7 +448,7 @@ class GravityModelBase(abc.ABC):
         ----------
         log_path:
             Path to the file to write the log to. Should be a csv file.
-        
+
         run_start_time:
             The datetime string when the run started. Helps identify which run
             the record belongs to as multiple runs could be appended to the same file.
@@ -481,10 +476,10 @@ class GravityModelBase(abc.ABC):
         convergence:
             The achieved convergence values of the curve produced in this
             iteration.
-        
+
         min_con:
             The minimum convergence value across all area types.
-        
+
         max_con:
             The maximum convergence value across all area types.
 
@@ -505,7 +500,7 @@ class GravityModelBase(abc.ABC):
                 "furness_rmse": np.round(furness_rmse, 6),
                 "bs_con": np.round(convergence, 4),
                 "min_con": np.round(min_con, 4),
-                "max_con": np.round(max_con, 4)
+                "max_con": np.round(max_con, 4),
             }
         )
 

@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """Implementation of a self-calibrating single area gravity model."""
+
 from __future__ import annotations
 
 # Built-Ins
@@ -112,7 +113,7 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
             furness_rmse=rmse,
             convergence=convergence,
             min_con=convergence,
-            max_con=convergence
+            max_con=convergence,
         )
 
         # Update loop params and return the achieved band shares
@@ -240,9 +241,9 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
         running_log_path:
             Path to output the running log to. This log will detail the
             performance of the run and is written in .csv format.
-        
+
         output_path: os.PathLike,
-            path to save the GM results, the folder gets created but throws 
+            path to save the GM results, the folder gets created but throws
             an error if it exists
 
         target_cost_distribution:
@@ -443,9 +444,9 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
         running_log_path:
             Path to output the running log to. This log will detail the
             performance of the run and is written in .csv format.
-        
+
         output_path: os.PathLike,
-            path to save the GM results, the folder gets created but throws 
+            path to save the GM results, the folder gets created but throws
             an error if it exists
 
         target_cost_distribution:
@@ -559,9 +560,9 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
         running_log_path:
             Path to output the running log to. This log will detail the
             performance of the run and is written in .csv format.
-                    
+
         output_path: os.PathLike,
-            path to save the GM results, the folder gets created but throws 
+            path to save the GM results, the folder gets created but throws
             an error if it exists
 
         target_cost_distribution:
@@ -674,7 +675,7 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
                 target_cost_distribution=target_cost_distribution,
                 **kwargs,
             )
-        
+
         results.save_gm_results(save_path=output_path)
 
         return results
@@ -700,9 +701,9 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
         running_log_path:
             Path to output the running log to. This log will detail the
             performance of the run and is written in .csv format.
-                                
+
         output_path: os.PathLike,
-            path to save the GM results, the folder gets created but throws 
+            path to save the GM results, the folder gets created but throws
             an error if it exists
 
         target_cost_distribution:
@@ -789,9 +790,9 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
         running_log_path:
             Path to output the running log to. This log will detail the
             performance of the run and is written in .csv format.
-                                
+
         output_path: os.PathLike,
-            path to save the GM results, the folder gets created but throws 
+            path to save the GM results, the folder gets created but throws
             an error if it exists
 
         target_cost_convergence:
@@ -847,7 +848,7 @@ class SingleAreaGravityModelCalibrator(core.GravityModelBase):
             )
 
         assert self.achieved_cost_dist is not None
-        
+
         results = GravityModelResults(
             cost_distribution=self.achieved_cost_dist,
             cost_convergence=self.achieved_convergence,

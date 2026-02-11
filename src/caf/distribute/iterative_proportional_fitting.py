@@ -3,6 +3,7 @@
 
 See: https://en.wikipedia.org/wiki/Iterative_proportional_fitting
 """
+
 # Built-Ins
 import itertools
 import logging
