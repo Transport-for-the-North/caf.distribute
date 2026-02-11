@@ -377,7 +377,7 @@ class MGMCostDistribution:
 
     name: str
     cost_distribution: cost_utils.CostDistribution
-    zones: pd.DataFrame #np.ndarray
+    zones: pd.Series
     function_params: dict[str, float]
 
     # TODO(kf) validate params
@@ -448,12 +448,11 @@ class MGMCostDistribution:
             cat_zone_correspondence[lookup_cat_col] == category, [lookup_zone_col]
         ]
 
-        # zones = ordered_zones.to_numpy()
-        zones = pd.DataFrame({'zone_id': cat_zone_correspondence[lookup_zone_col]})
+        zones = pd.Series(cat_zone_correspondence[lookup_zone_col], name='zone_id')
 
         # tell user if we have zones in cat->lookup that arent in zones
-        if not np.all(np.isin(cat_zones[lookup_zone_col], zones['zone_id'])):
-            missing_values = cat_zones[~np.isin(cat_zones[lookup_zone_col], zones['zone_id'])]
+        if not np.all(np.isin(cat_zones[lookup_zone_col], zones)):
+            missing_values = cat_zones[~np.isin(cat_zones[lookup_zone_col], zones)]
             raise ValueError(
                 f"The following values from cat->zone lookup are not present in the tld zones: {missing_values}"
             )
