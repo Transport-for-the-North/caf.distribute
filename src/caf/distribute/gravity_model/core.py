@@ -266,6 +266,7 @@ class GravityModelBase(abc.ABC):
         self._attempt_id: int = -1
         self._loop_num: int = -1
         self._loop_start_time: float = -1.0
+        self._run_start_time: str = ""
         self._perceived_factors: np.ndarray = np.ones_like(self.cost_matrix)
 
         # Additional attributes
@@ -487,6 +488,8 @@ class GravityModelBase(abc.ABC):
         -------
         None
         """
+        # pylint: disable=too-many-arguments
+
         log_dict = {
             "run_start_time": str(run_start_time),
             "attempt_id": str(attempt_id),
