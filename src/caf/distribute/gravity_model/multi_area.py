@@ -925,6 +925,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         self,
         distributions: MultiCostDistribution,
         running_log_path: Path,
+        output_path: Path,
         furness_tol: float = 1e-6,
     ) -> dict[str, GravityModelResults]:
         """
@@ -939,6 +940,8 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             Distributions to use to run the gravity model
         running_log_path : Path
             Csv path to log results and info
+        output_path : Path
+            Path to save the results of the gravity model run
         furness_tol : float, optional
             tolerance for difference in target and achieved value,
             at which to stop furnessing, by default 1e-6
@@ -948,6 +951,10 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         dict[str, GravityModelResults]
             The results of the gravity model run for each distribution
         """
+
+        self._validate_running_log(running_log_path)
+        self._validate_output_path(output_path)
+        
         params_len = len(distributions[0].function_params)
         cost_args = []
         for dist in distributions:
@@ -969,7 +976,11 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
                 cost_distribution=self.achieved_cost_dist[i],
                 cost_convergence=self.achieved_convergence[dist.name],
                 target_cost_distribution=dist.cost_distribution,
-                value_distribution=self.achieved_distribution[dist.zones.index],
+                value_distribution=pd.DataFrame(
+                    self.achieved_distribution[dist.zones.index],
+                    index=self.cost_matrix_df.index[dist.zones.index],
+                    columns=self.cost_matrix_df.columns
+                ),
                 cost_function=self.cost_function,
                 cost_params=self._cost_params_to_kwargs(
                     cost_args[i * params_len : i * params_len + params_len]
@@ -977,6 +988,11 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             )
 
             results[dist.name] = result_i
+            # save results
+            save_path = os.path.join(output_path, dist.name)
+            # create each subfolder
+            os.makedirs(save_path)
+            result_i.save_gm_results(save_path=save_path)
         return results
 
 
