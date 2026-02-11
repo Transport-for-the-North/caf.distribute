@@ -179,8 +179,8 @@ def _multi_tld(data_dir, mock_dir):
 
 @pytest.fixture(name="cal_no_furness", scope="session")
 def fixture_cal_no_furness(infilled, multi_tld, trip_ends, mock_dir, data_dir):
-    row_targets = trip_ends["origin"].values
-    col_targets = trip_ends["destination"].values
+    row_targets = trip_ends["origin"]
+    col_targets = trip_ends["destination"]
 
     # Convert the infilled array into a pd.DataFrame to be passed to the gravity model
     if infilled.shape[0] != infilled.shape[1]:
@@ -208,8 +208,8 @@ def fixture_cal_no_furness(infilled, multi_tld, trip_ends, mock_dir, data_dir):
 
 @pytest.fixture(name="cal_furness", scope="session")
 def fixture_cal_furness(infilled, multi_tld, trip_ends, mock_dir, data_dir):
-    row_targets = trip_ends["origin"].values
-    col_targets = trip_ends["destination"].values
+    row_targets = trip_ends["origin"]
+    col_targets = trip_ends["destination"]
 
     # Convert the infilled array into a pd.DataFrame to be passed to the gravity model
     if infilled.shape[0] != infilled.shape[1]:

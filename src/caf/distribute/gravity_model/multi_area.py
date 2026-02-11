@@ -493,8 +493,8 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
 
     def __init__(
         self,
-        row_targets: np.ndarray,
-        col_targets: np.ndarray,
+        row_targets: pd.Series,
+        col_targets: pd.Series,
         cost_matrix: pd.DataFrame,
         cost_function: cost_functions.CostFunction,
     ):
@@ -513,31 +513,13 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
                 "row and column target totals do not match. This is likely to cause Furnessing to fail."
                 f" Difference (row targets - col targets) = {round(row_targets.sum() - col_targets.sum(),2)}"
             )
-
-        array_checks = {
+        
+        # check for NaNs and Infs
+        df_checks = {
+            "cost matrix": cost_matrix,
             "row targets": row_targets,
             "column targets": col_targets,
         }
-
-        df_checks = {
-            "cost matrix": cost_matrix
-        }
-
-        for name, data in array_checks.items():
-            if np.isnan(data).any():
-                raise ValueError(f"There are NaNs in {name}")
-            if np.isinf(data).any():
-                raise ValueError(f"There are Infs in {name}")
-
-            num_zeros = (data == 0).sum()  # casting bool as 1, 0
-
-            LOG.info(
-                "There are %s 0s in %s (%s percent)",
-                num_zeros,
-                name,
-                (num_zeros / data.size) * 100,
-            )
-        
         for name, data in df_checks.items():
             if np.isnan(data).any().any():
                 raise ValueError(f"There are NaNs in {name}")
@@ -552,17 +534,23 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
                 name,
                 (num_zeros / data.size) * 100,
             )
-
+        # check for zones with both 0 row and column targets
         zero_in_both = np.stack([row_targets == 0, col_targets == 0], axis=1).all(axis=1).sum()
 
         LOG.info("There are %s zones with both 0 row and column targets.", zero_in_both)
 
-        self.row_targets = row_targets
-        self.col_targets = col_targets
+        self.row_targets = row_targets.to_numpy()
+        self.col_targets = col_targets.to_numpy()
+        # check for mismatching dimensions
         if len(row_targets) != cost_matrix.shape[0]:
             raise IndexError("row_targets doesn't match cost_matrix")
         if len(col_targets) != cost_matrix.shape[1]:
             raise IndexError("col_targets doesn't match cost_matrix")
+        # check for mismatching zone orders
+        if not row_targets.index.equals(cost_matrix.index):
+            raise IndexError("row_targets zones don't match cost_matrix origins")
+        if not col_targets.index.equals(cost_matrix.columns):
+            raise IndexError("col_targets zones don't match cost_matrix destinations")
 
     def _calculate_perceived_factors(
         self,
@@ -1003,7 +991,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
 
 def gravity_model(
     row_targets: pd.Series,
-    col_targets: np.ndarray,
+    col_targets: pd.Series,
     cost_distributions: MultiCostDistribution,
     cost_function: cost_functions.CostFunction,
     cost_mat: pd.DataFrame,
