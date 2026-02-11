@@ -776,6 +776,15 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             # create each subfolder
             os.makedirs(save_path)
             result_i.save_gm_results(save_path=save_path)
+        # save overall matrix too
+        overall_matrix = pd.DataFrame(
+                    self.achieved_distribution,
+                    index=self.cost_matrix_df.index,
+                    columns=self.cost_matrix_df.columns
+                )
+        GravityModelResults.save_overall_matrix(matrix=overall_matrix, 
+                                                save_path=output_path)
+        
         return results
 
     def _jacobian_function(
@@ -993,6 +1002,15 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             # create each subfolder
             os.makedirs(save_path)
             result_i.save_gm_results(save_path=save_path)
+        # save overall matrix too
+        overall_matrix = pd.DataFrame(
+                    self.achieved_distribution,
+                    index=self.cost_matrix_df.index,
+                    columns=self.cost_matrix_df.columns
+                )
+        GravityModelResults.save_overall_matrix(matrix=overall_matrix, 
+                                                save_path=output_path)
+        
         return results
 
 

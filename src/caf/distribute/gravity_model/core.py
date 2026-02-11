@@ -136,6 +136,33 @@ class GravityModelResults:
         output_params["convergence"] = self.cost_convergence
         return pd.Series(output_params)
     
+    @staticmethod
+    def save_overall_matrix(
+            matrix: pd.DataFrame,
+            save_path: os.PathLike
+            ) -> None:
+        """Save the overall achieved distribution matrix to a provided location.
+
+        Parameters
+        ----------
+        matrix: pd.DataFrame
+            The achieved distribution matrix to save
+        save_path: os.PathLike
+            the path to save the results to
+        Returns
+        -------
+        Saves the overall achieved distribution matrix to a CSV file in the provided location.
+        """
+        
+        # Save the overall achieved distribution matrix to CSV
+        io.safe_dataframe_to_csv(
+            matrix,
+            os.path.join(save_path, 'overall_matrix.csv'),
+            mode="w",
+            header=True,
+            index=True,
+        )
+    
     def save_gm_results(
             self,
             save_path: os.PathLike
