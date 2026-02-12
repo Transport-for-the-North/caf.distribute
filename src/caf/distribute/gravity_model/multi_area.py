@@ -556,12 +556,14 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
                     warnings.warn("row_targets reordered to match cost_matrix origins order")
             else:
                 raise IndexError("row_targets zones differ to cost_matrix origins")
-            
+
         if not col_targets.index.equals(cost_matrix.columns):
             if col_targets.index.isin(cost_matrix.columns).all():
                 col_targets = col_targets.reindex(cost_matrix.columns)
                 if col_targets.index.equals(cost_matrix.columns):
-                    warnings.warn("col_targets reordered to match cost_matrix destinations order")
+                    warnings.warn(
+                        "col_targets reordered to match cost_matrix destinations order"
+                    )
             else:
                 raise IndexError("col_targets zones differ to cost_matrix destinations")
 
