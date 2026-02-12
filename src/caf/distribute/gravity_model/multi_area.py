@@ -16,7 +16,7 @@ from typing import Any, Iterator, Optional
 # Third Party
 import numpy as np
 import pandas as pd
-from caf.toolkit import BaseConfig, cost_utils, timing, math_utils
+from caf.toolkit import BaseConfig, cost_utils, math_utils, timing
 from scipy import optimize
 
 # Local Imports

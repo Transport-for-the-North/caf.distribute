@@ -7,6 +7,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
+from caf.toolkit import timing
 from matplotlib import pyplot as plt
 
 # Local Imports
@@ -14,7 +15,6 @@ from caf.distribute import cost_functions
 from caf.distribute import gravity_model as gm
 from caf.distribute import utils
 from caf.distribute.gravity_model import GravityModelResults
-from caf.toolkit import timing
 
 
 @pytest.fixture(name="cost_from_code", scope="session")
