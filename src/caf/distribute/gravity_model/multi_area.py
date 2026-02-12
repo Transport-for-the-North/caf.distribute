@@ -542,18 +542,32 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
 
         LOG.info("There are %s zones with both 0 row and column targets.", zero_in_both)
 
-        self.row_targets = row_targets.to_numpy()
-        self.col_targets = col_targets.to_numpy()
         # check for mismatching dimensions
         if len(row_targets) != cost_matrix.shape[0]:
             raise IndexError("row_targets doesn't match cost_matrix")
         if len(col_targets) != cost_matrix.shape[1]:
             raise IndexError("col_targets doesn't match cost_matrix")
-        # check for mismatching zone orders
+        # check for mismatching zone orders and reorder if possible and provide warning, check again after
         if not row_targets.index.equals(cost_matrix.index):
-            raise IndexError("row_targets zones don't match cost_matrix origins")
+            if row_targets.index.isin(cost_matrix.index).all():
+                row_targets = row_targets.reindex(cost_matrix.index)
+                # check again to be sure
+                if row_targets.index.equals(cost_matrix.index):
+                    warnings.warn("row_targets reordered to match cost_matrix origins order")
+            else:
+                raise IndexError("row_targets zones differ to cost_matrix origins")
+            
         if not col_targets.index.equals(cost_matrix.columns):
-            raise IndexError("col_targets zones don't match cost_matrix destinations")
+            if col_targets.index.isin(cost_matrix.columns).all():
+                col_targets = col_targets.reindex(cost_matrix.columns)
+                if col_targets.index.equals(cost_matrix.columns):
+                    warnings.warn("col_targets reordered to match cost_matrix destinations order")
+            else:
+                raise IndexError("col_targets zones differ to cost_matrix destinations")
+
+        # assign to class
+        self.row_targets = row_targets.to_numpy()
+        self.col_targets = col_targets.to_numpy()
 
     def _calculate_perceived_factors(
         self,
