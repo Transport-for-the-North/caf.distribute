@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """Tests for the caf.toolkit.array_utils module"""
+
 # Built-Ins
 import itertools
 
