@@ -463,14 +463,14 @@ class MGMCostDistribution:
 
         # get a list of zones that use this category of TLD
         cat_zones = cat_zone_correspondence.loc[
-            cat_zone_correspondence[lookup_cat_col] == category, [lookup_zone_col]
+            cat_zone_correspondence[lookup_cat_col] == category, lookup_zone_col
         ]
 
         zones = pd.Series(cat_zone_correspondence[lookup_zone_col], name="zone_id")
 
         # tell user if we have zones in cat->lookup that arent in zones
-        if not np.all(np.isin(cat_zones[lookup_zone_col], zones)):
-            missing_values = cat_zones[~np.isin(cat_zones[lookup_zone_col], zones)]
+        if not np.all(np.isin(cat_zones, zones)):
+            missing_values = cat_zones[~np.isin(cat_zones, zones)]
             raise ValueError(
                 f"The following values from cat->zone lookup are not present in the tld zones: {missing_values}"
             )
@@ -975,7 +975,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         output_path: Path,
         furness_tol: float = 1e-6,
         four_d_inputs: Optional[furness.SectoralConstraintInputs] = None,
-    ) -> dict[int | str, GravityModelCalibrateResults]:
+    ) -> dict[int | str, GravityModelResults]:
         """
         Run the gravity_model without calibrating.
 
@@ -1065,12 +1065,12 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
                                    'prop': dist.cost_distribution.trip_vals})
             target["prop"] /= target["prop"].sum()
             starts, ends = furness.cost_to_prop(
-                self.cost_matrix[dist.zones],
+                self.cost_matrix[dist.zones.index],
                 target,
                 'prop',
                 return_bands=True
             )
-            target['prop'] *= self.row_targets[dist.zones].sum()
+            target['prop'] *= self.row_targets[dist.zones.index].sum()
             starts_dict[dist.name] = pd.DataFrame(starts, index=dist.zones).stack()
             ends_dict[dist.name] = pd.DataFrame(ends, index=dist.zones).stack()
             props_dict[dist.name] = target.set_index(['min', 'max']).squeeze()
@@ -1147,7 +1147,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             # Re-normalise after adjustment
             target["normalised"] /= target["normalised"].sum()
             prop_cost, band_vals = furness.cost_to_prop(
-                self.cost_matrix[dist.zones],
+                self.cost_matrix[dist.zones.index],
                 target[
                     [
                         dist.cost_distribution.min_col,
@@ -1179,7 +1179,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
                 single_convergence,
             ) = core.cost_distribution_stats(
                 achieved_trip_distribution=new_mat[dist.zones],
-                cost_matrix=self.cost_matrix[dist.zones],
+                cost_matrix=self.cost_matrix[dist.zones.index],
                 target_cost_distribution=dist.cost_distribution,
             )
 
