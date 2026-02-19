@@ -322,11 +322,19 @@ class GravityModelBase(abc.ABC):
             raise ValueError("An output path must be provided to save results.")
         # check on the output folder
         if os.path.exists(output_path):
-            raise FileExistsError(
-                f"Cannot save results: path '{output_path}' already exists. "
-                "Please choose a different location."
+            # if exists, check if it's empty (so it's fine)
+            # if not empty, throw an error to avoid overwriting results
+            empty = True
+            for _ in os.scandir(output_path):
+                empty = False
+                break
+            if not empty:
+                raise FileExistsError(
+                    f"Cannot save results: path '{output_path}' already exists and is not empty. "
+                    "Please choose a different location."
             )
-        os.makedirs(output_path)
+        else:
+            os.makedirs(output_path)
 
     def _initialise_internal_params(self) -> None:
         """Set running params to their default values for a run."""
