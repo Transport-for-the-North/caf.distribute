@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """Tests for the caf.toolkit.iterative_proportional_fitting module"""
+
 from __future__ import annotations
 
 # Built-Ins

@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """Collection of utility functions for numpy and sparse arrays."""
+
 from __future__ import annotations
 
 # Built-Ins

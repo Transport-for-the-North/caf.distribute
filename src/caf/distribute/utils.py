@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """Module for miscellaneous utilities for the package."""
+
 # Built-Ins
 import functools
 from typing import Literal
