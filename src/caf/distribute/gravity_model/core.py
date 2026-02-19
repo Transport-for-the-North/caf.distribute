@@ -332,7 +332,7 @@ class GravityModelBase(abc.ABC):
                 raise FileExistsError(
                     f"Cannot save results: path '{output_path}' already exists and is not empty. "
                     "Please choose a different location."
-            )
+                )
         else:
             os.makedirs(output_path)
 
