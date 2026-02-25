@@ -730,22 +730,23 @@ def numpy_ndim_furness(
     return mat, rmse, iter_num
 
 def adjust(mat: pd.Series,
-            targets: dict[bool, pd.Series],
+            targets: list[tuple[bool, pd.Series]],
             factor_cap: int):
     factors = []
-    for inc_intras, targ in targets.items():
+    for inc_intras, targ in targets:
         check_dim = list(set(mat.index.names).intersection(targ.index.names))
         if not inc_intras:
-            df_mat = mat.reset_index(level=['o_zone', 'd_zon'])
-            inters = df_mat[df_mat['o_zon'] != df_mat['d_zon']].set_index(['o_zone', 'd_zon'], append=True)
-            intras = df_mat[df_mat['o_zon'] != df_mat['d_zon']].set_index(['o_zone', 'd_zon'], append=True)
+            df_mat = mat.reset_index(level=['o_zon', 'd_zon'])
+            inters = df_mat[df_mat['o_zon'] != df_mat['d_zon']].set_index(['o_zon', 'd_zon'], append=True)
+            intras = df_mat[df_mat['o_zon'] == df_mat['d_zon']].set_index(['o_zon', 'd_zon'], append=True)
             check_intras = intras.groupby(check_dim).sum()
             check_mat = mat.groupby(check_dim).sum() - check_intras
-            targ_inters = targ = check_intras
-            adj = targ_inters / check_mat
-            
-        check_mat = mat.groupby(check_dim).sum()
-        adj = (targ / check_mat).fillna(1)
+            # targ_inters = targ = check_intras
+            adj = (targ / check_mat).fillna(1)
+        else:
+            check_mat = mat.groupby(check_dim).sum()
+            adj = (targ / check_mat).fillna(1)
+        
         factors.append(adj)
         adj[adj > factor_cap] = factor_cap
         adj[adj < factor_cap ** -1] = factor_cap ** -1
