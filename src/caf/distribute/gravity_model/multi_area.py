@@ -299,9 +299,10 @@ class MultiCostDistribution:
 
         for dist in distributions:
             if all_zones is None:
-                all_zones = dist.zones
+                all_zones = dist.zones.values if isinstance(dist.zones, pd.Series) else dist.zones
             else:
-                all_zones = np.concatenate((all_zones, dist.zones))
+                zone_vals = dist.zones.values if isinstance(dist.zones, pd.Series) else dist.zones
+                all_zones = np.concatenate((all_zones, zone_vals))
 
         assert all_zones is not None
 
@@ -745,9 +746,10 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         best_convergence = self.achieved_convergence
         best_params = []
         log = pd.read_csv(running_log_path)
-        for i in range(len(self.achieved_convergence)):
+        # for i in range(len(self.achieved_convergence)):
+        for dist in distributions:
             for param in self.cost_function.param_names:
-                best_params.append(log.loc[log[f"convergence_{i}"] == log[f"convergence_{i}"].max(), f"{param}_{i}"].iloc[-1])
+                best_params.append(log.loc[log[f"convergence_{dist.name}"] == log[f"convergence_{dist.name}"].max(), f"{param}_{dist.name}"].iloc[-1])
         best_params = np.array(best_params)
         if (
             not all(self.achieved_convergence) >= gm_params.failure_tol
@@ -932,7 +934,6 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             residuals.append(single_achieved_residuals)
 
         log_costs = {}
-
         for i, dist in enumerate(cost_distributions):
             j = 0
             # TODO(kf) Fix this to reflect TLD class
@@ -1071,8 +1072,8 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
                 return_bands=True
             )
             target['prop'] *= self.row_targets[dist.zones.index].sum()
-            starts_dict[dist.name] = pd.DataFrame(starts, index=dist.zones).stack()
-            ends_dict[dist.name] = pd.DataFrame(ends, index=dist.zones).stack()
+            starts_dict[dist.name] = pd.DataFrame(starts, index=dist.zones, columns=self.cost_matrix_df.columns).stack()
+            ends_dict[dist.name] = pd.DataFrame(ends, index=dist.zones, columns=self.cost_matrix_df.columns).stack()
             props_dict[dist.name] = target.set_index(['min', 'max']).squeeze()
         starts = pd.concat(starts_dict)
         starts.name = 'band_start'
