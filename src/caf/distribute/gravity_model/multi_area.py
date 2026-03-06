@@ -746,10 +746,9 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         best_convergence = self.achieved_convergence
         best_params = []
         log = pd.read_csv(running_log_path)
-        # for i in range(len(self.achieved_convergence)):
         for dist in distributions:
             for param in self.cost_function.param_names:
-                best_params.append(log.loc[log[f"convergence_{dist.name}"] == log[f"convergence_{dist.name}"].max(), f"{param}_{dist.name}"].iloc[-1])
+                best_params.append(log.loc[(len(log) - 1), f"{param}_{dist.name}"])
         best_params = np.array(best_params)
         if (
             not all(self.achieved_convergence) >= gm_params.failure_tol
@@ -772,11 +771,11 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             ):
                 best_params = result.x
 
-        self._attempt_id: int = -2
-        self._gravity_function(
-            init_params=best_params,
-            **(gravity_kwargs | kwargs),
-        )
+        # self._attempt_id: int = -2
+        # self._gravity_function(
+        #     init_params=best_params,
+        #     **(gravity_kwargs | kwargs),
+        # )
 
         assert self.achieved_cost_dist is not None
         results = {}
