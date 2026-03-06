@@ -737,17 +737,18 @@ class adj_input:
 
 def adjust(mat: pd.Series,
             targets: list[adj_input]):
+    inner_mat = mat.copy()
     factors = []
-    for adj in targets:
-        targ = adj.target
-        factor_cap = adj.factor_cap
-        check_dim = list(set(mat.index.names).intersection(targ.index.names))
-        check_mat = mat.groupby(check_dim).sum()
+    for ite in targets:
+        targ = ite.target
+        factor_cap = ite.factor_cap
+        check_dim = list(set(inner_mat.index.names).intersection(targ.index.names))
+        check_mat = inner_mat.groupby(check_dim).sum()
         adj = (targ / check_mat).fillna(1)
-        factors.append(adj)
+        factors.append(adj.copy())
         adj[adj > factor_cap] = factor_cap
         adj[adj < factor_cap ** -1] = factor_cap ** -1
-        mat = mat * adj
+        inner_mat = inner_mat * adj
     return mat, factors
 
 
