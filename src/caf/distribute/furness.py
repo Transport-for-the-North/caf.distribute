@@ -729,24 +729,21 @@ def numpy_ndim_furness(
     )
     return mat, rmse, iter_num
 
+@dataclass
+class adj_input:
+    target: pd.Series
+    include_rmse: bool
+    factor_cap: int
+
 def adjust(mat: pd.Series,
-            targets: list[tuple[bool, pd.Series]],
-            factor_cap: int):
+            targets: list[adj_input]):
     factors = []
-    for inc_intras, targ in targets:
+    for adj in targets:
+        targ = adj.target
+        factor_cap = adj.factor_cap
         check_dim = list(set(mat.index.names).intersection(targ.index.names))
-        if not inc_intras:
-            df_mat = mat.reset_index(level=['o_zon', 'd_zon'])
-            inters = df_mat[df_mat['o_zon'] != df_mat['d_zon']].set_index(['o_zon', 'd_zon'], append=True)
-            intras = df_mat[df_mat['o_zon'] == df_mat['d_zon']].set_index(['o_zon', 'd_zon'], append=True)
-            check_intras = intras.groupby(check_dim).sum()
-            check_mat = mat.groupby(check_dim).sum() - check_intras
-            # targ_inters = targ = check_intras
-            adj = (targ / check_mat).fillna(1)
-        else:
-            check_mat = mat.groupby(check_dim).sum()
-            adj = (targ / check_mat).fillna(1)
-        
+        check_mat = mat.groupby(check_dim).sum()
+        adj = (targ / check_mat).fillna(1)
         factors.append(adj)
         adj[adj > factor_cap] = factor_cap
         adj[adj < factor_cap ** -1] = factor_cap ** -1
@@ -756,7 +753,7 @@ def adjust(mat: pd.Series,
 
 def pandas_ndim_furness(
     seed_mat: pd.Series,
-    targets: list[pd.Series],
+    targets: list[adj_input],
     targ_len: int,
     max_iters: int = 10000,
     tol: float = 1e-9,
@@ -802,9 +799,10 @@ def pandas_ndim_furness(
         mat = adjust(mat, targets)
         diff = 0.0
         for targ in targets:
-            check_dim = list(set(mat.index.names).intersection(targ.index.names))
-            check_mat = mat.groupby(check_dim).sum()
-            diff += float(((check_mat - targ) ** 2).sum())
+            if targ.include_rmse:
+                check_dim = list(set(mat.index.names).intersection(targ.target.index.names))
+                check_mat = mat.groupby(check_dim).sum()
+                diff += float(((check_mat - targ.target) ** 2).sum())
         prev_rmse = rmse
         rmse = (diff / targ_len) ** 0.5
         if rmse < tol:
