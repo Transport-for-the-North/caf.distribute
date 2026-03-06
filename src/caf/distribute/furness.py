@@ -749,7 +749,7 @@ def adjust(mat: pd.Series,
         adj[adj > factor_cap] = factor_cap
         adj[adj < factor_cap ** -1] = factor_cap ** -1
         inner_mat = inner_mat * adj
-    return mat, factors
+    return inner_mat, factors
 
 
 def pandas_ndim_furness(
@@ -797,7 +797,7 @@ def pandas_ndim_furness(
     mat = seed_mat.copy()
     rmse = np.inf
     for iter_num in range(max_iters):
-        mat = adjust(mat, targets)
+        mat, _ = adjust(mat, targets)
         diff = 0.0
         for targ in targets:
             if targ.include_rmse:
