@@ -742,7 +742,7 @@ def adjust(mat: pd.Series,
     for ite in targets:
         targ = ite.target
         factor_cap = ite.factor_cap
-        check_dim = list(set(inner_mat.index.names).intersection(targ.index.names))
+        check_dim = [name for name in inner_mat.index.names if name in targ.index.names]
         check_mat = inner_mat.groupby(check_dim).sum()
         adj = (targ / check_mat).fillna(1)
         factors.append(adj.copy())
