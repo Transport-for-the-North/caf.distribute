@@ -8,6 +8,7 @@ import warnings
 from typing import Optional
 from dataclasses import dataclass
 from typing import Callable
+from copy import deepcopy
 
 # Third Party
 import numpy as np
@@ -103,6 +104,7 @@ class SectoralConstraintInputs:
     zonal_zones: Optional[np.ndarray] = None
     furness_inputs: Optional[FurnessInputs] = None
 
+
 @dataclass
 class PropsInput:
     """
@@ -158,6 +160,7 @@ def cost_to_prop(costs: np.ndarray, bands: pd.DataFrame, val_col: str, return_ba
         return band_starts, band_ends
     band_indices[band_indices == 0] = bands[val_col].min() * 0.5
     return band_indices, bands[val_col].values
+
 
 # # # FUNCTIONS # # #
 def calc_rmse(col_targets, furnessed_mat, row_targets, n_vals: Optional[int] = None):
@@ -304,6 +307,34 @@ def doubly_constrained_furness(
 
     return furnessed_mat, iter_num + 1, cur_rmse
 
+
+def dist_match(props: dict[int, PropsInput], mat: np.ndarray, return_checkers=False):
+    checkers = {}
+    inner_mat = deepcopy(mat)
+    for area, distro in props.items():
+        to_alter = inner_mat[distro.zones]
+        checker = {}
+        for i in distro.prop_vals:
+            tot_demand = to_alter[distro.props == i].sum()
+            checker[i] = tot_demand
+        # pylint: disable=unsupported-assignment-operation, unsubscriptable-object
+        # pylint error
+        checker_df = pd.DataFrame.from_dict(checker, orient="index").reset_index()
+        checker_df.columns = ["target_prop", "demand"]
+        checker_df["act_prop"] = checker_df["demand"] / checker_df["demand"].sum()
+        checker_df["adj"] = (checker_df["target_prop"] / checker_df["act_prop"]).replace(0, 1)
+        checker_df.fillna(0, inplace=True)
+        checker_df.set_index("target_prop", inplace=True)
+
+        for i in checker_df.index:
+            to_alter[distro.props == i] *= checker_df.loc[i, "adj"]
+        inner_mat[distro.zones] = to_alter
+        checkers[area] = checker_df
+    if return_checkers:
+        return pd.concat(checkers), inner_mat
+    return inner_mat
+
+
 def triply_constrained_furness(
     props: list[PropsInput],
     row_targets,
@@ -342,6 +373,7 @@ def triply_constrained_furness(
     cur_rmse = np.inf
     iter_num = 0
     n_vals = len(row_targets)
+    checker_df = pd.DataFrame({"adj": np.inf}, index=[0])
     if init_mat is None:
         # build seed
         furnessed_mat = np.zeros(mat_size)
@@ -352,28 +384,12 @@ def triply_constrained_furness(
             furnessed_mat, row_targets, col_targets, max_iters=10, warning=False
         )
     else:
-        furnessed_mat = init_mat
+        furnessed_mat = deepcopy(init_mat)
     for iter_num in range(1, max_iters):
         # first adjust to match cost bands; this is the 'third' constraint but
         # is done first as the other two need to be matched more closely
-        for distro in props:
-            to_alter = furnessed_mat[distro.zones]
-            checker = {}
-            for i in distro.prop_vals:
-                tot_demand = to_alter[distro.props == i].sum()
-                checker[i] = tot_demand
-            # pylint: disable=unsupported-assignment-operation, unsubscriptable-object
-            # pylint error
-            checker_df = pd.DataFrame.from_dict(checker, orient="index").reset_index()
-            checker_df.columns = ["target_prop", "demand"]
-            checker_df["act_prop"] = checker_df["demand"] / checker_df["demand"].sum()
-            checker_df["adj"] = checker_df["target_prop"] / checker_df["act_prop"]
-            checker_df.fillna(0, inplace=True)
-            checker_df.set_index("target_prop", inplace=True)
-
-            for i in checker_df.index:
-                to_alter[distro.props == i] *= checker_df.loc[i, "adj"]
-            furnessed_mat[distro.zones] = to_alter
+        if (checker_df["adj"] - 1).abs().max() > 5e-1:
+            dist_match(props, furnessed_mat)
             # pylint:enable=unsupported-assignment-operation, unsubscriptable-object
         # Adjust rows
         row_ach = np.sum(furnessed_mat, axis=1)
@@ -399,6 +415,7 @@ def triply_constrained_furness(
         col_diff = (col_targets - np.sum(furnessed_mat, axis=0)) ** 2
         cur_rmse = ((np.sum(row_diff) + np.sum(col_diff)) / n_vals) ** 0.5
         if cur_rmse < tol:
+            print(f"Converged in {iter_num} iterations with rmse of {cur_rmse}")
             early_exit = True
             break
     if (not early_exit) & (iter_num >= max_iters):
@@ -410,6 +427,7 @@ def triply_constrained_furness(
         )
 
     return furnessed_mat
+
 
 def sectoral_constraint(inputs: SectoralConstraintInputs):
     """
@@ -818,3 +836,163 @@ def pandas_ndim_furness(
         f"Exiting with {rmse} rmse."
     )
     return mat, rmse, iter_num
+
+
+@dataclass
+class SegInput:
+    """
+    props: Instance of PropsInput used for the tld aspect of segmentation_furness
+    """
+    props: PropsInput
+    col_targets: np.ndarray
+    row_targets: np.ndarray
+
+
+def seg_inner(targets, results):
+    for targ in targets:
+        comp_mat = results.sum(set(results.dims).difference(targ.dims))
+        adj = (targ / comp_mat).fillna(1)
+        results *= adj
+    # calc rmse
+    diff = 0
+    for targ in targets:
+        check_mat = results.sum(set(results.dims).difference(targ.dims))
+        diff += float(((check_mat - targ) ** 2).sum()) / np.prod(targ.shape)
+    rmse = (diff) ** 0.5
+    return results, rmse
+
+
+def segmentation_furness(
+    triple_inputs: dict[int, SegInput],
+    sum_mat: np.ndarray,
+    mat_size: tuple[int, int],
+    seed_mat: xr.DataArray=None,
+    max_iters: int = 5000,
+    outer_max_iters: int = 500,
+    tol: float = 1e-5,
+):
+    """
+    Furness to a set of tlds, trip ends at some level of segmentation, and a full 
+    matrix at an aggregate level.
+    
+    The furness initially attempts to match to distributions, trip ends and matrix. If 
+    that process stops improving before convergence is met, it will fall back to only 
+    furnessing to matrix and trip ends. In practice this process rarely gets to the 
+    default level of convergence.
+    Args:
+        triple_inputs: dict[int, SegInput]
+            Dict of segment value to an instance of SegInput
+        sum_mat: np.ndarray
+            The aggregate level matrix used as a target
+        mat_size: tuple[int, int]
+            The shape of the matrices.
+        max_iters: int=5000: 
+            The max number of iterations when resorting to the simpler furness
+        outer_max_iters: int=500
+            The max number of iterations at full detail
+        tol: float = 1e-5
+            The RMSE the process aims to get to.
+
+    Returns:
+        _type_: _description_
+    """
+    # Convert inputs to Xarrays for fast furnessing
+    rows = xr.DataArray(
+        data=[i.row_targets for i in triple_inputs.values()],
+        dims=["seg", "o"],
+        coords={"seg": list(triple_inputs.keys()), "o": np.arange(mat_size[0])},
+    )
+    cols = xr.DataArray(
+        data=[i.col_targets for i in triple_inputs.values()],
+        dims=["seg", "d"],
+        coords={"seg": list(triple_inputs.keys()), "d": np.arange(mat_size[1])},
+    )
+    mat_targ = xr.DataArray(sum_mat, dims=["o", "d"])
+    targets = [cols, rows, mat_targ]
+    # Initial matrices are just the overall target matrix
+    if seed_mat is None:
+        results = xr.DataArray(
+            [np.ones(sum_mat.shape)] * len(triple_inputs),
+            dims=["seg", "o", "d"],
+            coords={
+                "seg": list(triple_inputs.keys()),
+                "o": np.arange(mat_size[0]),
+                "d": np.arange(mat_size[1]),
+            },
+        )
+    else:
+        results=seed_mat
+    prev_rmse = np.inf
+    iter_num = 1
+    while True:
+        for seg, val in triple_inputs.items():
+            dist_matched = dist_match(val.props, results.sel(seg=seg).values)
+            results.loc[seg] = dist_matched
+
+        results, rmse = seg_inner(targets, results)
+
+        LOG.debug(f"iter:{iter_num}, rmse:{rmse}")
+        if rmse < tol:
+            LOG.info(
+                f"Full furnessing (to distributions, trip ends and matrix sum) has converged in "
+                f"{iter_num} iterations, with an rmse of {rmse}."
+            )
+            break
+        # This break condition needs deciding better. Some do seem to improve very slowly for 
+        # a very long time.
+        if prev_rmse - rmse < rmse / 100:
+            LOG.warning(
+                f"Full furnessing (to distributions, trip ends and matrix sum) has stopped "
+                f"improving after {iter_num} iterations, with an rmse of {rmse}. Furnessing to "
+                f"just trip ends and matrix sum to reach convergence."
+            )
+            for i in range(1,max_iters):
+                results, rmse = seg_inner(targets, results)
+                if rmse < tol:
+                    LOG.info(
+                        f"Partial furnessing to trip ends and matrix sum has converged in {i} "
+                        f"iterations with an rmse of {rmse}."
+                    )
+                    break
+                if (prev_rmse - rmse < tol) & (i > 10):
+                    break
+                prev_rmse = rmse
+            if rmse > tol:
+                LOG.warning(
+                    f"Partial furnessing to trip ends and matrix sum has failed to converge in {i} "
+                    f"iterations with an rmse of {rmse}."
+                )
+            break
+        if iter_num > outer_max_iters:
+            LOG.warning(
+                f"Full furnessing (to distributions, trip ends and matrix sum) has failed to "
+                f"converge after {iter_num} iterations, with an rmse of {rmse}. Furnessing to "
+                f"just trip ends and matrix sum to reach convergence."
+            )
+            for i in range(max_iters):
+                results, rmse = seg_inner(targets, results)
+                if rmse < tol:
+                    LOG.info(
+                        f"Partial furnessing to trip ends and matrix sum has converged in {i} "
+                        f"iterations with an rmse of {rmse}."
+                    )
+                    break
+            if rmse > tol:
+                LOG.warning(
+                    f"Partial furnessing to trip ends and matrix sum has failed to converge in {i} "
+                    f"iterations with an rmse of {rmse}."
+                )
+            break
+        prev_rmse = rmse
+        iter_num += 1
+    checkers = {}
+    for seg, val in triple_inputs.items():
+        checks, alt_mat = dist_match(val.props, results.sel(seg=seg).values, True)
+        checkers[seg] = checks
+    max_diff = np.abs(results.sum(dim='seg').to_numpy() - sum_mat).max()
+    LOG.info(f"Max difference between achieved dist and sum mat is {max_diff}")
+    return (
+        results.to_series().unstack(level="d"),
+        rmse,
+        pd.concat(checkers),
+    )
