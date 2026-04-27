@@ -12,7 +12,7 @@ pytest-cov>=4.1.0
 pytest-xdist>=3.3.1
 
 # edit_install
-versioningit>=2.2.0
+versioningit>=3.3.0
 
 # For documentation requirements se docs/requirements.txt
 
