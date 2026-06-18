@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """Collection of cost functions to be used with distribution models."""
+
 from __future__ import annotations
 
 # Built-Ins

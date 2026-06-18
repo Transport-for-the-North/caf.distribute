@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """Tests for the gravity_model.single_area module"""
+
 from __future__ import annotations
 
 # Built-Ins
@@ -40,6 +41,7 @@ class GMCreator:
     cost_matrix: np.ndarray
     target_cost_distribution: cost_utils.CostDistribution
     running_log_path: os.PathLike
+    output_path: os.PathLike
 
     @staticmethod
     def _read_row_targets(home: pathlib.Path) -> np.ndarray:
@@ -114,6 +116,7 @@ class GMCreator:
             return gm.run_with_perceived_factors(
                 cost_params=cost_params,
                 running_log_path=self.running_log_path,
+                output_path=self.output_path,
                 target_cost_distribution=self.target_cost_distribution,
                 target_cost_convergence=target_convergence,
                 max_iters=furness_max_iters,
@@ -123,6 +126,7 @@ class GMCreator:
         return gm.run(
             cost_params=cost_params,
             running_log_path=self.running_log_path,
+            output_path=self.output_path,
             target_cost_distribution=self.target_cost_distribution,
             max_iters=furness_max_iters,
             tol=furness_tol,
@@ -152,6 +156,7 @@ class GMCreator:
             return gm.calibrate_with_perceived_factors(
                 init_params=init_params,
                 running_log_path=self.running_log_path,
+                output_path=self.output_path,
                 target_cost_distribution=self.target_cost_distribution,
                 diff_step=diff_step,
                 ftol=ftol,
@@ -166,6 +171,7 @@ class GMCreator:
         return gm.calibrate(
             init_params=init_params,
             running_log_path=self.running_log_path,
+            output_path=self.output_path,
             target_cost_distribution=self.target_cost_distribution,
             diff_step=diff_step,
             ftol=ftol,
@@ -229,6 +235,7 @@ class GMRunResults(GMCreator):
         cls,
         path: pathlib.Path,
         running_log_path: os.PathLike,
+        output_path: os.PathLike,
         cost_function: cost_functions.CostFunction,
     ) -> GMCreator:
         """Load data from files to create this test"""
@@ -236,6 +243,7 @@ class GMRunResults(GMCreator):
         return cls(
             cost_function=cost_function,
             running_log_path=running_log_path,
+            output_path=output_path,
             **cls.get_common_constructor_kwargs(path),
             **cls.get_specific_constructor_kwargs(calib_path),
         )
@@ -297,6 +305,7 @@ class GMCalibrateResults(GMRunResults):
         cls,
         path: pathlib.Path,
         running_log_path: os.PathLike,
+        output_path: os.PathLike,
         cost_function: cost_functions.CostFunction,
     ) -> GMCreator:
         """Load data from files to create this test"""
@@ -304,6 +313,7 @@ class GMCalibrateResults(GMRunResults):
         return cls(
             cost_function=cost_function,
             running_log_path=running_log_path,
+            output_path=output_path,
             **cls.get_common_constructor_kwargs(path),
             **cls.get_specific_constructor_kwargs(calib_path),
         )
@@ -318,6 +328,7 @@ class GMCalibratePerceivedResults(GMCalibrateResults):
         cls,
         path: pathlib.Path,
         running_log_path: os.PathLike,
+        output_path: os.PathLike,
         cost_function: cost_functions.CostFunction,
     ) -> GMCreator:
         """Load data from files to create this test"""
@@ -325,6 +336,7 @@ class GMCalibratePerceivedResults(GMCalibrateResults):
         return cls(
             cost_function=cost_function,
             running_log_path=running_log_path,
+            output_path=output_path,
             **cls.get_common_constructor_kwargs(path),
             **cls.get_specific_constructor_kwargs(calib_path),
         )
@@ -339,6 +351,7 @@ class GMRunPerceivedResults(GMRunResults):
         cls,
         path: pathlib.Path,
         running_log_path: os.PathLike,
+        output_path: os.PathLike,
         cost_function: cost_functions.CostFunction,
     ) -> GMCreator:
         """Load data from files to create this test"""
@@ -346,6 +359,7 @@ class GMRunPerceivedResults(GMRunResults):
         return cls(
             cost_function=cost_function,
             running_log_path=running_log_path,
+            output_path=output_path,
             **cls.get_common_constructor_kwargs(path),
             **cls.get_specific_constructor_kwargs(calib_path),
         )
@@ -355,10 +369,12 @@ class GMRunPerceivedResults(GMRunResults):
 def simple_gm_calib_results(tmp_path, cost_function) -> GMCalibrateResults:
     """Load in the small_and_simple test"""
     running_log_path = tmp_path / "run_log.csv"
+    output_path = tmp_path / "gm_results"
     data_path = TEST_DATA_PATH / "small_and_simple"
     results = GMCalibrateResults.from_file(
         path=data_path,
         running_log_path=running_log_path,
+        output_path=output_path,
         cost_function=cost_function,
     )
     # this is to stop MyPy moaning
@@ -369,10 +385,12 @@ def simple_gm_calib_results(tmp_path, cost_function) -> GMCalibrateResults:
 def real_gm_calib_results(tmp_path, cost_function) -> GMCalibrateResults:
     """Load in the real world test"""
     running_log_path = tmp_path / "run_log.csv"
+    output_path = tmp_path / "gm_results"
     data_path = TEST_DATA_PATH / "realistic"
     results = GMCalibrateResults.from_file(
         path=data_path,
         running_log_path=running_log_path,
+        output_path=output_path,
         cost_function=cost_function,
     )
     # this is to stop MyPy moaning
@@ -383,10 +401,12 @@ def real_gm_calib_results(tmp_path, cost_function) -> GMCalibrateResults:
 def real_gm_calib_perceived_results(tmp_path, cost_function) -> GMCalibratePerceivedResults:
     """Load in the real world test"""
     running_log_path = tmp_path / "run_log.csv"
+    output_path = tmp_path / "gm_results"
     data_path = TEST_DATA_PATH / "realistic"
     results = GMCalibratePerceivedResults.from_file(
         path=data_path,
         running_log_path=running_log_path,
+        output_path=output_path,
         cost_function=cost_function,
     )
     # this is to stop MyPy moaning
@@ -397,10 +417,12 @@ def real_gm_calib_perceived_results(tmp_path, cost_function) -> GMCalibratePerce
 def simple_gm_run_results(tmp_path, cost_function) -> GMRunResults:
     """Load in the small_and_simple test"""
     running_log_path = tmp_path / "run_log.csv"
+    output_path = tmp_path / "gm_results"
     data_path = TEST_DATA_PATH / "small_and_simple"
     results = GMRunResults.from_file(
         path=data_path,
         running_log_path=running_log_path,
+        output_path=output_path,
         cost_function=cost_function,
     )
     # this is to stop MyPy moaning
@@ -411,10 +433,12 @@ def simple_gm_run_results(tmp_path, cost_function) -> GMRunResults:
 def real_gm_run_results(tmp_path, cost_function) -> GMRunResults:
     """Load in the real world test"""
     running_log_path = tmp_path / "run_log.csv"
+    output_path = tmp_path / "gm_results"
     data_path = TEST_DATA_PATH / "realistic"
     results = GMRunResults.from_file(
         path=data_path,
         running_log_path=running_log_path,
+        output_path=output_path,
         cost_function=cost_function,
     )
     # this is to stop MyPy moaning
@@ -425,10 +449,12 @@ def real_gm_run_results(tmp_path, cost_function) -> GMRunResults:
 def real_gm_run_perceived_results(tmp_path, cost_function) -> GMRunPerceivedResults:
     """Load in the real world test"""
     running_log_path = tmp_path / "run_log.csv"
+    output_path = tmp_path / "gm_results"
     data_path = TEST_DATA_PATH / "realistic"
     results = GMRunPerceivedResults.from_file(
         path=data_path,
         running_log_path=running_log_path,
+        output_path=output_path,
         cost_function=cost_function,
     )
     # this is to stop MyPy moaning

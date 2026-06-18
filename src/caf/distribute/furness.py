@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """Furness functions for distributing vectors to matrices."""
+
 # Built-Ins
 import logging
 import operator
