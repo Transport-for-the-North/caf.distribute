@@ -179,7 +179,7 @@ class MultiCostDistribution:
     @classmethod
     def from_pandas(
         cls,
-        ordered_zones: pd.Series,
+        # ordered_zones: pd.Series,
         tld: pd.DataFrame,
         cat_zone_correspondence: pd.DataFrame,
         func_params: dict[int | str, dict[str, float]],
@@ -237,6 +237,8 @@ class MultiCostDistribution:
         `validate`
         """
         # pylint: disable=too-many-arguments
+        # order the TLD lookup by zone to ensure consistent ordering and indexing
+        cat_zone_correspondence = cat_zone_correspondence.sort_values(by=lookup_zone_col).reset_index(drop=True)
 
         distributions: list[MGMCostDistribution] = []
 
@@ -246,7 +248,7 @@ class MultiCostDistribution:
             distributions.append(
                 MGMCostDistribution.from_pandas(
                     category,
-                    pd.Series(ordered_zones),
+                    # pd.Series(ordered_zones),
                     tld,
                     cat_zone_correspondence,
                     func_params[category],
@@ -360,9 +362,10 @@ class MGMCostDistribution:
         A cost distribution in a CostDistribution class from toolkit. This
         will often be a trip-length distribution but cost can be in any units
         as long as they match the cost matrix
-    zones: np.ndarray
-        The zones this distribution applies to. This is NOT zone number, or zone
-        ID but the indices of the relevant zones in your cost matrix/target_rows
+    zones: pd.DataFrame
+        The zones this distribution applies to. This is zone number, or zone
+        ID which is take from cost_matrix. The zones.index can be used for 
+        array indexing
     function_params: dict[str,str]
         Initial parameters for your cost function to start guessing at. There
         is a method included for choosing these which hasn't yet been
@@ -375,7 +378,7 @@ class MGMCostDistribution:
 
     name: str
     cost_distribution: cost_utils.CostDistribution
-    zones: np.ndarray
+    zones: pd.DataFrame
     function_params: dict[str, float]
 
     # TODO(kf) validate params
@@ -385,7 +388,7 @@ class MGMCostDistribution:
     def from_pandas(
         cls,
         category: str,
-        ordered_zones: pd.Series,
+        # ordered_zones: pd.Series,
         tld: pd.DataFrame,
         cat_zone_correspondence: pd.DataFrame,
         func_params: dict[str, float],
@@ -443,20 +446,22 @@ class MGMCostDistribution:
 
         # get a list of zones that use this category of TLD
         cat_zones = cat_zone_correspondence.loc[
-            cat_zone_correspondence[lookup_cat_col] == category, lookup_zone_col
-        ].to_numpy()
+            cat_zone_correspondence[lookup_cat_col] == category, [lookup_zone_col]
+        ]
 
-        zones = ordered_zones.to_numpy()
+        # zones = ordered_zones.to_numpy()
+        zones = pd.DataFrame({'zone_id': cat_zone_correspondence[lookup_zone_col]})
 
         # tell user if we have zones in cat->lookup that arent in zones
-        if not np.all(np.isin(cat_zones, zones)):
-            missing_values = cat_zones[~np.isin(cat_zones, zones)]
+        if not np.all(np.isin(cat_zones[lookup_zone_col], zones['zone_id'])):
+            missing_values = cat_zones[~np.isin(cat_zones[lookup_zone_col], zones['zone_id'])]
             raise ValueError(
                 f"The following values from cat->zone lookup are not present in the tld zones: {missing_values}"
             )
 
         # get the indices
-        cat_zone_indices = np.where(np.isin(zones, cat_zones))[0]
+        # cat_zone_indices = np.where(np.isin(zones, cat_zones))[0]
+        # cat_zones_indices = cat_zones.index.to_numpy()
 
         # get tld for cat
         cat_tld = tld[tld[tld_cat_col] == category]
@@ -469,7 +474,7 @@ class MGMCostDistribution:
             trips_col=tld_trips_col,
         )
 
-        return cls(category, cat_cost_distribution, cat_zone_indices, func_params)
+        return cls(category, cat_cost_distribution, cat_zones, func_params)
 
 
 class MultiAreaGravityModelCalibrator(core.GravityModelBase):
@@ -488,7 +493,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         aiming to match. This can alternatively be thought of as the
         columns that wish to be distributed.
 
-    cost_matrix: np.ndarray
+    cost_matrix: pd.DataFrame
         A matrix detailing the cost between each and every zone. This
         matrix must be the same size as
         `(len(row_targets), len(col_targets))`.
@@ -503,14 +508,15 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         self,
         row_targets: np.ndarray,
         col_targets: np.ndarray,
-        cost_matrix: np.ndarray,
+        cost_matrix: pd.DataFrame,
         cost_function: cost_functions.CostFunction,
     ):
         super().__init__(cost_function=cost_function, cost_matrix=cost_matrix)
-
+        
         # This is to stop MyPy moaning
         self.achieved_distribution: np.ndarray
         self._loop_start_time: float
+        self._run_start_time: str
 
         if row_targets.sum() != col_targets.sum():
             warnings.warn(
@@ -519,9 +525,9 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             )
 
         checks = {
-            "cost matrix": cost_matrix,
             "row targets": row_targets,
             "column targets": col_targets,
+            "cost matrix": self.cost_matrix.to_numpy()
         }
 
         for name, data in checks.items():
@@ -568,14 +574,19 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         return np.concatenate(shares)
 
     def _create_seed_matrix(self, cost_distributions, cost_args, params_len):
-        base_mat = np.zeros_like(self.cost_matrix)
+        base_mat = pd.DataFrame(
+            np.zeros(self.cost_matrix.shape),
+            index=self.cost_matrix.index,
+            columns=self.cost_matrix.columns
+        )
         for i, dist in enumerate(cost_distributions):
             init_params = cost_args[i * params_len : i * params_len + params_len]
             init_params_kwargs = self._cost_params_to_kwargs(init_params)
+            current_zones = dist.zones.to_numpy().flatten()
             mat_slice = self.cost_function.calculate(
-                self.cost_matrix[dist.zones], **init_params_kwargs
+                self.cost_matrix.loc[current_zones, :].to_numpy(), **init_params_kwargs
             )
-            base_mat[dist.zones] = mat_slice
+            base_mat.loc[current_zones, :] = mat_slice
         return base_mat
 
     # pylint: disable=too-many-locals
@@ -583,6 +594,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         self,
         distributions: MultiCostDistribution,
         running_log_path: Path,
+        output_path: Path,
         gm_params: GMCalibParams,
         verbose: int = 0,
         **kwargs,
@@ -602,6 +614,9 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             distributions to use for the calibrations
         running_log_path: os.PathLike,
             path to a csv to log the model iterations and results
+        output_path: Path,
+            path to save the GM results, the folder gets created but throws an 
+            error if it exists and is not empty
         gm_params: GMCalibParams
             defines the detailed parameters, see `GMCalibParams` documentation for more info
         *args,
@@ -621,6 +636,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         """
 
         self._validate_running_log(running_log_path)
+        self._validate_output_path(output_path)
         self._initialise_internal_params()
 
         params_len = len(distributions[0].function_params)
@@ -635,8 +651,9 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             max_binning = dist.cost_distribution.max_vals.max()
             min_binning = dist.cost_distribution.min_vals.min()
 
-            max_cost = self.cost_matrix[dist.zones, :].max()
-            min_cost = self.cost_matrix[dist.zones, :].min()
+            current_zones = dist.zones.to_numpy().flatten()
+            max_cost = self.cost_matrix.loc[current_zones, :].max().max()
+            min_cost = self.cost_matrix.loc[current_zones, :].min().min()
 
             if max_cost > max_binning:
                 warnings.warn(
@@ -724,10 +741,16 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         assert self.achieved_cost_dist is not None
         results = {}
         for i, dist in enumerate(distributions):
+            current_zones = dist.zones.to_numpy().flatten()
+            current_zones_index = self.cost_matrix.index.get_indexer(current_zones)
             result_i = GravityModelResults(
                 cost_distribution=self.achieved_cost_dist[i],
                 cost_convergence=self.achieved_convergence[dist.name],
-                value_distribution=self.achieved_distribution[dist.zones],
+                value_distribution=pd.DataFrame(
+                    self.achieved_distribution[current_zones_index, :],
+                    index=current_zones,
+                    columns=self.cost_matrix.columns.to_numpy().flatten(),
+                ),
                 target_cost_distribution=dist.cost_distribution,
                 cost_function=self.cost_function,
                 cost_params=self._cost_params_to_kwargs(
@@ -736,6 +759,11 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             )
 
             results[dist.name] = result_i
+            # save results
+            save_path = os.path.join(output_path, dist.name)
+            # create each subfolder
+            os.makedirs(save_path)
+            result_i.save_gm_results(save_path=save_path)
         return results
 
     def _jacobian_function(
@@ -755,12 +783,13 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         jacobian = np.zeros((jac_length, jac_width))
         # Build seed matrix
         base_mat = self._create_seed_matrix(cost_distributions, init_params, params_len)
+        base_mat_values = base_mat.to_numpy()
         # Calculate net effect of furnessing (saves a lot of time on furnessing here)
         furness_factor = np.divide(
             self.achieved_distribution,
-            base_mat,
-            where=base_mat != 0,
-            out=np.zeros_like(base_mat),
+            base_mat_values,
+            where=base_mat_values != 0,
+            out=np.zeros_like(base_mat_values),
         )
         # Allows iteration of cost_distributions within a loop of cost_distributions
         inner_dists = cost_distributions.copy()
@@ -768,19 +797,20 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         for j, dist in enumerate(cost_distributions):
             distributions = init_params[j * params_len : j * params_len + params_len]
             init_params_kwargs = self._cost_params_to_kwargs(distributions)
+            current_zones = dist.zones.to_numpy().flatten()
             for i, cost_param in enumerate(self.cost_function.kw_order):
                 cost_step = init_params_kwargs[cost_param] * diff_step
                 adj_cost_kwargs = init_params_kwargs.copy()
                 adj_cost_kwargs[cost_param] += cost_step
                 adj_mat_slice = self.cost_function.calculate(
-                    self.cost_matrix[dist.zones], **adj_cost_kwargs
+                    self.cost_matrix.loc[current_zones, :].to_numpy(), **adj_cost_kwargs
                 )
                 adj_mat = base_mat.copy()
-                adj_mat[dist.zones] = adj_mat_slice
-                adj_dist = adj_mat * furness_factor
+                adj_mat.loc[current_zones, :] = adj_mat_slice
+                adj_dist_values = adj_mat.to_numpy() * furness_factor
                 if furness_jac:
-                    adj_dist, *_ = furness.doubly_constrained_furness(
-                        seed_vals=adj_dist,
+                    adj_dist_values, *_ = furness.doubly_constrained_furness(
+                        seed_vals=adj_dist_values,
                         row_targets=self.achieved_distribution.sum(axis=1),
                         col_targets=self.achieved_distribution.sum(axis=0),
                         tol=furness_tol / 10,
@@ -789,14 +819,16 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
                     )
                 test_res = []
                 for inner_dist in inner_dists:
+                    current_zones = inner_dist.zones.to_numpy().flatten()
+                    current_zones_index = self.cost_matrix.index.get_indexer(current_zones)
                     adj_cost_dist = cost_utils.CostDistribution.from_data(
-                        matrix=adj_dist[inner_dist.zones],
-                        cost_matrix=self.cost_matrix[inner_dist.zones],
+                        matrix=adj_dist_values[current_zones_index, :],
+                        cost_matrix=self.cost_matrix.loc[current_zones, :].to_numpy(),
                         bin_edges=inner_dist.cost_distribution.bin_edges,
                     )
                     act_cost_dist = cost_utils.CostDistribution.from_data(
-                        matrix=self.achieved_distribution[inner_dist.zones],
-                        cost_matrix=self.cost_matrix[inner_dist.zones],
+                        matrix=self.achieved_distribution[current_zones_index, :],
+                        cost_matrix=self.cost_matrix.loc[current_zones, :].to_numpy(),
                         bin_edges=inner_dist.cost_distribution.bin_edges,
                     )
                     test_res.append(
@@ -819,8 +851,8 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         del diff_step
 
         base_mat = self._create_seed_matrix(cost_distributions, init_params, params_len)
-        matrix, iters, rmse = furness.doubly_constrained_furness(
-            seed_vals=base_mat,
+        matrix_values, iters, rmse = furness.doubly_constrained_furness(
+            seed_vals=base_mat.to_numpy(),
             row_targets=self.row_targets,
             col_targets=self.col_targets,
             tol=furness_tol,
@@ -829,13 +861,15 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         distributions = []
         residuals = []
         for dist in cost_distributions:
+            current_zones = dist.zones.to_numpy().flatten()
+            current_zones_index = self.cost_matrix.index.get_indexer(current_zones)
             (
                 single_cost_distribution,
                 single_achieved_residuals,
                 single_convergence,
             ) = core.cost_distribution_stats(
-                achieved_trip_distribution=matrix[dist.zones],
-                cost_matrix=self.cost_matrix[dist.zones],
+                achieved_trip_distribution=matrix_values[current_zones_index, :],
+                cost_matrix=self.cost_matrix.loc[current_zones, :].to_numpy(),
                 target_cost_distribution=dist.cost_distribution,
             )
             convergences[dist.name] = single_convergence
@@ -850,13 +884,14 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         for i, dist in enumerate(cost_distributions):
             j = 0
             for name in dist.function_params.keys():
-                log_costs[f"{name}_{i}"] = init_params[params_len * i + j]
+                log_costs[f"{name}_{dist.name}"] = init_params[params_len * i + j]
                 j += 1
-            log_costs[f"convergence_{i}"] = convergences[dist.name]
+            log_costs[f"convergence_{dist.name}"] = convergences[dist.name]
 
         end_time = timing.current_milli_time()
         self._log_iteration(
             log_path=running_log_path,
+            run_start_time=self._run_start_time,
             attempt_id=self._attempt_id,
             loop_num=self._loop_num,
             loop_time=(end_time - self._loop_start_time) / 1000,
@@ -864,6 +899,8 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             furness_iters=iters,
             furness_rmse=rmse,
             convergence=float(np.mean(list(convergences.values()))),
+            min_con=float(min(list(convergences.values()))),
+            max_con=float(max(list(convergences.values())))
         )
 
         self._loop_num += 1
@@ -871,7 +908,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
 
         self.achieved_cost_dist: list[cost_utils.CostDistribution] = distributions
         self.achieved_convergence: dict[str, float] = convergences
-        self.achieved_distribution = matrix
+        self.achieved_distribution = matrix_values
 
         achieved_residuals = np.concatenate(residuals)
 
@@ -882,6 +919,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         self,
         distributions: MultiCostDistribution,
         running_log_path: Path,
+        output_path: Path,
         furness_tol: float = 1e-6,
     ) -> dict[str, GravityModelResults]:
         """
@@ -896,6 +934,9 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             Distributions to use to run the gravity model
         running_log_path : Path
             Csv path to log results and info
+        output_path: Path,
+            path to save the GM results, the folder gets created but throws an 
+            error if it exists and it not empty
         furness_tol : float, optional
             tolerance for difference in target and achieved value,
             at which to stop furnessing, by default 1e-6
@@ -905,6 +946,10 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         dict[str, GravityModelResults]
             The results of the gravity model run for each distribution
         """
+
+        self._validate_running_log(running_log_path)
+        self._validate_output_path(output_path)
+
         params_len = len(distributions[0].function_params)
         cost_args = []
         for dist in distributions:
@@ -922,11 +967,17 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         assert self.achieved_cost_dist is not None
         results = {}
         for i, dist in enumerate(distributions):
+            current_zones = dist.zones.to_numpy().flatten()
+            current_zones_index = self.cost_matrix.index.get_indexer(current_zones)
             result_i = GravityModelResults(
                 cost_distribution=self.achieved_cost_dist[i],
                 cost_convergence=self.achieved_convergence[dist.name],
                 target_cost_distribution=dist.cost_distribution,
-                value_distribution=self.achieved_distribution[dist.zones],
+                value_distribution=pd.DataFrame(
+                    self.achieved_distribution[current_zones_index, :],
+                    index=current_zones,
+                    columns=self.cost_matrix.columns.to_numpy().flatten()
+                ),
                 cost_function=self.cost_function,
                 cost_params=self._cost_params_to_kwargs(
                     cost_args[i * params_len : i * params_len + params_len]
@@ -934,6 +985,11 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             )
 
             results[dist.name] = result_i
+            # save results
+            save_path = os.path.join(output_path, dist.name)
+            # create each subfolder
+            os.makedirs(save_path)
+            result_i.save_gm_results(save_path=save_path)
         return results
 
 
@@ -1016,7 +1072,7 @@ def gravity_model(
 
     # Furness trips to trip ends
     matrix, iters, rmse = furness.doubly_constrained_furness(
-        seed_vals=seed_matrix.values,
+        seed_vals=seed_matrix.to_numpy(),
         row_targets=row_targets,
         col_targets=col_targets,
         tol=furness_tol,

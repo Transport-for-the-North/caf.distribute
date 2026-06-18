@@ -40,7 +40,7 @@ class GravityModelResults:
         This will be the same as calculating the convergence of
         `cost_distribution` and `target_cost_distribution`.
     """
-    value_distribution: np.ndarray
+    value_distribution: pd.DataFrame
     """The achieved distribution of the given values (usually trip values
         between different places).
     """
@@ -135,6 +135,80 @@ class GravityModelResults:
         output_params = self.cost_params.copy()
         output_params["convergence"] = self.cost_convergence
         return pd.Series(output_params)
+    
+    def save_gm_results(
+            self,
+            save_path: os.PathLike
+            ) -> None:
+        """Save the gravity model results to a provided location.
+
+        Parameters
+        ----------
+        self: dict[str, Any]
+            Dictionary of GravityModelResults, one per area type/category
+        save_path: os.PathLike
+            the path to save the results to
+        Returns
+        -------
+        Saves the results to CSV and PNG files in the provided location.
+
+        Raises
+        ------
+        ValueError
+            when no results are given
+        Exception
+            when there is an error extracting results for a given area type from results
+        """
+        
+        if not self:
+            raise ValueError("No results provided to save.")
+
+        # extract data from the GravityModelResults object
+        cost_outputs = pd.DataFrame({
+            'lower_bin_bound': self.cost_distribution.min_vals,
+            'upper_bin_bound': self.cost_distribution.max_vals,
+            'achieved_cost_distribution': self.cost_distribution.band_share_vals,
+            'target_cost_distribution': self.target_cost_distribution.band_share_vals
+            })
+        
+        # extract value distribution - this gets turned into a DataFrame
+        # with the filtered index (origins) and the same columns (destinations) as 
+        # the cost matrix for ease of use in comparison to the cost distribution
+        value_dist_output = self.value_distribution
+
+        # pull the summary output
+        summary_output = self.summary.to_frame(name='Value')
+
+        # create the comparison plot - there is error handling inside the method
+        tld_plot = self.plot_distributions()
+
+        # save the outputs to CSV
+        io.safe_dataframe_to_csv(
+            cost_outputs,
+            os.path.join(save_path, 'cost_distribution.csv'),
+            mode="w",
+            header=True,
+            index=False,
+        )
+        io.safe_dataframe_to_csv(
+            value_dist_output,
+            os.path.join(save_path, 'value_distribution.csv'),
+            mode="w",
+            header=True,
+            index=True,
+        )
+        io.safe_dataframe_to_csv(
+            summary_output,
+            os.path.join(save_path, 'summary.csv'),
+            mode="w",
+            header=True,
+            index=True,
+        )
+        
+        # save the comparison plot
+        tld_plot.savefig(os.path.join(save_path, 'tld_plot.png'))
+        plt.close(tld_plot)          
+
 
 
 class GravityModelBase(abc.ABC):
@@ -152,7 +226,7 @@ class GravityModelBase(abc.ABC):
     def __init__(
         self,
         cost_function: cost_functions.CostFunction,
-        cost_matrix: np.ndarray,
+        cost_matrix: pd.DataFrame,
         cost_min_max_buf: float = 0.1,
         unique_id: str = "",
     ):
@@ -166,7 +240,11 @@ class GravityModelBase(abc.ABC):
         self._attempt_id: int = -1
         self._loop_num: int = -1
         self._loop_start_time: float = -1.0
-        self._perceived_factors: np.ndarray = np.ones_like(self.cost_matrix)
+        self._perceived_factors: pd.DataFrame = pd.DataFrame(
+            np.ones(cost_matrix.shape), 
+            index=cost_matrix.index, 
+            columns=cost_matrix.columns
+        )
 
         # Additional attributes
         self.initial_cost_params: dict[str, Any] = dict()
@@ -176,7 +254,7 @@ class GravityModelBase(abc.ABC):
         self.achieved_cost_dist: (
             cost_utils.CostDistribution | list[cost_utils.CostDistribution] | None
         ) = None
-        self.achieved_distribution: np.ndarray = np.zeros_like(cost_matrix)
+        self.achieved_distribution: np.ndarray = np.zeros(cost_matrix.shape)
 
     @staticmethod
     def _tidy_unique_id(unique_id: str) -> str:
@@ -214,15 +292,40 @@ class GravityModelBase(abc.ABC):
                     f"Logs will be appended to the end of the file at: "
                     f"{running_log_path}"
                 )
+    
+    @staticmethod
+    def _validate_output_path(output_path: os.PathLike) -> None:
+        if output_path is None: 
+            raise ValueError("An output path must be provided to save results.")
+        
+        if os.path.exists(output_path):
+            # if exists, check if it's empty (so it's fine)
+            # if not empty, throw an error to avoid overwriting results
+            empty = True
+            for _ in os.scandir(output_path):
+                empty = False
+                break
+            if not empty:
+                raise FileExistsError(
+                    f"Cannot save results: path '{output_path}' already exists and is not empty. "
+                    "Please choose a different location."
+            )
+        else:
+            os.makedirs(output_path)
 
     def _initialise_internal_params(self) -> None:
         """Set running params to their default values for a run."""
         self._attempt_id = 1
         self._loop_num = 1
         self._loop_start_time = timing.current_milli_time()
+        self._run_start_time = timing.get_datetime()
         self.initial_cost_params = dict()
         self.initial_convergence = 0
-        self._perceived_factors = np.ones_like(self.cost_matrix)
+        self._perceived_factors = pd.DataFrame(
+            np.ones(self.cost_matrix.shape),
+            index=self.cost_matrix.index,
+            columns=self.cost_matrix.columns
+        )
 
     def _cost_params_to_kwargs(self, args: list[Any]) -> dict[str, Any]:
         """Convert a list of args into kwargs that self.cost_function expects."""
@@ -318,6 +421,7 @@ class GravityModelBase(abc.ABC):
     @staticmethod
     def _log_iteration(
         log_path: os.PathLike,
+        run_start_time: str,
         attempt_id: int,
         loop_num: int,
         loop_time: float,
@@ -325,6 +429,8 @@ class GravityModelBase(abc.ABC):
         furness_iters: int,
         furness_rmse: float,
         convergence: float,
+        min_con: float,
+        max_con: float
     ) -> None:
         """Write data from an iteration to a log file.
 
@@ -332,6 +438,10 @@ class GravityModelBase(abc.ABC):
         ----------
         log_path:
             Path to the file to write the log to. Should be a csv file.
+        
+        run_start_time:
+            The datetime string when the run started. Helps identify which run
+            the record belongs to as multiple runs could be appended to the same file.
 
         attempt_id:
             Identifier indicating which section of a run / calibration the
@@ -356,12 +466,19 @@ class GravityModelBase(abc.ABC):
         convergence:
             The achieved convergence values of the curve produced in this
             iteration.
+        
+        min_con:
+            The minimum convergence value across all area types.
+        
+        max_con:
+            The maximum convergence value across all area types.
 
         Returns
         -------
         None
         """
         log_dict = {
+            "run_start_time": str(run_start_time),
             "attempt_id": str(attempt_id),
             "loop_number": str(loop_num),
             "runtime (s)": loop_time / 1000,
@@ -372,6 +489,8 @@ class GravityModelBase(abc.ABC):
                 "furness_iters": furness_iters,
                 "furness_rmse": np.round(furness_rmse, 6),
                 "bs_con": np.round(convergence, 4),
+                "min_con": np.round(min_con, 4),
+                "max_con": np.round(max_con, 4)
             }
         )
 
@@ -413,24 +532,35 @@ class GravityModelBase(abc.ABC):
         perc_factors = np.clip(perc_factors, 0.5, 2)
 
         # Initialise loop
-        perc_factors_mat = np.ones_like(self.cost_matrix)
+        perc_factors_mat = pd.DataFrame(
+            np.ones(self.cost_matrix.shape),
+            index=self.cost_matrix.index,
+            columns=self.cost_matrix.columns
+        )
         min_vals = target_cost_distribution.min_vals
         max_vals = target_cost_distribution.max_vals
 
         # Convert factors to matrix resembling the cost matrix
         for min_val, max_val, factor in zip(min_vals, max_vals, perc_factors):
             distance_mask = (self.cost_matrix >= min_val) & (self.cost_matrix < max_val)
-            perc_factors_mat = np.multiply(
-                perc_factors_mat,
-                factor,
-                where=distance_mask,
-                out=perc_factors_mat,
-            )
+            perc_factors_mat = perc_factors_mat.where(~distance_mask, perc_factors_mat * factor)
 
         # Assign to class attribute
         self._perceived_factors = perc_factors_mat
 
-    def _apply_perceived_factors(self, cost_matrix: np.ndarray) -> np.ndarray:
+    def _apply_perceived_factors(self, cost_matrix: pd.DataFrame) -> pd.DataFrame:
+        """Apply perceived factors to cost matrix.
+        
+        Parameters
+        ----------
+        cost_matrix : pd.DataFrame
+            Cost matrix to apply factors to
+            
+        Returns
+        -------
+        pd.DataFrame
+            Cost matrix with perceived factors applied
+        """
         return cost_matrix * self._perceived_factors
 
     def _guess_init_params(
