@@ -152,7 +152,7 @@ class GravityModelBase(abc.ABC):
     def __init__(
         self,
         cost_function: cost_functions.CostFunction,
-        cost_matrix: np.ndarray,
+        cost_matrix: pd.DataFrame,
         cost_min_max_buf: float = 0.1,
         unique_id: str = "",
     ):
@@ -430,7 +430,7 @@ class GravityModelBase(abc.ABC):
         # Assign to class attribute
         self._perceived_factors = perc_factors_mat
 
-    def _apply_perceived_factors(self, cost_matrix: np.ndarray) -> np.ndarray:
+    def _apply_perceived_factors(self, cost_matrix: pd.DataFrame) -> pd.DataFrame:
         return cost_matrix * self._perceived_factors
 
     def _guess_init_params(
@@ -485,7 +485,7 @@ class GravityModelBase(abc.ABC):
 # # # FUNCTIONS # # #
 def cost_distribution_stats(
     achieved_trip_distribution: np.ndarray,
-    cost_matrix: np.ndarray,
+    cost_matrix: pd.DataFrame,
     target_cost_distribution: Optional[cost_utils.CostDistribution] = None,
 ) -> tuple[cost_utils.CostDistribution, np.ndarray, float]:
     """Generate standard stats for a cost distribution performance.
