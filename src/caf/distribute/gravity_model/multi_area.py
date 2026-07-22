@@ -827,6 +827,7 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         furness_jac: bool,
         running_log_path: Path,
         params_len: int,
+        **_,
     ):
         del running_log_path
         # Build empty jacobian matrix
