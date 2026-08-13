@@ -43,6 +43,7 @@ class DistributeConf(BaseConfig):
 
     Attributes - data types are defined in code, descriptions are provided in comments
     ----------
+    internal_only: Flag indicating whether to restrict processing to internal zones only.
     mode_subset : Subset of modes to include in the run.
     timeperiod_subset : Subset of time periods to include in the run.
     purpose_subset : Subset of purposes to include in the run.
@@ -60,6 +61,7 @@ class DistributeConf(BaseConfig):
     max_process : Maximum number of processes for parallel execution.
     """
 
+    internal_only: bool
     mode_subset: int | list[int]
     timeperiod_subset: int | list[int]
     purpose_subset: int | list[int]
@@ -238,11 +240,11 @@ def _4d_constraint_gravity_model(
         # change from meters to kms to match tld
         cost_index = cost.data.index
         cost_columns = cost.data.columns
-        cost_infill = pd.DataFrame(utils.infill_cost_matrix(cost.data.to_numpy()))
+        cost_infill = pd.DataFrame(utils.infill_cost_matrix(cost.data.to_numpy(), diag_factor=0.4 ))
         cost_infill.index = cost_index
         cost_infill.columns = cost_columns
-        cost.data = cost_infill / 1000
- 
+        cost.data = cost_infill # / 1000  # only use this / 1000 if costs are in meters
+  
         tld = pd.read_csv(tlds[current_slice.aggregate(["p", "direction_od"]).generate_name()])
         tld["from"] = tld["trav_dist"].shift().fillna(0)
         tld.loc[tld["from"] > tld["trav_dist"], "from"] = 0
@@ -338,6 +340,11 @@ def main(cfg: DistributeConf):
         tld_lookup = pd.read_csv(cfg.tld_lookup_path)
         zoning = cb.ZoningSystem.get_zoning(cfg.zone_system)
 
+        if cfg.internal_only:
+            # filter on cumbria_local_id being between 1000000 and 2000000 (2... and 3... are buffer and external zones)
+            tld_lookup = tld_lookup[(tld_lookup["cumbria_local_id"] >= 1000000) & (tld_lookup["cumbria_local_id"] < 2000000)]
+            zoning = zoning.to_internal()
+
         # z2s_cfg removed
 
         # --- Split p into HB and NHB -----------------------------------------------
@@ -369,7 +376,7 @@ def main(cfg: DistributeConf):
             MatrixType.OD,
             pathlib.Path(cost_cfg["folder_path"]),
             filename_template=cost_cfg["filename_template"],
-        )
+       )
 
         # --- TLD files -------------------------------------------------------------
         tld_cfg = cfg.tld_files
@@ -395,8 +402,16 @@ def main(cfg: DistributeConf):
         te_cfg = cfg.trip_ends
         dvec_map = {}
         if 0 in direction_od_list:
+            prod_nhb = cb.DVector.load(te_cfg["prod_nhb"])
+            attr_nhb = cb.DVector.load(te_cfg["attr_nhb"])
+            if cfg.internal_only:
+                # Filter on internal zones, and keep only one zoning system in order to balance trip ends
+                prod_nhb = cb.DVector(segmentation=prod_nhb.segmentation, import_data=prod_nhb.data, zoning_system=zoning)
+                prod_nhb = prod_nhb.to_internal(zone_name=zoning.name)
+                attr_nhb = cb.DVector(segmentation=attr_nhb.segmentation, import_data=attr_nhb.data, zoning_system=zoning)
+                attr_nhb = attr_nhb.to_internal(zone_name=zoning.name).balance_by_segments(prod_nhb)
             prod_nhb = (
-                cb.DVector.load(te_cfg["prod_nhb"])
+                prod_nhb
                 .aggregate(["p", "m", "tp"])
                 .filter_segment_value("p", nhb_p_subset, keep_filtered=True)
                 .filter_segment_value("m", m_subset, keep_filtered=True)
@@ -404,7 +419,7 @@ def main(cfg: DistributeConf):
                 .aggregate_comp_zones(zoning)
             )
             attr_nhb = (
-                cb.DVector.load(te_cfg["attr_nhb"])
+                attr_nhb
                 .aggregate(["p", "m", "tp"])
                 .filter_segment_value("p", nhb_p_subset, keep_filtered=True)
                 .filter_segment_value("m", m_subset, keep_filtered=True)
@@ -413,8 +428,16 @@ def main(cfg: DistributeConf):
             )
             dvec_map[0] = (prod_nhb, attr_nhb)
         if 1 in direction_od_list:
+            hb_prod_fr = cb.DVector.load(te_cfg["hb_prod_fr"])
+            hb_attr_fr = cb.DVector.load(te_cfg["hb_attr_fr"])
+            if cfg.internal_only:
+                # Filter on internal zones, and keep only one zoning system in order to balance trip ends
+                hb_prod_fr = cb.DVector(segmentation=hb_prod_fr.segmentation, import_data=hb_prod_fr.data, zoning_system=zoning)
+                hb_prod_fr = hb_prod_fr.to_internal(zone_name=zoning.name)
+                hb_attr_fr = cb.DVector(segmentation=hb_attr_fr.segmentation, import_data=hb_attr_fr.data, zoning_system=zoning)
+                hb_attr_fr = hb_attr_fr.to_internal(zone_name=zoning.name).balance_by_segments(hb_prod_fr)
             hb_prod_fr = (
-                cb.DVector.load(te_cfg["hb_prod_fr"])
+                hb_prod_fr
                 .aggregate(["p", "m", "tp"])
                 .filter_segment_value("p", hb_p_subset, keep_filtered=True)
                 .filter_segment_value("m", m_subset, keep_filtered=True)
@@ -422,7 +445,7 @@ def main(cfg: DistributeConf):
                 .aggregate_comp_zones(zoning)
             )
             hb_attr_fr = (
-                cb.DVector.load(te_cfg["hb_attr_fr"])
+                hb_attr_fr
                 .aggregate(["p", "m", "tp"])
                 .filter_segment_value("p", hb_p_subset, keep_filtered=True)
                 .filter_segment_value("m", m_subset, keep_filtered=True)
@@ -431,8 +454,16 @@ def main(cfg: DistributeConf):
             )
             dvec_map[1] = (hb_prod_fr, hb_attr_fr)
         if 2 in direction_od_list:
+            hb_prod_to = cb.DVector.load(te_cfg["hb_prod_to"])
+            hb_attr_to = cb.DVector.load(te_cfg["hb_attr_to"])
+            if cfg.internal_only:
+                # Filter on internal zones, and keep only one zoning system in order to balance trip ends
+                hb_prod_to = cb.DVector(segmentation=hb_prod_to.segmentation, import_data=hb_prod_to.data, zoning_system=zoning)
+                hb_prod_to = hb_prod_to.to_internal(zone_name=zoning.name)
+                hb_attr_to = cb.DVector(segmentation=hb_attr_to.segmentation, import_data=hb_attr_to.data, zoning_system=zoning)
+                hb_attr_to = hb_attr_to.to_internal(zone_name=zoning.name).balance_by_segments(hb_prod_to)
             hb_prod_to = (
-                cb.DVector.load(te_cfg["hb_prod_to"])
+                hb_prod_to
                 .aggregate(["p", "m", "tp"])
                 .filter_segment_value("p", hb_p_subset, keep_filtered=True)
                 .filter_segment_value("m", m_subset, keep_filtered=True)
@@ -440,7 +471,7 @@ def main(cfg: DistributeConf):
                 .aggregate_comp_zones(zoning)
             )
             hb_attr_to = (
-                cb.DVector.load(te_cfg["hb_attr_to"])
+                hb_attr_to
                 .aggregate(["p", "m", "tp"])
                 .filter_segment_value("p", hb_p_subset, keep_filtered=True)
                 .filter_segment_value("m", m_subset, keep_filtered=True)
