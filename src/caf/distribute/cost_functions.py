@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 """Collection of cost functions to be used with distribution models."""
-
 from __future__ import annotations
 
 # Built-Ins
@@ -12,6 +11,7 @@ from typing import Any, Callable, Mapping, Optional
 
 # Third Party
 import numpy as np
+import pandas as pd
 
 # pylint: disable=import-error,wrong-import-position
 from caf.toolkit import math_utils
@@ -29,6 +29,7 @@ class BuiltInCostFunction(enum.Enum):
 
     TANNER = "tanner"
     LOG_NORMAL = "log_normal"
+    GAUSSIAN = "gaussian"
 
     def get_cost_function(self) -> CostFunction:
         """Get the Class defining this cost function."""
@@ -46,6 +47,14 @@ class BuiltInCostFunction(enum.Enum):
                 params={"sigma": (0, 5), "mu": (0, 10)},
                 default_params={"sigma": 1, "mu": 2},
                 function=log_normal,
+            )
+
+        if self == BuiltInCostFunction.GAUSSIAN:
+            return CostFunction(
+                name=self.name,
+                params={"sigma": (0, 4), "power": (1, 4)},
+                default_params={"sigma": 0.5, "power": 2},
+                function=gaussian,
             )
 
         raise ValueError(f"No definition exists for {self} built in cost function")
@@ -87,7 +96,7 @@ class CostFunction:
 
         # Validate the params and cost function
         try:
-            self.function(np.array(1e-2), **self.param_max)
+            self.function(pd.DataFrame([[1e-2]]), **self.param_max)
         except TypeError as exc:
             raise ValueError(
                 f"Received a TypeError while testing the given params "
@@ -154,7 +163,7 @@ class CostFunction:
             return_val[name] = random.uniform(self.param_min[name], self.param_max[name])
         return return_val
 
-    def calculate(self, base_cost: np.ndarray, **kwargs) -> np.ndarray:
+    def calculate(self, base_cost: pd.DataFrame, **kwargs) -> pd.DataFrame:
         """Calculate the actual cost using self.function.
 
         Before calling the cost function the given cost function params will
@@ -310,3 +319,64 @@ def log_normal(
     exp = np.exp(-exp_numerator / exp_denominator)
 
     return np.maximum(frac * exp, min_return_val)
+
+
+def gaussian(
+    base_cost: np.ndarray,
+    sigma: float,
+    power: float,
+    min_return_val: float = 1e-150,
+) -> np.ndarray:
+    """
+    Apply a Gaussian cost decay function.
+
+    Parameters
+    ----------
+    base_cost : np.ndarray
+        Array of the base costs.
+
+    sigma : float
+        Dispersion parameter controlling Gaussian width.
+
+    power : float
+        Exponent applied to cost before the exponential term.
+
+    min_return_val : float, optional
+        Minimum allowed return value.
+
+    Returns
+    -------
+    np.ndarray
+        Array of Gaussian-decayed cost values.
+    """
+
+    # Validate numeric inputs
+    math_utils.check_numeric({"sigma": sigma, "power": power})
+
+    sigma = 100 * sigma
+
+    sigma = float(sigma)
+    power = float(power)
+
+    if sigma == 0:
+        raise ValueError("sigma must be non-zero for Gaussian decay.")
+    
+    # cost^power but safe for zeros
+    cost_power = np.power(
+        base_cost,
+        power,
+        where=base_cost != 0,
+        out=np.zeros_like(base_cost, dtype=float),
+    )
+
+    # Gaussian exponential
+    exp_term = np.exp(-cost_power / (2 * sigma**2))
+
+    # Apply minimum threshold
+    exp_term = np.maximum(exp_term, min_return_val)
+
+    exp_term[base_cost == 0] = 0
+
+    ## Return as DataFrame with same structure
+    # return pd.DataFrame(exp_term, index=base_cost.index, columns=base_cost.columns)
+    return exp_term
