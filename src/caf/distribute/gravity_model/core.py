@@ -336,6 +336,60 @@ class GravityModelBase(abc.ABC):
         else:
             os.makedirs(output_path)
 
+    @staticmethod
+    def _apply_relative_costs(
+        seed_mat: np.ndarray,
+        main_mode_costs: np.ndarray,
+        alternate_mode_costs: np.ndarray,
+        steepness: float=1.0
+                              ):
+        """
+        Adjust seed matrix based on the ration between cost matrix, and some alternate costs.
+
+        This is written to adjust seed matrices for rail distributions, taking into account 
+        the cost relative to car costs, so that where car costs are lower than rail for an OD pair, 
+        rail trips are suppressed, and vice versa. This could potentially be used for other similar 
+        situations.
+
+        _extended_summary_
+
+        Parameters
+        ----------
+        seed_mat : np.ndarray
+            The seed matrix to be adjusted.
+        main_mode_costs : np.ndarray
+            The costs being used in this gravity model run.
+        alternate_mode_costs : np.ndarray
+            The costs of an alternate mode, e.g. car where main mode is rail.
+        steepness : float=1.0,
+            The steepness of adjustment, where zero means no adjustment. Should be between 0 and 5 
+            usually, where 5 is quite steep, and going much more than that approaches a step function.
+        """
+        def adj_rational(a, b, p=1.0, zero_over_zero=1.0):
+            """
+            f(r) = 2 r^p / (1 + r^p), r = a/b
+            Range: [0, 2], with f(1)=1
+            p>1 steeper, 0<p<1 gentler
+            """
+            def safe_ratio(a, b, zero_over_zero=1.0):
+                """
+                Elementwise ratio r = a / b with explicit handling:
+                - b == 0 and a > 0  -> +inf
+                - b == 0 and a == 0 -> zero_over_zero (default 1.0)
+                Assumes a, b are nonnegative.
+                """
+                a = np.asarray(a, dtype=float)
+                b = np.asarray(b, dtype=float)
+
+                r = np.divide(a, b, out=np.full_like(a, np.inf), where=(b != 0))
+                r = np.where((a == 0) & (b == 0), zero_over_zero, r)
+                return r
+            r = safe_ratio(a, b, zero_over_zero=zero_over_zero)
+            rp = np.power(r, p)
+            return 2.0 * rp / (1.0 + rp)
+        factors = adj_rational(alternate_mode_costs, main_mode_costs, p=steepness)
+        return seed_mat * factors
+
     def _initialise_internal_params(self) -> None:
         """Set running params to their default values for a run."""
         self._attempt_id = 1
