@@ -606,7 +606,14 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             shares.append(dist.band_share_vals)
         return np.concatenate(shares)
 
-    def _create_seed_matrix(self, cost_distributions, cost_args, params_len):
+    def _create_seed_matrix(
+        self,
+        cost_distributions,
+        cost_args,
+        params_len,
+        alternate_cost_matrix: Optional[np.ndarray] = None,
+        relative_cost_steepness: float = 1.0,
+    ):
         base_mat = np.zeros_like(self.cost_matrix)
         zones = []
         for i, dist in enumerate(cost_distributions):
@@ -617,6 +624,15 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             )
             zones += list(dist.zones)
             base_mat[dist.zones.index] = mat_slice
+
+        if alternate_cost_matrix is not None:
+            base_mat = self._apply_relative_costs(
+                seed_mat=base_mat,
+                main_mode_costs=self.cost_matrix,
+                alternate_mode_costs=alternate_cost_matrix,
+                steepness=relative_cost_steepness,
+            )
+
         # seed vals must be zero where targets are zero for furnessing to work.
         base_mat[np.where(self.row_targets == 0), :] = 0
         base_mat[:, np.where(self.col_targets == 0)] = 0
@@ -629,6 +645,8 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         running_log_path: Path,
         output_path: Path,
         gm_params: GMCalibParams,
+        alternate_cost_matrix: pd.DataFrame | np.ndarray | None = None,
+        relative_cost_steepness: float = 1.0,
         return_distributions: bool = False,
         four_d_inputs: furness.SectoralConstraintInputs | None = None,
         verbose: int = 0,
@@ -651,6 +669,11 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             path to a csv to log the model iterations and results
         output_path: Path,
             path to save the GM results, the folder gets created but throws an error if it exists
+        alternate_cost_matrix: pd.DataFrame | np.ndarray | None = None
+            Optional alternate costs to apply as a relative adjustment to
+            the generated seed matrix.
+        relative_cost_steepness: float = 1.0
+            Steepness used when applying relative costs.
         return_distributions: bool = True
             Whether to update the input distributions with the best params found,
             and return.
@@ -673,6 +696,20 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         """
 
         self._validate_running_log(running_log_path)
+
+        alt_cost_matrix_array: Optional[np.ndarray] = None
+        if alternate_cost_matrix is not None:
+            if isinstance(alternate_cost_matrix, pd.DataFrame):
+                alt_cost_matrix_array = alternate_cost_matrix.to_numpy()
+            else:
+                alt_cost_matrix_array = np.asarray(alternate_cost_matrix)
+
+            if alt_cost_matrix_array.shape != self.cost_matrix.shape:
+                raise ValueError(
+                    "alternate_cost_matrix shape does not match cost_matrix. "
+                    f"Expected {self.cost_matrix.shape}, got {alt_cost_matrix_array.shape}."
+                )
+
         self._validate_output_path(output_path)
         self._initialise_internal_params()
 
@@ -718,6 +755,8 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
             "furness_jac": gm_params.furness_jac,
             "furness_tol": gm_params.furness_tol,
             "four_d_inputs": four_d_inputs,
+            "alternate_cost_matrix": alt_cost_matrix_array,
+            "relative_cost_steepness": relative_cost_steepness,
         }
         optimise_cost_params = functools.partial(
             optimize.least_squares,
@@ -827,6 +866,8 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         furness_jac: bool,
         running_log_path: Path,
         params_len: int,
+        alternate_cost_matrix: Optional[np.ndarray] = None,
+        relative_cost_steepness: float = 1.0,
         **_,
     ):
         del running_log_path
@@ -835,7 +876,13 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         jac_width = len(cost_distributions) * params_len
         jacobian = np.zeros((jac_length, jac_width))
         # Build seed matrix
-        base_mat = self._create_seed_matrix(cost_distributions, init_params, params_len)
+        base_mat = self._create_seed_matrix(
+            cost_distributions,
+            init_params,
+            params_len,
+            alternate_cost_matrix=alternate_cost_matrix,
+            relative_cost_steepness=relative_cost_steepness,
+        )
         # Calculate net effect of furnessing (saves a lot of time on furnessing here)
         furness_factor = np.divide(
             self.achieved_distribution,
@@ -858,6 +905,18 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
                 )
                 adj_mat = base_mat.copy()
                 adj_mat[dist.zones.index] = adj_mat_slice
+                if alternate_cost_matrix is not None:
+                    adj_mat = self._apply_relative_costs(
+                        seed_mat=adj_mat,
+                        main_mode_costs=self.cost_matrix,
+                        alternate_mode_costs=alternate_cost_matrix,
+                        steepness=relative_cost_steepness,
+                    )
+
+                # Seed values must remain zero where the targets are zero.
+                adj_mat[np.where(self.row_targets == 0), :] = 0
+                adj_mat[:, np.where(self.col_targets == 0)] = 0
+
                 adj_dist = adj_mat * furness_factor
                 if furness_jac:
                     adj_dist, *_ = furness.doubly_constrained_furness(
@@ -896,11 +955,19 @@ class MultiAreaGravityModelCalibrator(core.GravityModelBase):
         params_len: int,
         diff_step: int = 0,
         four_d_inputs: Optional[furness.SectoralConstraintInputs] = None,
+        alternate_cost_matrix: Optional[np.ndarray] = None,
+        relative_cost_steepness: float = 1.0,
         **_,
     ):
         del diff_step
 
-        base_mat = self._create_seed_matrix(cost_distributions, init_params, params_len)
+        base_mat = self._create_seed_matrix(
+            cost_distributions,
+            init_params,
+            params_len,
+            alternate_cost_matrix=alternate_cost_matrix,
+            relative_cost_steepness=relative_cost_steepness,
+        )
         if four_d_inputs is not None:
             furness_inputs = furness.FurnessInputs(
                 seed_vals=base_mat,
