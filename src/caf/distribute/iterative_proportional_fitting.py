@@ -369,12 +369,15 @@ def default_convergence(
             f"targets length: {len(targets)}, achieved length: {len(achieved)}"
         )
 
-    max_conv = 0
+    max_conv = 0.0
     for target, ach in zip(targets, achieved):
-        conv = np.max(abs((ach / target) - 1))
+        # Convert sparse inputs to dense arrays so convergence is always numeric.
+        target_arr = np.asarray(target.todense() if hasattr(target, "todense") else target)
+        ach_arr = np.asarray(ach.todense() if hasattr(ach, "todense") else ach)
+        conv = float(np.max(np.abs((ach_arr / target_arr) - 1)))
         max_conv = max(max_conv, conv)
 
-    return max_conv
+    return float(max_conv)
 
 
 def pd_marginals_to_np(
@@ -586,7 +589,7 @@ def adjust_towards_aggregates(
         sum_axes = tuple(set(range(n_dims)) - set(dimensions))
         achieved_aggregates.append(out_mat.sum(axis=sum_axes))
 
-    return out_mat, convergence_fn(target_marginals, achieved_aggregates)
+    return out_mat, float(convergence_fn(target_marginals, achieved_aggregates))
 
 
 # Sparse doesn't handle DIV/0 very well
@@ -669,7 +672,7 @@ def sparse_adjust_towards_aggregates(
         sum_axes = tuple(set(range(n_dims)) - set(dimensions))
         achieved_aggregates.append(array_utils.sparse_sum(sparse_array=out_mat, axis=sum_axes))
 
-    return out_mat, convergence_fn(target_marginals, achieved_aggregates)
+    return out_mat, float(convergence_fn(target_marginals, achieved_aggregates))
 
 
 def ipf_dataframe(

@@ -30,10 +30,10 @@ def fixture_code_costs():
 
 @pytest.fixture(name="infilled_expected", scope="session")
 def fix_infilled_exp(cost_from_code):
-    mat = cost_from_code.values
+    mat = cost_from_code.to_numpy(copy=True)
     np.fill_diagonal(mat, 101)
-    min = np.min(mat, axis=1)
-    np.fill_diagonal(mat, min / 2)
+    min_vals = np.min(mat, axis=1)
+    np.fill_diagonal(mat, min_vals / 2)
     return mat
 
 
@@ -152,17 +152,14 @@ def fixture_jac_furn(data_dir, mock_dir):
 
 
 @pytest.fixture(name="multi_tld", scope="session")
-def _multi_tld(data_dir, mock_dir):
+def _multi_tld(data_dir):
     tld_lookup = pd.read_csv(data_dir / "distributions_lookup.csv")
-
-    ordered_zones = tld_lookup["zone"]
 
     func_parameters = {}
     for cat in tld_lookup["cat"].unique():
         func_parameters[cat] = {"mu": 1, "sigma": 2}
 
     multitld = gm.MultiCostDistribution.from_pandas(
-        # ordered_zones,
         pd.read_csv(data_dir / "distributions.csv"),
         tld_lookup,
         func_parameters,
@@ -239,7 +236,9 @@ class TestUtils:
     # TODO(IS) only one test currently so leaving in this file
     def test_infill_costs(self, infilled_from_code, infilled_expected):
         """Test the method to infill a cost matrix (mainly intrazonal costs)"""
-        assert np.array_equal(np.round(infilled_expected, 3), np.round(infilled_from_code, 3))
+        expected = np.asarray(infilled_expected)
+        achieved = np.asarray(infilled_from_code)
+        assert np.array_equal(np.round(expected, 3), np.round(achieved, 3))
 
 
 class TestDist:
@@ -279,4 +278,4 @@ class TestResults:
     def test_cellular(self, cal_furness, area, precision, data_dir):
         cal_results = cal_furness[area].value_distribution
         check = pd.read_csv(data_dir / "results" / f"{area.lower()}.csv", index_col=0).values
-        np.testing.assert_allclose(check, cal_results, rtol=precision)
+        np.testing.assert_allclose(check, cal_results.to_numpy(), rtol=precision)

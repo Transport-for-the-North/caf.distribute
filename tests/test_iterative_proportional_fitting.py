@@ -22,6 +22,15 @@ from caf.distribute import iterative_proportional_fitting
 # # # CONSTANTS # # #
 
 
+def _as_numpy(value: Any) -> np.ndarray:
+    """Convert supported array-likes to dense NumPy arrays for assertions."""
+    if hasattr(value, "to_numpy"):
+        return np.asarray(value.to_numpy())
+    if hasattr(value, "todense"):
+        return np.asarray(value.todense())
+    return np.asarray(value)
+
+
 # # # Classes # # #
 @dataclasses.dataclass
 class IpfData:
@@ -521,7 +530,11 @@ class TestIpf:
         )
 
         # Check the results
-        np_testing.assert_allclose(mat, ipf_rmse_example_results.final_matrix, rtol=1e-4)
+        np_testing.assert_allclose(
+            _as_numpy(mat),
+            _as_numpy(ipf_rmse_example_results.final_matrix),
+            rtol=1e-4,
+        )
         assert iters == ipf_rmse_example_results.completed_iters
         np.testing.assert_almost_equal(conv, ipf_rmse_example_results.final_convergence)
 
@@ -533,7 +546,11 @@ class TestIpf:
         )
 
         # Check the results
-        np_testing.assert_allclose(mat, ipf_ipfn_example_results.final_matrix, rtol=1e-4)
+        np_testing.assert_allclose(
+            _as_numpy(mat),
+            _as_numpy(ipf_ipfn_example_results.final_matrix),
+            rtol=1e-4,
+        )
         assert iters == ipf_ipfn_example_results.completed_iters
         np.testing.assert_almost_equal(conv, ipf_ipfn_example_results.final_convergence)
 
@@ -545,7 +562,11 @@ class TestIpf:
         )
 
         # Check the results
-        np_testing.assert_allclose(mat, ipf_invalid_combos_results.final_matrix, rtol=1e-4)
+        np_testing.assert_allclose(
+            _as_numpy(mat),
+            _as_numpy(ipf_invalid_combos_results.final_matrix),
+            rtol=1e-4,
+        )
         assert iters == ipf_invalid_combos_results.completed_iters
         np.testing.assert_almost_equal(conv, ipf_invalid_combos_results.final_convergence)
 
@@ -568,7 +589,7 @@ class TestIpf:
             )
 
         # Check the results
-        np_testing.assert_allclose(mat, target_mat, rtol=1e-4)
+        np_testing.assert_allclose(_as_numpy(mat), _as_numpy(target_mat), rtol=1e-4)
         assert iters == target_iters
         np.testing.assert_almost_equal(conv, target_conv)
 
@@ -586,7 +607,7 @@ class TestIpf:
             )
 
         # Check the results
-        np_testing.assert_allclose(mat, target_mat, rtol=1e-4)
+        np_testing.assert_allclose(_as_numpy(mat), _as_numpy(target_mat), rtol=1e-4)
         assert iters == target_iters
         np.testing.assert_almost_equal(conv, target_conv)
 

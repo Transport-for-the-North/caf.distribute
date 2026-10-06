@@ -277,7 +277,7 @@ class GMRunResults(GMCreator):
             rtol=1e-3,
         )
         np.testing.assert_allclose(
-            gm_results.value_distribution,
+            gm_results.value_distribution.to_numpy(),
             self.distribution,
             rtol=1e-3,
         )

@@ -15,6 +15,12 @@ from caf.distribute import array_utils
 # # # CONSTANTS # # #
 
 
+def _to_numpy(value):
+    if hasattr(value, "todense"):
+        return np.asarray(value.todense())
+    return np.asarray(value)
+
+
 # # # FIXTURES # # #
 def make_sparse_flag_matrix(shape: tuple[int, ...], sparsity: float) -> np.ndarray:
     """Make a matrix of 1s and 0s of a certain sparsity"""
@@ -72,7 +78,7 @@ class TestSparseSum:
         del repeat
         target = random_sparse_matrix.sum()
         achieved = array_utils.sparse_sum(random_sparse_matrix)
-        np.testing.assert_almost_equal(achieved, target)
+        np.testing.assert_almost_equal(_to_numpy(achieved), _to_numpy(target))
 
     @pytest.mark.parametrize("sum_axis", itertools.permutations((0, 1, 2), 3))
     @pytest.mark.parametrize("repeat", range(2))
@@ -86,7 +92,7 @@ class TestSparseSum:
         del repeat
         target = random_3d_sparse_matrix.sum()
         achieved = array_utils.sparse_sum(random_3d_sparse_matrix, axis=sum_axis)
-        np.testing.assert_almost_equal(achieved, target)
+        np.testing.assert_almost_equal(_to_numpy(achieved), _to_numpy(target))
 
     @pytest.mark.parametrize("sum_axis", axis_permutations(3))
     def test_sum_axis_subset(
