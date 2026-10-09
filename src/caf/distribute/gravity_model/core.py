@@ -374,19 +374,20 @@ class GravityModelBase(abc.ABC):
             def safe_ratio(a, b, zero_over_zero=1.0):
                 """
                 Elementwise ratio r = a / b with explicit handling:
-                - b == 0 and a > 0  -> +inf
+                - b == 0 and a > 0  -> 1
                 - b == 0 and a == 0 -> zero_over_zero (default 1.0)
                 Assumes a, b are nonnegative.
                 """
                 a = np.asarray(a, dtype=float)
                 b = np.asarray(b, dtype=float)
 
-                r = np.divide(a, b, out=np.full_like(a, np.inf), where=(b != 0))
+                r = np.divide(a, b, out=np.full_like(a, 1.0), where=(b != 0))
                 r = np.where((a == 0) & (b == 0), zero_over_zero, r)
                 return r
             r = safe_ratio(a, b, zero_over_zero=zero_over_zero)
-            rp = np.power(r, p)
-            return 2.0 * rp / (1.0 + rp)
+            # 2 / (1 + r^-p) equals 2 r^p / (1 + r^p) but stays finite for r = inf (and 0)
+            with np.errstate(divide="ignore"):
+                return 2.0 / (1.0 + np.power(r, -p))
         factors = adj_rational(alternate_mode_costs, main_mode_costs, p=steepness)
         return seed_mat * factors
 
