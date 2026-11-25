@@ -862,6 +862,64 @@ def seg_inner(targets, results):
     return results, rmse
 
 
+def _aggregate_zoning(mat: xr.DataArray, agg_shape: tuple[int, int]) -> xr.DataArray:
+    """Aggregate matrix to a coarser zoning using pure block aggregation."""
+    fine_o, fine_d = mat.shape
+    agg_o, agg_d = agg_shape
+    if fine_o % agg_o != 0 or fine_d % agg_d != 0:
+        raise ValueError(
+            "Pure zoning aggregation requires fine zoning dimensions to be divisible by "
+            "the aggregate zoning dimensions."
+        )
+    o_factor = fine_o // agg_o
+    d_factor = fine_d // agg_d
+    aggregated = mat.to_numpy().reshape(agg_o, o_factor, agg_d, d_factor).sum(axis=(1, 3))
+    return xr.DataArray(
+        aggregated,
+        dims=["o_agg", "d_agg"],
+        coords={"o_agg": np.arange(agg_o), "d_agg": np.arange(agg_d)},
+    )
+
+
+def _expand_zoning_adjustment(
+    adjustment: xr.DataArray, fine_shape: tuple[int, int], fine_coords: dict[str, np.ndarray]
+) -> xr.DataArray:
+    """Expand aggregate-zone adjustment factors back to fine zoning."""
+    fine_o, fine_d = fine_shape
+    agg_o, agg_d = adjustment.shape
+    o_factor = fine_o // agg_o
+    d_factor = fine_d // agg_d
+    expanded = np.repeat(np.repeat(adjustment.to_numpy(), o_factor, axis=0), d_factor, axis=1)
+    return xr.DataArray(expanded, dims=["o", "d"], coords=fine_coords)
+
+
+def iterative_inner(rows, cols, mat_targ, results):
+    """Single inner iteration for iterative_adjust."""
+    for targ in [cols, rows]:
+        comp_mat = results.sum(set(results.dims).difference(targ.dims))
+        adj = (targ / comp_mat).fillna(1)
+        results *= adj
+
+    summed = results.sum(dim="seg")
+    agg = _aggregate_zoning(summed, mat_targ.shape)
+    mat_adj = (mat_targ / agg).fillna(1)
+    fine_adj = _expand_zoning_adjustment(
+        mat_adj,
+        fine_shape=(results.sizes["o"], results.sizes["d"]),
+        fine_coords={"o": results.coords["o"].values, "d": results.coords["d"].values},
+    )
+    results *= fine_adj
+
+    diff = 0
+    for targ in [cols, rows]:
+        check_mat = results.sum(set(results.dims).difference(targ.dims))
+        diff += float(((check_mat - targ) ** 2).sum()) / np.prod(targ.shape)
+    agg = _aggregate_zoning(results.sum(dim="seg"), mat_targ.shape)
+    diff += float(((agg - mat_targ) ** 2).sum()) / np.prod(mat_targ.shape)
+    rmse = (diff) ** 0.5
+    return results, rmse
+
+
 def segmentation_furness(
     triple_inputs: dict[int, SegInput],
     sum_mat: np.ndarray,
@@ -991,6 +1049,120 @@ def segmentation_furness(
         checkers[seg] = checks
     max_diff = np.abs(results.sum(dim='seg').to_numpy() - sum_mat).max()
     LOG.info(f"Max difference between achieved dist and sum mat is {max_diff}")
+    return (
+        results.to_series().unstack(level="d"),
+        rmse,
+        pd.concat(checkers),
+    )
+
+
+def iterative_adjust(
+    triple_inputs: dict[int, SegInput],
+    sum_mat: np.ndarray,
+    mat_size: tuple[int, int],
+    seed_mat: xr.DataArray = None,
+    max_iters: int = 5000,
+    outer_max_iters: int = 500,
+    tol: float = 1e-5,
+):
+    """
+    Furness to distributions and trip ends at fine zoning with matrix totals at aggregate zoning.
+
+    This mirrors segmentation_furness except the matrix target is an aggregation of the seed
+    matrix zoning (pure aggregation), rather than an aggregation of segmentation.
+    """
+    rows = xr.DataArray(
+        data=[i.row_targets for i in triple_inputs.values()],
+        dims=["seg", "o"],
+        coords={"seg": list(triple_inputs.keys()), "o": np.arange(mat_size[0])},
+    )
+    cols = xr.DataArray(
+        data=[i.col_targets for i in triple_inputs.values()],
+        dims=["seg", "d"],
+        coords={"seg": list(triple_inputs.keys()), "d": np.arange(mat_size[1])},
+    )
+    mat_targ = xr.DataArray(sum_mat, dims=["o_agg", "d_agg"])
+    if seed_mat is None:
+        results = xr.DataArray(
+            [np.ones(mat_size)] * len(triple_inputs),
+            dims=["seg", "o", "d"],
+            coords={
+                "seg": list(triple_inputs.keys()),
+                "o": np.arange(mat_size[0]),
+                "d": np.arange(mat_size[1]),
+            },
+        )
+    else:
+        results = seed_mat
+    prev_rmse = np.inf
+    iter_num = 1
+    while True:
+        for seg, val in triple_inputs.items():
+            dist_matched = dist_match(val.props, results.sel(seg=seg).values)
+            results.loc[seg] = dist_matched
+
+        results, rmse = iterative_inner(rows, cols, mat_targ, results)
+
+        LOG.debug(f"iter:{iter_num}, rmse:{rmse}")
+        if rmse < tol:
+            LOG.info(
+                f"Full furnessing (to distributions, trip ends and aggregated matrix sum) has "
+                f"converged in {iter_num} iterations, with an rmse of {rmse}."
+            )
+            break
+        if prev_rmse - rmse < rmse / 100:
+            LOG.warning(
+                f"Full furnessing (to distributions, trip ends and aggregated matrix sum) has "
+                f"stopped improving after {iter_num} iterations, with an rmse of {rmse}. "
+                f"Furnessing to just trip ends and aggregated matrix sum to reach convergence."
+            )
+            for i in range(1, max_iters):
+                results, rmse = iterative_inner(rows, cols, mat_targ, results)
+                if rmse < tol:
+                    LOG.info(
+                        f"Partial furnessing to trip ends and aggregated matrix sum has converged "
+                        f"in {i} iterations with an rmse of {rmse}."
+                    )
+                    break
+                if (prev_rmse - rmse < tol) & (i > 10):
+                    break
+                prev_rmse = rmse
+            if rmse > tol:
+                LOG.warning(
+                    f"Partial furnessing to trip ends and aggregated matrix sum has failed to "
+                    f"converge in {i} iterations with an rmse of {rmse}."
+                )
+            break
+        if iter_num > outer_max_iters:
+            LOG.warning(
+                f"Full furnessing (to distributions, trip ends and aggregated matrix sum) has "
+                f"failed to converge after {iter_num} iterations, with an rmse of {rmse}. "
+                f"Furnessing to just trip ends and aggregated matrix sum to reach convergence."
+            )
+            for i in range(max_iters):
+                results, rmse = iterative_inner(rows, cols, mat_targ, results)
+                if rmse < tol:
+                    LOG.info(
+                        f"Partial furnessing to trip ends and aggregated matrix sum has converged "
+                        f"in {i} iterations with an rmse of {rmse}."
+                    )
+                    break
+            if rmse > tol:
+                LOG.warning(
+                    f"Partial furnessing to trip ends and aggregated matrix sum has failed to "
+                    f"converge in {i} iterations with an rmse of {rmse}."
+                )
+            break
+        prev_rmse = rmse
+        iter_num += 1
+
+    checkers = {}
+    for seg, val in triple_inputs.items():
+        checks, alt_mat = dist_match(val.props, results.sel(seg=seg).values, True)
+        checkers[seg] = checks
+    agg_results = _aggregate_zoning(results.sum(dim="seg"), sum_mat.shape).to_numpy()
+    max_diff = np.abs(agg_results - sum_mat).max()
+    LOG.info(f"Max difference between achieved dist and aggregated sum mat is {max_diff}")
     return (
         results.to_series().unstack(level="d"),
         rmse,
